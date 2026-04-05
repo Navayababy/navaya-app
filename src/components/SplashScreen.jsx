@@ -17,14 +17,14 @@ export default function SplashScreen({ onDone }) {
       display:        'flex',
       alignItems:     'center',
       justifyContent: 'center',
-      background:     brand.cream,
+      background:     brand.sand,
       zIndex:         9999,
       opacity:        fading ? 0 : 1,
       transition:     'opacity 0.5s ease',
       pointerEvents:  'none',
     }}>
       <svg width="160" height="160" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-        <rect width="512" height="512" rx="114" fill={brand.sand} />
+        <rect width="512" height="512" fill={brand.sand} />
         <text
           x="256"
           y="256"

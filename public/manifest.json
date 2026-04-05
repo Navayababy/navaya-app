@@ -4,15 +4,21 @@
   "description": "Breastfeeding support and tracking",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F5F0EB",
-  "theme_color": "#F5F0EB",
+  "background_color": "#C4A882",
+  "theme_color": "#C4A882",
   "orientation": "portrait",
   "icons": [
     {
       "src": "/icons/navaya-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/navaya-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }

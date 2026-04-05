@@ -1,0 +1,13 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="#C4A882"/>
+  <text
+    x="256"
+    y="256"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-family="'Avenir Next', 'Avenir', 'Century Gothic', 'Futura', sans-serif"
+    font-weight="500"
+    font-size="82"
+    letter-spacing="18"
+    fill="#4A3728">NAVAYA</text>
+</svg>
