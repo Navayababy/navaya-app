@@ -4,8 +4,8 @@
   "description": "Breastfeeding support and tracking",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#C4A882",
-  "theme_color": "#C4A882",
+  "background_color": "#4A3728",
+  "theme_color": "#4A3728",
   "orientation": "portrait",
   "icons": [
     {
