@@ -1,12 +1,16 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { getNightMode, setNightMode, getUserName, getActiveTimer, setActiveTimer, clearActiveTimer } from './lib/storage.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
 import ChatScreen    from './screens/ChatScreen.jsx'
 import PrepareScreen from './screens/PrepareScreen.jsx'
 import NavBar        from './components/NavBar.jsx'
+import SplashScreen  from './components/SplashScreen.jsx'
 
 export default function App() {
+  const [splash, setSplash] = useState(true)
+  const hideSplash = useCallback(() => setSplash(false), [])
+
   const [screen, setScreen] = useState('home')
   const [night, setNight]   = useState(() => getNightMode())
 
@@ -74,6 +78,8 @@ export default function App() {
   const bg = night ? '#1A1410' : '#F5F0EB'
 
   return (
+    <>
+    {splash && <SplashScreen onDone={hideSplash} />}
     <div style={{
       maxWidth:      430,
       margin:        '0 auto',
@@ -91,5 +97,6 @@ export default function App() {
       </div>
       <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={feedActive} />
     </div>
+    </>
   )
 }
