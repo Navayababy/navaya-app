@@ -10,6 +10,7 @@ const KEYS = {
   nightMode:   'navaya_night',
   babyName:    'navaya_baby_name',
   userName:    'navaya_user_name',
+  activeTimer: 'navaya_active_timer',
 };
 
 // ── Sessions ────────────────────────────────────────────────────────────────
@@ -95,4 +96,22 @@ export function getBabyName() {
 
 export function setBabyName(name) {
   localStorage.setItem(KEYS.babyName, name);
+}
+
+// ── Active timer ─────────────────────────────────────────────────────────────
+
+export function getActiveTimer() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.activeTimer) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+export function setActiveTimer(side, startedAt) {
+  localStorage.setItem(KEYS.activeTimer, JSON.stringify({ side, startedAt }));
+}
+
+export function clearActiveTimer() {
+  localStorage.removeItem(KEYS.activeTimer);
 }

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { getNightMode, setNightMode, getUserName } from './lib/storage.js'
+import { getNightMode, setNightMode, getUserName, getActiveTimer, setActiveTimer, clearActiveTimer } from './lib/storage.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
 import ChatScreen    from './screens/ChatScreen.jsx'
@@ -11,10 +11,24 @@ export default function App() {
   const [night, setNight]   = useState(() => getNightMode())
 
   // ── Timer state lives here so it survives screen changes ──────────────────
-  const [feedActive,    setFeedActive]    = useState(false)
-  const [feedSide,      setFeedSide]      = useState('L')
-  const [feedStartedAt, setFeedStartedAt] = useState(null) // ms timestamp
-  const [elapsed,       setElapsed]       = useState(0)    // seconds
+  // Initialise from localStorage so the timer survives app close/reopen
+  const [feedActive,    setFeedActive]    = useState(() => {
+    const saved = getActiveTimer()
+    return saved !== null
+  })
+  const [feedSide,      setFeedSide]      = useState(() => {
+    const saved = getActiveTimer()
+    return saved?.side || 'L'
+  })
+  const [feedStartedAt, setFeedStartedAt] = useState(() => {
+    const saved = getActiveTimer()
+    return saved?.startedAt || null
+  })
+  const [elapsed,       setElapsed]       = useState(() => {
+    const saved = getActiveTimer()
+    if (!saved) return 0
+    return Math.floor((Date.now() - saved.startedAt) / 1000)
+  })
   const timerRef = useRef(null)
 
   // Keep elapsed ticking whenever a feed is active
@@ -35,11 +49,13 @@ export default function App() {
     setFeedStartedAt(now)
     setElapsed(0)
     setFeedActive(true)
+    setActiveTimer(side, now)
   }
 
   const stopFeed = () => {
     clearInterval(timerRef.current)
     setFeedActive(false)
+    clearActiveTimer()
     // Return the completed session data for HomeScreen to save
     return {
       side:         feedSide,
