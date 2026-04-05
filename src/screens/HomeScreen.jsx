@@ -260,7 +260,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
       )}
 
       {/* ── Recent sessions ── */}
-      <div style={{ padding: '14px 14px 24px' }}>
+      <div style={{ padding: '14px 14px 0' }}>
         <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8 }}>Recent</span>
         {sessions.length === 0 ? (
           <span style={{ fontSize: 13, color: p.sub }}>No feeds logged yet. Tap Left or Right to begin.</span>
@@ -281,6 +281,32 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
             </div>
           ))
         )}
+      </div>
+
+      {/* ── Instagram link ── */}
+      <div style={{ padding: '20px 14px 28px', textAlign: 'center' }}>
+        <a
+          href="https://www.instagram.com/navaya.life"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: 11,
+            color: p.sub,
+            textDecoration: 'none',
+            letterSpacing: '.06em',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            opacity: 0.7,
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+            <circle cx="12" cy="12" r="4"/>
+            <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/>
+          </svg>
+          @navaya.life
+        </a>
       </div>
 
     </div>
