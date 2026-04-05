@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { getNightMode, setNightMode } from './lib/storage.js'
+import { useState, useRef, useEffect } from 'react'
+import { getNightMode, setNightMode, getUserName } from './lib/storage.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
 import ChatScreen    from './screens/ChatScreen.jsx'
@@ -10,38 +10,70 @@ export default function App() {
   const [screen, setScreen] = useState('home')
   const [night, setNight]   = useState(() => getNightMode())
 
-  const toggleNight = () => {
-    setNight(n => {
-      setNightMode(!n)
-      return !n
-    })
+  // ── Timer state lives here so it survives screen changes ──────────────────
+  const [feedActive,    setFeedActive]    = useState(false)
+  const [feedSide,      setFeedSide]      = useState('L')
+  const [feedStartedAt, setFeedStartedAt] = useState(null) // ms timestamp
+  const [elapsed,       setElapsed]       = useState(0)    // seconds
+  const timerRef = useRef(null)
+
+  // Keep elapsed ticking whenever a feed is active
+  useEffect(() => {
+    if (feedActive && feedStartedAt) {
+      timerRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - feedStartedAt) / 1000))
+      }, 500)
+    } else {
+      clearInterval(timerRef.current)
+    }
+    return () => clearInterval(timerRef.current)
+  }, [feedActive, feedStartedAt])
+
+  const startFeed = (side) => {
+    const now = Date.now()
+    setFeedSide(side)
+    setFeedStartedAt(now)
+    setElapsed(0)
+    setFeedActive(true)
   }
+
+  const stopFeed = () => {
+    clearInterval(timerRef.current)
+    setFeedActive(false)
+    // Return the completed session data for HomeScreen to save
+    return {
+      side:         feedSide,
+      startedAt:    new Date(feedStartedAt).toISOString(),
+      endedAt:      new Date().toISOString(),
+      durationSecs: elapsed,
+    }
+  }
+
+  const toggleNight = () => {
+    setNight(n => { setNightMode(!n); return !n })
+  }
+
+  const timerProps = { feedActive, feedSide, elapsed, startFeed, stopFeed }
 
   const bg = night ? '#1A1410' : '#F5F0EB'
 
   return (
     <div style={{
-      maxWidth:        430,
-      margin:          '0 auto',
-      height:          '100dvh',
-      display:         'flex',
-      flexDirection:   'column',
-      background:      bg,
-      position:        'relative',
-      overflow:        'hidden',
+      maxWidth:      430,
+      margin:        '0 auto',
+      height:        '100dvh',
+      display:       'flex',
+      flexDirection: 'column',
+      background:    bg,
+      overflow:      'hidden',
     }}>
-
-      {/* Main screen area */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} />}
+        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} timer={timerProps} />}
         {screen === 'history' && <HistoryScreen night={night} />}
         {screen === 'chat'    && <ChatScreen    night={night} />}
         {screen === 'prepare' && <PrepareScreen night={night} />}
       </div>
-
-      {/* Bottom navigation */}
-      <NavBar screen={screen} setScreen={setScreen} night={night} />
-
+      <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={feedActive} />
     </div>
   )
 }
