@@ -4,13 +4,14 @@
 // Partner sync can be added later via Supabase.
 
 const KEYS = {
-  sessions:    'navaya_sessions',
-  checklist:   'navaya_checklist',
-  customItems: 'navaya_custom_items',
-  nightMode:   'navaya_night',
-  babyName:    'navaya_baby_name',
-  userName:    'navaya_user_name',
-  activeTimer: 'navaya_active_timer',
+  sessions:       'navaya_sessions',
+  checklist:      'navaya_checklist',
+  customItems:    'navaya_custom_items',
+  hiddenDefaults: 'navaya_hidden_defaults',
+  nightMode:      'navaya_night',
+  babyName:       'navaya_baby_name',
+  userName:       'navaya_user_name',
+  activeTimer:    'navaya_active_timer',
 };
 
 // ── Sessions ────────────────────────────────────────────────────────────────
@@ -76,6 +77,18 @@ export function getCustomItems() {
 
 export function setCustomItems(items) {
   localStorage.setItem(KEYS.customItems, JSON.stringify(items));
+}
+
+export function getHiddenDefaults() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.hiddenDefaults) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function saveHiddenDefaults(ids) {
+  localStorage.setItem(KEYS.hiddenDefaults, JSON.stringify(ids));
 }
 
 // ── Preferences ──────────────────────────────────────────────────────────────
