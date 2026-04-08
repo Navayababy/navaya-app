@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, updateSession } from '../lib/storage.js'
+import { getSessions, updateSession, deleteSession, addSession } from '../lib/storage.js'
 
 const MOOD_EMOJI = ['😔', '😐', '🙂', '😊', '🤩']
 const MOOD_LABEL = ['Tough', 'Okay', 'Good', 'Great', 'Amazing']
@@ -32,40 +32,64 @@ function timeStr(isoString) {
   return new Date(isoString).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
-// Convert HH:MM string back to a full ISO string on the same date as the original
-function applyTimeEdit(originalISO, newTimeStr) {
-  const [h, m] = newTimeStr.split(':').map(Number)
-  const d = new Date(originalISO)
-  d.setHours(h, m, 0, 0)
-  return d.toISOString()
+function dateStr(isoString) {
+  const d = new Date(isoString)
+  const y = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, '0')
+  const dy = String(d.getDate()).padStart(2, '0')
+  return `${y}-${mo}-${dy}`
+}
+
+function todayDateStr() {
+  return dateStr(new Date().toISOString())
+}
+
+// Build ISO string from separate date (YYYY-MM-DD) and time (HH:MM) inputs
+function buildISO(dateVal, timeVal) {
+  const [y, mo, d] = dateVal.split('-').map(Number)
+  const [h, m] = timeVal.split(':').map(Number)
+  return new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────────
-function EditModal({ session, night, onSave, onClose }) {
+function EditModal({ session, night, onSave, onDelete, onClose }) {
   const p = palette(night)
+  const [startDate, setStartDate] = useState(dateStr(session.startedAt))
   const [startTime, setStartTime] = useState(timeStr(session.startedAt))
+  const [endDate,   setEndDate]   = useState(session.endedAt ? dateStr(session.endedAt) : dateStr(session.startedAt))
   const [endTime,   setEndTime]   = useState(session.endedAt ? timeStr(session.endedAt) : '')
   const [side,      setSide]      = useState(session.side)
+  const [confirmDel, setConfirmDel] = useState(false)
 
   const handleSave = () => {
-    const newStartedAt = applyTimeEdit(session.startedAt, startTime)
-    const newEndedAt   = endTime ? applyTimeEdit(session.endedAt || session.startedAt, endTime) : session.endedAt
+    const newStartedAt = buildISO(startDate, startTime)
+    const newEndedAt   = endTime ? buildISO(endDate, endTime) : session.endedAt
     onSave(session.id, { side, startedAt: newStartedAt, endedAt: newEndedAt })
   }
 
+  const inputStyle = {
+    width: '100%', background: p.bg, border: `1px solid ${p.border}`,
+    borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text,
+    fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box',
+  }
+
+  const labelStyle = {
+    display: 'block', fontSize: 11, color: p.sub,
+    letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8,
+  }
+
   return (
-    // Backdrop
     <div onClick={onClose} style={{
-      position:   'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-      display:    'flex', alignItems: 'flex-end', justifyContent: 'center',
-      zIndex:     100, padding: '0 0 env(safe-area-inset-bottom, 0)',
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      zIndex: 100, padding: '0 0 env(safe-area-inset-bottom, 0)',
     }}>
-      {/* Sheet — stop clicks propagating */}
       <div onClick={e => e.stopPropagation()} style={{
-        width:        '100%', maxWidth: 430,
-        background:   p.card, borderRadius: '20px 20px 0 0',
-        padding:      '20px 20px 28px',
-        border:       `1px solid ${p.border}`,
+        width: '100%', maxWidth: 430,
+        background: p.card, borderRadius: '20px 20px 0 0',
+        padding: '20px 20px 28px',
+        border: `1px solid ${p.border}`,
+        maxHeight: '85vh', overflowY: 'auto',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: night ? brand.parchment : brand.bark }}>Edit feed</span>
@@ -73,7 +97,7 @@ function EditModal({ session, night, onSave, onClose }) {
         </div>
 
         {/* Side */}
-        <span style={{ display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Side</span>
+        <span style={labelStyle}>Side</span>
         <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
           {['L', 'R'].map(s => (
             <button key={s} onClick={() => setSide(s)}
@@ -83,19 +107,140 @@ function EditModal({ session, night, onSave, onClose }) {
           ))}
         </div>
 
+        {/* Start date + time */}
+        <span style={labelStyle}>Start</span>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+            style={{ ...inputStyle, flex: 1.4 }} />
+          <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
+            style={{ ...inputStyle, flex: 1 }} />
+        </div>
+
+        {/* End date + time */}
+        <span style={labelStyle}>End</span>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+            style={{ ...inputStyle, flex: 1.4 }} />
+          <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+            style={{ ...inputStyle, flex: 1 }} />
+        </div>
+
+        <button onClick={handleSave}
+          style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500, marginBottom: 10 }}>
+          Save changes
+        </button>
+
+        {/* Delete */}
+        {confirmDel ? (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setConfirmDel(false)}
+              style={{ flex: 1, padding: '12px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13, color: p.sub }}>
+              Cancel
+            </button>
+            <button onClick={() => onDelete(session.id)}
+              style={{ flex: 1, padding: '12px', borderRadius: 13, border: 'none', background: '#c0392b', cursor: 'pointer', fontSize: 13, color: '#fff', fontWeight: 500 }}>
+              Confirm delete
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmDel(true)}
+            style={{ width: '100%', padding: '12px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#c0392b' }}>
+            Delete this feed
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Add Feed modal ─────────────────────────────────────────────────────────────
+function AddFeedModal({ night, onSave, onClose }) {
+  const p = palette(night)
+  const now = new Date()
+  const defaultEnd = timeStr(now.toISOString())
+  const defaultStart = (() => {
+    const d = new Date(now.getTime() - 20 * 60 * 1000)
+    return timeStr(d.toISOString())
+  })()
+
+  const [date,      setDate]      = useState(todayDateStr())
+  const [startTime, setStartTime] = useState(defaultStart)
+  const [endTime,   setEndTime]   = useState(defaultEnd)
+  const [side,      setSide]      = useState('L')
+
+  const handleSave = () => {
+    const startedAt = buildISO(date, startTime)
+    const endedAt   = buildISO(date, endTime)
+    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
+    const session = {
+      id: Date.now().toString(),
+      side,
+      startedAt,
+      endedAt,
+      durationSecs,
+      mood: null,
+    }
+    onSave(session)
+  }
+
+  const inputStyle = {
+    width: '100%', background: p.bg, border: `1px solid ${p.border}`,
+    borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text,
+    fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box',
+  }
+
+  const labelStyle = {
+    display: 'block', fontSize: 11, color: p.sub,
+    letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8,
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      zIndex: 100, padding: '0 0 env(safe-area-inset-bottom, 0)',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: '100%', maxWidth: 430,
+        background: p.card, borderRadius: '20px 20px 0 0',
+        padding: '20px 20px 28px',
+        border: `1px solid ${p.border}`,
+        maxHeight: '85vh', overflowY: 'auto',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: night ? brand.parchment : brand.bark }}>Add feed</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: p.sub }}>×</button>
+        </div>
+
+        {/* Side */}
+        <span style={labelStyle}>Side</span>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+          {['L', 'R'].map(s => (
+            <button key={s} onClick={() => setSide(s)}
+              style={{ flex: 1, padding: '12px', borderRadius: 11, border: `1.5px solid ${side === s ? brand.sand : p.border}`, background: side === s ? brand.bark : 'transparent', cursor: 'pointer', color: side === s ? brand.sand : p.sub, fontSize: 13, fontWeight: 500 }}>
+              {s === 'L' ? 'Left' : 'Right'}
+            </button>
+          ))}
+        </div>
+
+        {/* Date */}
+        <span style={labelStyle}>Date</span>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+          style={{ ...inputStyle, marginBottom: 14 }} />
+
         {/* Start time */}
-        <span style={{ display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>Start time</span>
+        <span style={labelStyle}>Start time</span>
         <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
-          style={{ width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', marginBottom: 14 }} />
+          style={{ ...inputStyle, marginBottom: 14 }} />
 
         {/* End time */}
-        <span style={{ display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>End time</span>
+        <span style={labelStyle}>End time</span>
         <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
-          style={{ width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', marginBottom: 20 }} />
+          style={{ ...inputStyle, marginBottom: 20 }} />
 
         <button onClick={handleSave}
           style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-          Save changes
+          Add feed
         </button>
       </div>
     </div>
@@ -108,6 +253,7 @@ export default function HistoryScreen({ night }) {
   const [sessions,    setSessions]    = useState(() => getSessions())
   const [openDay,     setOpenDay]     = useState(null)
   const [editSession, setEditSession] = useState(null)
+  const [showAdd,     setShowAdd]     = useState(false)
 
   const grouped = useMemo(() => {
     const map = {}
@@ -119,13 +265,23 @@ export default function HistoryScreen({ night }) {
     return Object.values(map)
   }, [sessions])
 
+  // Monday–Sunday week (resets every Monday at 00:00)
   const weekSessions = useMemo(() => {
-    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-    return sessions.filter(s => new Date(s.startedAt).getTime() > cutoff)
+    const now = new Date()
+    const daysFromMonday = (now.getDay() + 6) % 7  // Mon=0 … Sun=6
+    const monday = new Date(now)
+    monday.setHours(0, 0, 0, 0)
+    monday.setDate(now.getDate() - daysFromMonday)
+    return sessions.filter(s => new Date(s.startedAt) >= monday)
   }, [sessions])
 
   const totalSecs  = weekSessions.reduce((a, s) => a + (s.durationSecs || 0), 0)
-  const avgPerDay  = weekSessions.length > 0 ? Math.round(totalSecs / 7) : 0
+  const daysElapsed = (() => {
+    const now = new Date()
+    const daysFromMonday = (now.getDay() + 6) % 7
+    return daysFromMonday + 1  // at least 1
+  })()
+  const avgPerDay  = weekSessions.length > 0 ? Math.round(totalSecs / daysElapsed) : 0
   const leftCount  = weekSessions.filter(s => s.side === 'L').length
   const rightCount = weekSessions.filter(s => s.side === 'R').length
   const mostUsed   = leftCount >= rightCount ? 'L' : 'R'
@@ -136,19 +292,37 @@ export default function HistoryScreen({ night }) {
     setEditSession(null)
   }
 
+  const handleDelete = (id) => {
+    const updated = deleteSession(id)
+    setSessions(updated)
+    setEditSession(null)
+  }
+
+  const handleAddFeed = (session) => {
+    const updated = addSession(session)
+    setSessions(updated)
+    setShowAdd(false)
+  }
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg }}>
 
-      <div style={{ padding: '20px 16px 12px' }}>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your journey</span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, marginTop: 2 }}>History</span>
+      <div style={{ padding: '20px 16px 12px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div>
+          <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your journey</span>
+          <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, marginTop: 2 }}>History</span>
+        </div>
+        <button onClick={() => setShowAdd(true)}
+          style={{ width: 36, height: 36, borderRadius: '50%', background: brand.bark, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+          <span style={{ color: brand.sand, fontSize: 22, lineHeight: 1, marginTop: -1 }}>+</span>
+        </button>
       </div>
 
       {/* Stats */}
       <div style={{ display: 'flex', gap: 8, padding: '0 14px 14px' }}>
         {[
           [weekSessions.length.toString(), 'feeds this week'],
-          [fmtMins(avgPerDay),              'average daily'],
+          [fmtMins(avgPerDay),              'avg per day'],
           [mostUsed,                         'most used side'],
         ].map(([val, lbl]) => (
           <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 13, padding: '11px 8px', border: `1px solid ${p.border}`, textAlign: 'center' }}>
@@ -218,7 +392,17 @@ export default function HistoryScreen({ night }) {
           session={editSession}
           night={night}
           onSave={handleSaveEdit}
+          onDelete={handleDelete}
           onClose={() => setEditSession(null)}
+        />
+      )}
+
+      {/* Add feed modal */}
+      {showAdd && (
+        <AddFeedModal
+          night={night}
+          onSave={handleAddFeed}
+          onClose={() => setShowAdd(false)}
         />
       )}
     </div>

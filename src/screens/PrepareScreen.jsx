@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { brand, palette } from '../theme.js'
-import { getChecked, setChecked as saveChecked, getCustomItems, setCustomItems as saveCustomItems } from '../lib/storage.js'
+import { getChecked, setChecked as saveChecked, getCustomItems, setCustomItems as saveCustomItems, getHiddenDefaults, saveHiddenDefaults } from '../lib/storage.js'
 
 const DEFAULT_ITEMS = [
   { id: 'cover',  emoji: '🌿', label: 'Navaya cover packed'            },
@@ -11,14 +11,18 @@ const DEFAULT_ITEMS = [
   { id: 'muslin', emoji: '🤍', label: 'Muslin cloth packed'            },
 ]
 
+const PROTECTED_ID = 'cover'
+
 export default function PrepareScreen({ night }) {
   const p = palette(night)
 
-  const [checked,     setChecked]     = useState(() => getChecked())
-  const [customItems, setCustomItems] = useState(() => getCustomItems())
-  const [newItem,     setNewItem]     = useState('')
+  const [checked,        setChecked]        = useState(() => getChecked())
+  const [customItems,    setCustomItems]    = useState(() => getCustomItems())
+  const [hiddenDefaults, setHiddenDefaults] = useState(() => getHiddenDefaults())
+  const [newItem,        setNewItem]        = useState('')
 
-  const allItems = [...DEFAULT_ITEMS, ...customItems]
+  const visibleDefaults = DEFAULT_ITEMS.filter(i => !hiddenDefaults.includes(i.id))
+  const allItems = [...visibleDefaults, ...customItems]
   const doneCount  = allItems.filter(i => checked[i.id]).length
   const totalCount = allItems.length
   const ready      = doneCount === totalCount && totalCount > 0
@@ -44,7 +48,16 @@ export default function PrepareScreen({ night }) {
     const next = customItems.filter(i => i.id !== id)
     setCustomItems(next)
     saveCustomItems(next)
-    // Also clear its checked state
+    const nextChecked = { ...checked }
+    delete nextChecked[id]
+    setChecked(nextChecked)
+    saveChecked(nextChecked)
+  }
+
+  const removeDefault = (id) => {
+    const next = [...hiddenDefaults, id]
+    setHiddenDefaults(next)
+    saveHiddenDefaults(next)
     const nextChecked = { ...checked }
     delete nextChecked[id]
     setChecked(nextChecked)
@@ -142,9 +155,9 @@ export default function PrepareScreen({ night }) {
                 </span>
               </button>
 
-              {/* Remove button for custom items */}
-              {isCustom && (
-                <button onClick={() => removeCustom(item.id)}
+              {/* Remove button — all items except the protected cover */}
+              {item.id !== PROTECTED_ID && (
+                <button onClick={() => isCustom ? removeCustom(item.id) : removeDefault(item.id)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: p.sub, fontSize: 16, padding: '0 0 0 8px', lineHeight: 1 }}>
                   ×
                 </button>

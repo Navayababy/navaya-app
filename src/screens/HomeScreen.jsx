@@ -44,6 +44,18 @@ function timeAgo(isoString) {
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m ago`
 }
 
+function fmtSince(isoString) {
+  if (!isoString) return null
+  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000)
+  if (diff < 60) return 'just now'
+  const h = Math.floor(diff / 3600)
+  const m = Math.floor((diff % 3600) / 60)
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
+}
+
+const sortByTime = arr => [...arr].sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
+
 function greeting() {
   const h = new Date().getHours()
   if (h < 12) return 'morning'
@@ -55,7 +67,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
   const p = palette(night)
   const { feedActive, feedSide, elapsed, startFeed, stopFeed } = timer
 
-  const [sessions,     setSessions]     = useState(() => getSessions().slice(0, 3))
+  const [sessions,     setSessions]     = useState(() => sortByTime(getSessions()).slice(0, 3))
   const [showMood,     setShowMood]     = useState(false)
   const [pendingSession, setPending]    = useState(null)
   const [partnerFlash, setPartnerFlash] = useState(false)
@@ -65,12 +77,12 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
   const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)])
   const nameInputRef = useRef(null)
 
-  const lastSession = getSessions()[0]
+  const lastSession = sortByTime(getSessions())[0] || null
   const lastSide    = lastSession?.side || 'R'
   const suggested   = lastSide === 'L' ? 'R' : 'L'
 
   const timeSinceLast = lastSession?.endedAt && !feedActive
-    ? Math.floor((Date.now() - new Date(lastSession.endedAt).getTime()) / 60000)
+    ? fmtSince(lastSession.endedAt)
     : null
 
   const handleStop = () => {
@@ -89,7 +101,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
       mood,
     }
     const updated = addSession(session)
-    setSessions(updated.slice(0, 3))
+    setSessions(sortByTime(updated).slice(0, 3))
     setPending(null)
     setShowMood(false)
   }
@@ -98,7 +110,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
     if (!pendingSession) return
     const session = { id: Date.now().toString(), ...pendingSession, mood: null }
     const updated = addSession(session)
-    setSessions(updated.slice(0, 3))
+    setSessions(sortByTime(updated).slice(0, 3))
     setPending(null)
     setShowMood(false)
   }
@@ -193,7 +205,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
               : `Next: ${suggested === 'L' ? 'Left' : 'Right'} side`}
           </span>
           {!feedActive && timeSinceLast !== null && (
-            <span style={{ marginLeft: 'auto', fontSize: 11, color: p.sub }}>{timeSinceLast}m ago</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: p.sub }}>{timeSinceLast}{timeSinceLast !== 'just now' ? ' ago' : ''}</span>
           )}
         </div>
 
@@ -209,7 +221,9 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
             </>
           ) : (
             <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 300, color: p.sub, lineHeight: 1 }}>
-              {timeSinceLast !== null ? `${timeSinceLast}m since last feed` : 'Ready to start'}
+              {timeSinceLast !== null
+                ? timeSinceLast === 'just now' ? 'just fed' : `${timeSinceLast} since last feed`
+                : 'Ready to start'}
             </span>
           )}
         </div>
