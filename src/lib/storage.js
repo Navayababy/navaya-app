@@ -46,6 +46,12 @@ export function updateSession(id, changes) {
   return sessions;
 }
 
+export function deleteSession(id) {
+  const sessions = getSessions().filter(s => s.id !== id);
+  localStorage.setItem(KEYS.sessions, JSON.stringify(sessions));
+  return sessions;
+}
+
 // ── Checklist ────────────────────────────────────────────────────────────────
 
 export function getChecked() {
