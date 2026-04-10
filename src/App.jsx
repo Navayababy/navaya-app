@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { getNightMode, setNightMode, getUserName, getActiveTimer, setActiveTimer, clearActiveTimer } from './lib/storage.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
+import NappyScreen   from './screens/NappyScreen.jsx'
 import ChatScreen    from './screens/ChatScreen.jsx'
 import PrepareScreen from './screens/PrepareScreen.jsx'
 import NavBar        from './components/NavBar.jsx'
@@ -86,6 +87,7 @@ export default function App() {
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} timer={timerProps} />}
         {screen === 'history' && <HistoryScreen night={night} />}
+        {screen === 'nappy'   && <NappyScreen   night={night} />}
         {screen === 'chat'    && <ChatScreen    night={night} />}
         {screen === 'prepare' && <PrepareScreen night={night} />}
       </div>

@@ -8,6 +8,7 @@ const KEYS = {
   checklist:      'navaya_checklist',
   customItems:    'navaya_custom_items',
   hiddenDefaults: 'navaya_hidden_defaults',
+  nappies:        'navaya_nappies',
   nightMode:      'navaya_night',
   babyName:       'navaya_baby_name',
   userName:       'navaya_user_name',
@@ -51,6 +52,30 @@ export function deleteSession(id) {
   const sessions = getSessions().filter(s => s.id !== id);
   localStorage.setItem(KEYS.sessions, JSON.stringify(sessions));
   return sessions;
+}
+
+// ── Nappies ──────────────────────────────────────────────────────────────────
+
+export function getNappies() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.nappies) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function addNappy(nappy) {
+  const nappies = getNappies();
+  nappies.unshift(nappy);
+  const trimmed = nappies.slice(0, 500);
+  localStorage.setItem(KEYS.nappies, JSON.stringify(trimmed));
+  return trimmed;
+}
+
+export function deleteNappy(id) {
+  const nappies = getNappies().filter(n => n.id !== id);
+  localStorage.setItem(KEYS.nappies, JSON.stringify(nappies));
+  return nappies;
 }
 
 // ── Checklist ────────────────────────────────────────────────────────────────
