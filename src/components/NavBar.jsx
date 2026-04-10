@@ -3,6 +3,7 @@ import { brand, palette } from '../theme.js'
 const tabs = [
   { id: 'home',    icon: '◉', label: 'Feed'    },
   { id: 'history', icon: '≡', label: 'History' },
+  { id: 'nappy',   icon: '◈', label: 'Nappy'   },
   { id: 'chat',    icon: '✦', label: 'Ask'     },
   { id: 'prepare', icon: '◎', label: 'Prepare' },
 ]
