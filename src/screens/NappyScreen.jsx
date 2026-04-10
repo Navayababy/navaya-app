@@ -65,14 +65,18 @@ export default function NappyScreen({ night }) {
   const [justLogged,   setJustLogged]   = useState(false)
   const [confirmDel,   setConfirmDel]   = useState(null)
 
+  const sortedNappies = useMemo(() =>
+    [...nappies].sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt)),
+  [nappies])
+
   const todayNappies = useMemo(() => {
     const start = todayMidnight()
-    return nappies.filter(n => new Date(n.loggedAt).getTime() >= start)
-  }, [nappies])
+    return sortedNappies.filter(n => new Date(n.loggedAt).getTime() >= start)
+  }, [sortedNappies])
 
   const wetToday  = todayNappies.filter(n => n.type === 'wet'  || n.type === 'both').length
   const pooToday  = todayNappies.filter(n => n.type === 'poo'  || n.type === 'both').length
-  const lastNappy = nappies[0] || null
+  const lastNappy = sortedNappies[0] || null
 
   const needsColor = type === 'poo' || type === 'both'
   const selectedColor = POO_COLORS.find(c => c.id === pooColor)
@@ -233,14 +237,14 @@ export default function NappyScreen({ night }) {
         {nappies.length === 0 ? (
           <span style={{ fontSize: 13, color: p.sub }}>No nappies logged yet. Tap a type above to begin.</span>
         ) : (
-          nappies.slice(0, 20).map((n, i) => {
+          sortedNappies.slice(0, 20).map((n, i) => {
             const meta  = TYPE_META[n.type]
             const pooC  = POO_COLORS.find(c => c.id === n.pooColor)
             return (
               <div key={n.id} style={{
                 display: 'flex', alignItems: 'center',
                 padding: '10px 0',
-                borderBottom: i < Math.min(nappies.length, 20) - 1 ? `1px solid ${p.border}` : 'none',
+                borderBottom: i < Math.min(sortedNappies.length, 20) - 1 ? `1px solid ${p.border}` : 'none',
               }}>
                 {/* Type dot */}
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: meta.dot, marginRight: 10, flexShrink: 0 }} />
