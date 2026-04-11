@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, addSession, getNappies, addNappy, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
+import { getSessions, addSession, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
 
 const QUOTES = [
   // — Verified breast milk facts —
@@ -68,11 +68,9 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
   const { feedActive, feedSide, elapsed, startFeed, stopFeed } = timer
 
   const [sessions,       setSessions]      = useState(() => sortByTime(getSessions()).slice(0, 3))
-  const [nappies,        setNappies]       = useState(() => getNappies())
   const [showMood,       setShowMood]      = useState(false)
   const [pendingSession, setPending]       = useState(null)
   const [partnerFlash,   setPartnerFlash]  = useState(false)
-  const [nappyFlash,     setNappyFlash]    = useState(false)
   const [editingName,    setEditingName]   = useState(false)
   const [userName,       setUserNameState] = useState(() => getUserName() || '')
   const [nameInput,      setNameInput]     = useState('')
@@ -91,28 +89,12 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
     ? fmtSince(lastSession.endedAt)
     : null
 
-  const { wetToday, dirtyToday } = useMemo(() => {
-    const start = new Date(); start.setHours(0, 0, 0, 0)
-    const today = nappies.filter(n => new Date(n.loggedAt) >= start)
-    return {
-      wetToday:   today.filter(n => n.type === 'wet'  || n.type === 'both').length,
-      dirtyToday: today.filter(n => n.type === 'poo'  || n.type === 'both').length,
-    }
-  }, [nappies])
-
   const handleStop = () => {
     const sessionData = stopFeed()
     setPending(sessionData)
     setShowMood(true)
     setTimeout(() => { setPartnerFlash(true) }, 400)
     setTimeout(() => { setPartnerFlash(false) }, 3500)
-  }
-
-  const logNappy = (type) => {
-    const nappy = { id: Date.now().toString(), type, pooColor: null, loggedAt: new Date().toISOString() }
-    setNappies(addNappy(nappy))
-    setNappyFlash(true)
-    setTimeout(() => setNappyFlash(false), 1800)
   }
 
   const saveMood = (mood) => {
@@ -301,43 +283,6 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
               style={{ width: '100%', padding: '15px', borderRadius: 13, border: `1.5px solid ${brand.bark}`, cursor: 'pointer', background: 'transparent', color: brand.bark, fontSize: 13, fontWeight: 500 }}>
               Finish feed
             </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Nappy quick-log ── */}
-      <div style={{ margin: '10px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '11px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: p.text, flex: 1 }}>Nappy</span>
-          <span style={{ fontSize: 10, color: p.sub }}>
-            {(wetToday + dirtyToday) > 0
-              ? `${wetToday} wet · ${dirtyToday} dirty today`
-              : 'none logged today'}
-          </span>
-        </div>
-        {nappyFlash ? (
-          <div style={{ textAlign: 'center', padding: '9px 0' }}>
-            <span style={{ fontSize: 13, color: '#4CAF50', fontWeight: 500 }}>✓ Logged</span>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: 8 }}>
-            {[
-              { type: 'wet',  emoji: '💧',   label: 'Wee'  },
-              { type: 'poo',  emoji: '💩',   label: 'Poo'  },
-              { type: 'both', emoji: '💧💩', label: 'Both' },
-            ].map(({ type, emoji, label }) => (
-              <button key={type} onClick={() => logNappy(type)}
-                style={{
-                  flex: 1, padding: '9px 4px', borderRadius: 10,
-                  border: `1px solid ${p.border}`, background: 'transparent',
-                  cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', gap: 3,
-                  WebkitTapHighlightColor: 'transparent',
-                }}>
-                <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
-                <span style={{ fontSize: 10, color: p.sub, fontWeight: 500 }}>{label}</span>
-              </button>
-            ))}
           </div>
         )}
       </div>
