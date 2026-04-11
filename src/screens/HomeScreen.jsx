@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, addSession, getSleeps, addSleep, getUserName, setUserName } from '../lib/storage.js'
+import { getSessions, addSession, getSleeps, addSleep, getNappies, addNappy, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
 
 const QUOTES = [
   // — Verified breast milk facts —
@@ -75,16 +75,22 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
   const { feedActive, feedSide, elapsed, startFeed, stopFeed } = timer
   const { sleepActive, sleepElapsed, startSleep, stopSleep }   = sleepTimer
 
-  const [sessions,     setSessions]     = useState(() => sortByTime(getSessions()).slice(0, 3))
-  const [sleeps,       setSleeps]       = useState(() => getSleeps())
-  const [showMood,     setShowMood]     = useState(false)
-  const [pendingSession, setPending]    = useState(null)
-  const [partnerFlash, setPartnerFlash] = useState(false)
-  const [editingName,  setEditingName]  = useState(false)
-  const [userName,     setUserNameState]= useState(() => getUserName() || '')
-  const [nameInput,    setNameInput]    = useState('')
+  const [sessions,       setSessions]      = useState(() => sortByTime(getSessions()).slice(0, 3))
+  const [sleeps,         setSleeps]        = useState(() => getSleeps())
+  const [nappies,        setNappies]       = useState(() => getNappies())
+  const [showMood,       setShowMood]      = useState(false)
+  const [pendingSession, setPending]       = useState(null)
+  const [partnerFlash,   setPartnerFlash]  = useState(false)
+  const [nappyFlash,     setNappyFlash]    = useState(false)
+  const [editingName,    setEditingName]   = useState(false)
+  const [userName,       setUserNameState] = useState(() => getUserName() || '')
+  const [nameInput,      setNameInput]     = useState('')
+  const [babyName,       setBabyNameState] = useState(() => getBabyName() || '')
+  const [babyNameInput,  setBabyNameInput] = useState('')
+  const [editingBaby,    setEditingBaby]   = useState(false)
   const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)])
-  const nameInputRef = useRef(null)
+  const nameInputRef  = useRef(null)
+  const babyNameRef   = useRef(null)
 
   const lastSleep   = sortByTime(sleeps)[0] || null
   const lastSession = sortByTime(getSessions())[0] || null
@@ -94,6 +100,15 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
   const timeSinceLast = lastSession?.endedAt && !feedActive
     ? fmtSince(lastSession.endedAt)
     : null
+
+  const { wetToday, dirtyToday } = useMemo(() => {
+    const start = new Date(); start.setHours(0, 0, 0, 0)
+    const today = nappies.filter(n => new Date(n.loggedAt) >= start)
+    return {
+      wetToday:   today.filter(n => n.type === 'wet'  || n.type === 'both').length,
+      dirtyToday: today.filter(n => n.type === 'poo'  || n.type === 'both').length,
+    }
+  }, [nappies])
 
   const handleStop = () => {
     const sessionData = stopFeed()
@@ -105,19 +120,20 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
 
   const handleStopSleep = () => {
     const data = stopSleep()
-    const sleep = { id: Date.now().toString(), ...data }
-    setSleeps(addSleep(sleep))
+    setSleeps(addSleep({ id: Date.now().toString(), ...data }))
+  }
+
+  const logNappy = (type) => {
+    const nappy = { id: Date.now().toString(), type, pooColor: null, loggedAt: new Date().toISOString() }
+    setNappies(addNappy(nappy))
+    setNappyFlash(true)
+    setTimeout(() => setNappyFlash(false), 1800)
   }
 
   const saveMood = (mood) => {
     if (!pendingSession) return
-    const session = {
-      id:           Date.now().toString(),
-      ...pendingSession,
-      mood,
-    }
-    const updated = addSession(session)
-    setSessions(sortByTime(updated).slice(0, 3))
+    const session = { id: Date.now().toString(), ...pendingSession, mood }
+    setSessions(sortByTime(addSession(session)).slice(0, 3))
     setPending(null)
     setShowMood(false)
   }
@@ -125,18 +141,14 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
   const skipMood = () => {
     if (!pendingSession) return
     const session = { id: Date.now().toString(), ...pendingSession, mood: null }
-    const updated = addSession(session)
-    setSessions(sortByTime(updated).slice(0, 3))
+    setSessions(sortByTime(addSession(session)).slice(0, 3))
     setPending(null)
     setShowMood(false)
   }
 
   const saveName = () => {
     const trimmed = nameInput.trim()
-    if (trimmed) {
-      setUserName(trimmed)
-      setUserNameState(trimmed)
-    }
+    if (trimmed) { setUserName(trimmed); setUserNameState(trimmed) }
     setEditingName(false)
   }
 
@@ -144,6 +156,18 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
     setNameInput(userName)
     setEditingName(true)
     setTimeout(() => nameInputRef.current?.focus(), 80)
+  }
+
+  const saveBabyName = () => {
+    const trimmed = babyNameInput.trim()
+    if (trimmed) { setBabyName(trimmed); setBabyNameState(trimmed) }
+    setEditingBaby(false)
+  }
+
+  const openBabyEdit = () => {
+    setBabyNameInput(babyName)
+    setEditingBaby(true)
+    setTimeout(() => babyNameRef.current?.focus(), 80)
   }
 
   const displayName = userName || 'there'
@@ -158,7 +182,7 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
             Good {greeting()}
           </span>
 
-          {/* Editable name */}
+          {/* Editable parent name */}
           {editingName ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
               <input
@@ -168,17 +192,10 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
                 onKeyDown={e => { if (e.key === 'Enter') saveName() }}
                 placeholder="Your name"
                 style={{
-                  fontFamily:   "'Cormorant Garamond', serif",
-                  fontSize:     24,
-                  fontWeight:   400,
-                  color:        night ? brand.parchment : brand.bark,
-                  background:   'transparent',
-                  border:       'none',
-                  borderBottom: `1.5px solid ${brand.sand}`,
-                  outline:      'none',
-                  width:        140,
-                  lineHeight:   1.2,
-                  padding:      '0 0 2px',
+                  fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 400,
+                  color: night ? brand.parchment : brand.bark, background: 'transparent',
+                  border: 'none', borderBottom: `1.5px solid ${brand.sand}`,
+                  outline: 'none', width: 140, lineHeight: 1.2, padding: '0 0 2px',
                 }}
               />
               <button onClick={saveName}
@@ -195,6 +212,39 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
               <span style={{ fontSize: 11, color: p.sub, marginTop: 4 }}>✎</span>
             </button>
           )}
+
+          {/* Editable baby name */}
+          <div style={{ marginTop: 3 }}>
+            {editingBaby ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  ref={babyNameRef}
+                  value={babyNameInput}
+                  onChange={e => setBabyNameInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveBabyName() }}
+                  placeholder="Baby's name"
+                  style={{
+                    fontFamily: "'DM Sans', sans-serif", fontSize: 12,
+                    color: p.sub, background: 'transparent', border: 'none',
+                    borderBottom: `1px solid ${brand.sand}`, outline: 'none',
+                    width: 110, padding: '0 0 1px',
+                  }}
+                />
+                <button onClick={saveBabyName}
+                  style={{ background: brand.bark, border: 'none', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', color: brand.sand, fontSize: 10, fontWeight: 500 }}>
+                  Save
+                </button>
+              </div>
+            ) : (
+              <button onClick={openBabyEdit}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 11, color: p.sub }}>
+                  {babyName ? `for ${babyName}` : '+ add baby\'s name'}
+                </span>
+                {babyName && <span style={{ fontSize: 9, color: p.sub, opacity: 0.55 }}>✎</span>}
+              </button>
+            )}
+          </div>
         </div>
 
         <button onClick={onNightToggle}
@@ -205,12 +255,12 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
 
       {/* ── Motivational quote ── */}
       <div style={{ padding: '10px 16px 0' }}>
-        <p style={{ fontSize: 12, color: p.sub, fontStyle: 'italic', lineHeight: 1.55, fontFamily: "'Cormorant Garamond', serif", fontSize: 15 }}>
+        <p style={{ fontSize: 15, color: p.sub, fontStyle: 'italic', lineHeight: 1.55, fontFamily: "'Cormorant Garamond', serif", margin: 0 }}>
           "{quote}"
         </p>
       </div>
 
-      {/* ── Timer card ── */}
+      {/* ── Feed timer card ── */}
       <div style={{ margin: '14px 14px 0', background: p.card, borderRadius: 18, border: `1px solid ${p.border}` }}>
 
         <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -297,6 +347,43 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
         </button>
       </div>
 
+      {/* ── Nappy quick-log ── */}
+      <div style={{ margin: '10px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '11px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: p.text, flex: 1 }}>Nappy</span>
+          <span style={{ fontSize: 10, color: p.sub }}>
+            {(wetToday + dirtyToday) > 0
+              ? `${wetToday} wet · ${dirtyToday} dirty today`
+              : 'none logged today'}
+          </span>
+        </div>
+        {nappyFlash ? (
+          <div style={{ textAlign: 'center', padding: '9px 0' }}>
+            <span style={{ fontSize: 13, color: '#4CAF50', fontWeight: 500 }}>✓ Logged</span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[
+              { type: 'wet',  emoji: '💧',   label: 'Wee'  },
+              { type: 'poo',  emoji: '💩',   label: 'Poo'  },
+              { type: 'both', emoji: '💧💩', label: 'Both' },
+            ].map(({ type, emoji, label }) => (
+              <button key={type} onClick={() => logNappy(type)}
+                style={{
+                  flex: 1, padding: '9px 4px', borderRadius: 10,
+                  border: `1px solid ${p.border}`, background: 'transparent',
+                  cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', gap: 3,
+                  WebkitTapHighlightColor: 'transparent',
+                }}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
+                <span style={{ fontSize: 10, color: p.sub, fontWeight: 500 }}>{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ── Partner flash ── */}
       {partnerFlash && (
         <div className="fade-up" style={{ margin: '10px 14px 0', background: brand.green, borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -312,11 +399,11 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
           <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 12 }}>This gets saved to your history.</span>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             {[
-              { emoji: '😔', label: 'Tough' },
-              { emoji: '😐', label: 'Okay'  },
-              { emoji: '🙂', label: 'Good'  },
-              { emoji: '😊', label: 'Great' },
-              { emoji: '🤩', label: 'Amazing'},
+              { emoji: '😔', label: 'Tough'   },
+              { emoji: '😐', label: 'Okay'    },
+              { emoji: '🙂', label: 'Good'    },
+              { emoji: '😊', label: 'Great'   },
+              { emoji: '🤩', label: 'Amazing' },
             ].map((m, i) => (
               <button key={i} onClick={() => saveMood(i + 1)}
                 style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px' }}>
@@ -332,9 +419,9 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
         </div>
       )}
 
-      {/* ── Recent sessions ── */}
+      {/* ── Recent feeds ── */}
       <div style={{ padding: '14px 14px 0' }}>
-        <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8 }}>Recent</span>
+        <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8 }}>Recent feeds</span>
         {sessions.length === 0 ? (
           <span style={{ fontSize: 13, color: p.sub }}>No feeds logged yet. Tap Left or Right to begin.</span>
         ) : (
@@ -362,16 +449,7 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
           href="https://www.instagram.com/navaya.life"
           target="_blank"
           rel="noopener noreferrer"
-          style={{
-            fontSize: 11,
-            color: p.sub,
-            textDecoration: 'none',
-            letterSpacing: '.06em',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            opacity: 0.7,
-          }}
+          style={{ fontSize: 11, color: p.sub, textDecoration: 'none', letterSpacing: '.06em', display: 'inline-flex', alignItems: 'center', gap: 5, opacity: 0.7 }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>

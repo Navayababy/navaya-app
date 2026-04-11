@@ -1,12 +1,19 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, getNappies, getSleeps, updateSession, deleteSession, addSession, deleteNappy, deleteSleep } from '../lib/storage.js'
+import { getSessions, getNappies, getSleeps, updateSession, deleteSession, addSession, deleteNappy, deleteSleep, addNappy, addSleep } from '../lib/storage.js'
 
 const MOOD_EMOJI = ['😔', '😐', '🙂', '😊', '🤩']
 const MOOD_LABEL = ['Tough', 'Okay', 'Good', 'Great', 'Amazing']
 
-const POO_HEX   = { mustard: '#D4A843', yellow: '#EDD050', green: '#6B9E5C', brown: '#8B6347', dark: '#2D1F14' }
-const POO_LABEL = { mustard: 'Mustard', yellow: 'Yellow',  green: 'Green',   brown: 'Brown',   dark: 'Dark/Black' }
+const POO_HEX    = { mustard: '#D4A843', yellow: '#EDD050', green: '#6B9E5C', brown: '#8B6347', dark: '#2D1F14' }
+const POO_LABEL  = { mustard: 'Mustard', yellow: 'Yellow',  green: 'Green',   brown: 'Brown',   dark: 'Dark/Black' }
+const POO_COLORS = [
+  { id: 'mustard', hex: '#D4A843', label: 'Mustard'    },
+  { id: 'yellow',  hex: '#EDD050', label: 'Yellow'     },
+  { id: 'green',   hex: '#6B9E5C', label: 'Green'      },
+  { id: 'brown',   hex: '#8B6347', label: 'Brown'      },
+  { id: 'dark',    hex: '#2D1F14', label: 'Dark/Black' },
+]
 
 function fmt(secs) {
   const m = Math.floor(secs / 60)
@@ -48,6 +55,22 @@ function buildISO(dateVal, timeVal) {
 
 function todayDateStr() { return dateStr(new Date().toISOString()) }
 
+// ── Shared modal shell ────────────────────────────────────────────────────────
+function ModalShell({ title, night, onClose, children }) {
+  const p = palette(night)
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, padding: '0 0 env(safe-area-inset-bottom, 0)' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: p.card, borderRadius: '20px 20px 0 0', padding: '20px 20px 28px', border: `1px solid ${p.border}`, maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: night ? brand.parchment : brand.bark }}>{title}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: p.card === '#fff' ? '#666' : '#aaa' }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 // ── Edit modal (feeds only) ───────────────────────────────────────────────────
 function EditModal({ session, night, onSave, onDelete, onClose }) {
   const p = palette(night)
@@ -64,65 +87,54 @@ function EditModal({ session, night, onSave, onDelete, onClose }) {
     onSave(session.id, { side, startedAt: newStartedAt, endedAt: newEndedAt })
   }
 
-  const inputStyle = {
-    width: '100%', background: p.bg, border: `1px solid ${p.border}`,
-    borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text,
-    fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box',
-  }
+  const inputStyle = { width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box' }
   const labelStyle = { display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, padding: '0 0 env(safe-area-inset-bottom, 0)' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: p.card, borderRadius: '20px 20px 0 0', padding: '20px 20px 28px', border: `1px solid ${p.border}`, maxHeight: '85vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: night ? brand.parchment : brand.bark }}>Edit feed</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: p.sub }}>×</button>
-        </div>
-
-        <span style={labelStyle}>Side</span>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-          {['L', 'R'].map(s => (
-            <button key={s} onClick={() => setSide(s)} style={{ flex: 1, padding: '12px', borderRadius: 11, border: `1.5px solid ${side === s ? brand.sand : p.border}`, background: side === s ? brand.bark : 'transparent', cursor: 'pointer', color: side === s ? brand.sand : p.sub, fontSize: 13, fontWeight: 500 }}>
-              {s === 'L' ? 'Left' : 'Right'}
-            </button>
-          ))}
-        </div>
-
-        <span style={labelStyle}>Start</span>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ ...inputStyle, flex: 1.4 }} />
-          <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-        </div>
-
-        <span style={labelStyle}>End</span>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inputStyle, flex: 1.4 }} />
-          <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-        </div>
-
-        <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500, marginBottom: 10 }}>
-          Save changes
-        </button>
-
-        {confirmDel ? (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setConfirmDel(false)} style={{ flex: 1, padding: '12px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13, color: p.sub }}>Cancel</button>
-            <button onClick={() => onDelete(session.id)} style={{ flex: 1, padding: '12px', borderRadius: 13, border: 'none', background: '#c0392b', cursor: 'pointer', fontSize: 13, color: '#fff', fontWeight: 500 }}>Confirm delete</button>
-          </div>
-        ) : (
-          <button onClick={() => setConfirmDel(true)} style={{ width: '100%', padding: '12px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#c0392b' }}>
-            Delete this feed
+    <ModalShell title="Edit feed" night={night} onClose={onClose}>
+      <span style={labelStyle}>Side</span>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {['L', 'R'].map(s => (
+          <button key={s} onClick={() => setSide(s)} style={{ flex: 1, padding: '12px', borderRadius: 11, border: `1.5px solid ${side === s ? brand.sand : p.border}`, background: side === s ? brand.bark : 'transparent', cursor: 'pointer', color: side === s ? brand.sand : p.sub, fontSize: 13, fontWeight: 500 }}>
+            {s === 'L' ? 'Left' : 'Right'}
           </button>
-        )}
+        ))}
       </div>
-    </div>
+
+      <span style={labelStyle}>Start</span>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ ...inputStyle, flex: 1.4 }} />
+        <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+      </div>
+
+      <span style={labelStyle}>End</span>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inputStyle, flex: 1.4 }} />
+        <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+      </div>
+
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500, marginBottom: 10 }}>
+        Save changes
+      </button>
+
+      {confirmDel ? (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setConfirmDel(false)} style={{ flex: 1, padding: '12px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13, color: p.sub }}>Cancel</button>
+          <button onClick={() => onDelete(session.id)} style={{ flex: 1, padding: '12px', borderRadius: 13, border: 'none', background: '#c0392b', cursor: 'pointer', fontSize: 13, color: '#fff', fontWeight: 500 }}>Confirm delete</button>
+        </div>
+      ) : (
+        <button onClick={() => setConfirmDel(true)} style={{ width: '100%', padding: '12px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#c0392b' }}>
+          Delete this feed
+        </button>
+      )}
+    </ModalShell>
   )
 }
 
 // ── Add Feed modal ─────────────────────────────────────────────────────────────
 function AddFeedModal({ night, onSave, onClose }) {
   const p = palette(night)
-  const now = new Date()
+  const now          = new Date()
   const defaultEnd   = timeStr(now.toISOString())
   const defaultStart = timeStr(new Date(now.getTime() - 20 * 60 * 1000).toISOString())
 
@@ -142,36 +154,138 @@ function AddFeedModal({ night, onSave, onClose }) {
   const labelStyle = { display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, padding: '0 0 env(safe-area-inset-bottom, 0)' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: p.card, borderRadius: '20px 20px 0 0', padding: '20px 20px 28px', border: `1px solid ${p.border}`, maxHeight: '85vh', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: night ? brand.parchment : brand.bark }}>Add feed</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: p.sub }}>×</button>
-        </div>
-
-        <span style={labelStyle}>Side</span>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-          {['L', 'R'].map(s => (
-            <button key={s} onClick={() => setSide(s)} style={{ flex: 1, padding: '12px', borderRadius: 11, border: `1.5px solid ${side === s ? brand.sand : p.border}`, background: side === s ? brand.bark : 'transparent', cursor: 'pointer', color: side === s ? brand.sand : p.sub, fontSize: 13, fontWeight: 500 }}>
-              {s === 'L' ? 'Left' : 'Right'}
-            </button>
-          ))}
-        </div>
-
-        <span style={labelStyle}>Date</span>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
-
-        <span style={labelStyle}>Start time</span>
-        <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
-
-        <span style={labelStyle}>End time</span>
-        <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, marginBottom: 20 }} />
-
-        <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-          Add feed
-        </button>
+    <ModalShell title="Add feed" night={night} onClose={onClose}>
+      <span style={labelStyle}>Side</span>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {['L', 'R'].map(s => (
+          <button key={s} onClick={() => setSide(s)} style={{ flex: 1, padding: '12px', borderRadius: 11, border: `1.5px solid ${side === s ? brand.sand : p.border}`, background: side === s ? brand.bark : 'transparent', cursor: 'pointer', color: side === s ? brand.sand : p.sub, fontSize: 13, fontWeight: 500 }}>
+            {s === 'L' ? 'Left' : 'Right'}
+          </button>
+        ))}
       </div>
-    </div>
+
+      <span style={labelStyle}>Date</span>
+      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
+
+      <span style={labelStyle}>Start time</span>
+      <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
+
+      <span style={labelStyle}>End time</span>
+      <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, marginBottom: 20 }} />
+
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+        Add feed
+      </button>
+    </ModalShell>
+  )
+}
+
+// ── Add Nappy modal ────────────────────────────────────────────────────────────
+function AddNappyModal({ night, onSave, onClose }) {
+  const p = palette(night)
+  const [type,     setType]     = useState('wet')
+  const [pooColor, setPooColor] = useState('mustard')
+  const [date,     setDate]     = useState(todayDateStr())
+  const [logTime,  setLogTime]  = useState(timeStr(new Date().toISOString()))
+
+  const needsColor = type === 'poo' || type === 'both'
+
+  const handleSave = () => {
+    const [y, mo, d] = date.split('-').map(Number)
+    const [h, m]     = logTime.split(':').map(Number)
+    const loggedAt   = new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
+    onSave({ id: Date.now().toString(), type, pooColor: needsColor ? pooColor : null, loggedAt })
+  }
+
+  const inputStyle = { width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box' }
+  const labelStyle = { display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }
+
+  return (
+    <ModalShell title="Log nappy" night={night} onClose={onClose}>
+      <span style={labelStyle}>Type</span>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        {[
+          { t: 'wet',  emoji: '💧',   label: 'Wee'  },
+          { t: 'poo',  emoji: '💩',   label: 'Poo'  },
+          { t: 'both', emoji: '💧💩', label: 'Both' },
+        ].map(({ t, emoji, label }) => (
+          <button key={t} onClick={() => setType(t)}
+            style={{ flex: 1, padding: '12px 6px', borderRadius: 11, border: `1.5px solid ${type === t ? brand.sand : p.border}`, background: type === t ? brand.bark : 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
+            <span style={{ fontSize: 12, color: type === t ? brand.sand : p.sub, fontWeight: 500 }}>{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {needsColor && (
+        <>
+          <span style={labelStyle}>Colour</span>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 18, alignItems: 'center' }}>
+            {POO_COLORS.map(c => (
+              <button key={c.id} onClick={() => setPooColor(c.id)} style={{
+                width: 28, height: 28, borderRadius: '50%', background: c.hex, padding: 0,
+                border:       pooColor === c.id ? `2px solid ${brand.sand}` : '2px solid transparent',
+                outline:      pooColor === c.id ? `2px solid ${brand.bark}` : 'none',
+                outlineOffset: 1, cursor: 'pointer', flexShrink: 0,
+                WebkitTapHighlightColor: 'transparent',
+              }} />
+            ))}
+            <span style={{ fontSize: 11, color: p.sub }}>
+              {POO_COLORS.find(c => c.id === pooColor)?.label}
+            </span>
+          </div>
+        </>
+      )}
+
+      <span style={labelStyle}>Date & time</span>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <input type="date" value={date}    onChange={e => setDate(e.target.value)}    style={{ ...inputStyle, flex: 1.4 }} />
+        <input type="time" value={logTime} onChange={e => setLogTime(e.target.value)} style={{ ...inputStyle, flex: 1   }} />
+      </div>
+
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+        Log nappy
+      </button>
+    </ModalShell>
+  )
+}
+
+// ── Add Sleep modal ────────────────────────────────────────────────────────────
+function AddSleepModal({ night, onSave, onClose }) {
+  const p = palette(night)
+  const now          = new Date()
+  const defaultEnd   = timeStr(now.toISOString())
+  const defaultStart = timeStr(new Date(now.getTime() - 30 * 60 * 1000).toISOString())
+
+  const [date,      setDate]      = useState(todayDateStr())
+  const [startTime, setStartTime] = useState(defaultStart)
+  const [endTime,   setEndTime]   = useState(defaultEnd)
+
+  const handleSave = () => {
+    const startedAt    = buildISO(date, startTime)
+    const endedAt      = buildISO(date, endTime)
+    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
+    onSave({ id: Date.now().toString(), startedAt, endedAt, durationSecs })
+  }
+
+  const inputStyle = { width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box' }
+  const labelStyle = { display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }
+
+  return (
+    <ModalShell title="Log nap" night={night} onClose={onClose}>
+      <span style={labelStyle}>Date</span>
+      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
+
+      <span style={labelStyle}>Start time</span>
+      <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
+
+      <span style={labelStyle}>End time</span>
+      <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, marginBottom: 20 }} />
+
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+        Log nap
+      </button>
+    </ModalShell>
   )
 }
 
@@ -184,7 +298,7 @@ export default function HistoryScreen({ night }) {
   const [sleeps,      setSleeps]      = useState(() => getSleeps())
   const [openDay,     setOpenDay]     = useState(null)
   const [editSession, setEditSession] = useState(null)
-  const [showAdd,     setShowAdd]     = useState(false)
+  const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'sleep'
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
 
   // ── Merge all entry types into one sorted timeline ────────────────────────
@@ -205,39 +319,47 @@ export default function HistoryScreen({ night }) {
     return Object.values(map)
   }, [allEntries])
 
-  // ── Stats: feeds this week (Mon–Sun), nappies today, last nap ────────────
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
+
+  const feedsToday = useMemo(() =>
+    sessions.filter(s => new Date(s.startedAt) >= todayStart)
+  , [sessions, todayStart])
+
+  const feedTimeTodaySecs = useMemo(() =>
+    feedsToday.reduce((a, s) => a + (s.durationSecs || 0), 0)
+  , [feedsToday])
+
+  const wetToday = useMemo(() =>
+    nappies.filter(n => new Date(n.loggedAt) >= todayStart && (n.type === 'wet' || n.type === 'both')).length
+  , [nappies, todayStart])
+
+  const dirtyToday = useMemo(() =>
+    nappies.filter(n => new Date(n.loggedAt) >= todayStart && (n.type === 'poo' || n.type === 'both')).length
+  , [nappies, todayStart])
+
   const weekFeeds = useMemo(() => {
-    const now = new Date()
+    const now    = new Date()
     const monday = new Date(now)
     monday.setHours(0, 0, 0, 0)
     monday.setDate(now.getDate() - (now.getDay() + 6) % 7)
     return sessions.filter(s => new Date(s.startedAt) >= monday)
   }, [sessions])
 
-  const nappyToday = useMemo(() => {
-    const start = new Date(); start.setHours(0, 0, 0, 0)
-    return nappies.filter(n => new Date(n.loggedAt) >= start).length
-  }, [nappies])
+  const weekAvgDuration = useMemo(() => {
+    if (!weekFeeds.length) return 0
+    return Math.round(weekFeeds.reduce((a, s) => a + (s.durationSecs || 0), 0) / weekFeeds.length)
+  }, [weekFeeds])
 
-  const lastSleep = useMemo(() =>
-    [...sleeps].sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))[0] || null
-  , [sleeps])
+  const leftCount  = weekFeeds.filter(s => s.side === 'L').length
+  const rightCount = weekFeeds.filter(s => s.side === 'R').length
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleSaveEdit = (id, changes) => {
-    setSessions(updateSession(id, changes))
-    setEditSession(null)
-  }
-
-  const handleDeleteFeed = (id) => {
-    setSessions(deleteSession(id))
-    setEditSession(null)
-  }
-
-  const handleAddFeed = (session) => {
-    setSessions(addSession(session))
-    setShowAdd(false)
-  }
+  const handleSaveEdit  = (id, changes) => { setSessions(updateSession(id, changes)); setEditSession(null) }
+  const handleDeleteFeed = (id)         => { setSessions(deleteSession(id));           setEditSession(null) }
+  const handleAddFeed   = (session)     => { setSessions(addSession(session));          setAddMode(null) }
+  const handleAddNappy  = (nappy)       => { setNappies(addNappy(nappy));               setAddMode(null) }
+  const handleAddSleep  = (sleep)       => { setSleeps(addSleep(sleep));                setAddMode(null) }
 
   const handleDelete = ({ id, type }) => {
     if (type === 'nappy') setNappies(deleteNappy(id))
@@ -267,26 +389,39 @@ export default function HistoryScreen({ night }) {
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your journey</span>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, marginTop: 2 }}>History</span>
         </div>
-        <button onClick={() => setShowAdd(true)} style={{ width: 36, height: 36, borderRadius: '50%', background: brand.bark, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+        <button onClick={() => setAddMode('picker')} style={{ width: 36, height: 36, borderRadius: '50%', background: brand.bark, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
           <span style={{ color: brand.sand, fontSize: 22, lineHeight: 1, marginTop: -1 }}>+</span>
         </button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'flex', gap: 8, padding: '0 14px 14px' }}>
+      {/* ── Today stats ── */}
+      <div style={{ display: 'flex', gap: 8, padding: '0 14px 8px' }}>
         {[
-          [weekFeeds.length.toString(),                              'feeds this week'],
-          [nappyToday.toString(),                                    'nappies today'  ],
-          [lastSleep ? fmtMins(lastSleep.durationSecs || 0) : '—',  'last nap'       ],
-        ].map(([val, lbl]) => (
+          { val: feedsToday.length.toString(), lbl: 'feeds today',  sub: feedTimeTodaySecs > 0 ? fmtMins(feedTimeTodaySecs) : null },
+          { val: wetToday.toString(),          lbl: 'wet today',    sub: null },
+          { val: dirtyToday.toString(),        lbl: 'dirty today',  sub: null },
+        ].map(({ val, lbl, sub }) => (
           <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 13, padding: '11px 8px', border: `1px solid ${p.border}`, textAlign: 'center' }}>
             <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: brand.bark }}>{val}</span>
             <span style={{ display: 'block', fontSize: 9, color: p.sub, lineHeight: 1.3, marginTop: 2 }}>{lbl}</span>
+            {sub && <span style={{ display: 'block', fontSize: 9, color: p.sub, opacity: 0.65, marginTop: 1 }}>{sub}</span>}
           </div>
         ))}
       </div>
 
-      {/* Day groups */}
+      {/* ── This week summary ── */}
+      {weekFeeds.length > 0 && (
+        <div style={{ margin: '0 14px 14px', background: p.card, borderRadius: 10, border: `1px solid ${p.border}`, padding: '8px 12px' }}>
+          <span style={{ fontSize: 10, color: p.sub }}>
+            {'This week · '}
+            <span style={{ color: p.text, fontWeight: 500 }}>{weekFeeds.length} feed{weekFeeds.length !== 1 ? 's' : ''}</span>
+            {weekAvgDuration > 0 && <>{' · avg '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(weekAvgDuration)}</span>{' each'}</>}
+            {(leftCount + rightCount) > 0 && <>{' · L/R: '}<span style={{ color: p.text, fontWeight: 500 }}>{leftCount}/{rightCount}</span></>}
+          </span>
+        </div>
+      )}
+
+      {/* ── Day groups ── */}
       {grouped.length === 0 ? (
         <div style={{ padding: '20px 14px' }}>
           <span style={{ fontSize: 13, color: p.sub }}>No entries yet. Your history will appear here.</span>
@@ -308,10 +443,10 @@ export default function HistoryScreen({ night }) {
               {isOpen && (
                 <div style={{ borderTop: `1px solid ${p.border}` }}>
                   {group.entries.map((entry, i) => {
-                    const isLast = i === group.entries.length - 1
+                    const isLast      = i === group.entries.length - 1
                     const borderStyle = isLast ? 'none' : `1px solid ${p.border}`
 
-                    // ── Feed row ────────────────────────────────────────────
+                    // ── Feed row ──────────────────────────────────────────
                     if (entry._type === 'feed') return (
                       <div key={entry.id}
                         style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle, cursor: 'pointer' }}
@@ -331,11 +466,11 @@ export default function HistoryScreen({ night }) {
                       </div>
                     )
 
-                    // ── Nappy row ───────────────────────────────────────────
+                    // ── Nappy row ─────────────────────────────────────────
                     if (entry._type === 'nappy') {
                       const nappyEmoji = entry.type === 'wet' ? '💧' : entry.type === 'poo' ? '💩' : '💧💩'
                       const nappyLabel = entry.type === 'wet' ? 'Wee' : entry.type === 'poo' ? 'Poo' : 'Wee & Poo'
-                      const isDel = confirmDel?.id === entry.id
+                      const isDel      = confirmDel?.id === entry.id
                       return (
                         <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.loggedAt)}</span>
@@ -363,7 +498,7 @@ export default function HistoryScreen({ night }) {
                       )
                     }
 
-                    // ── Sleep row ───────────────────────────────────────────
+                    // ── Sleep row ─────────────────────────────────────────
                     if (entry._type === 'sleep') {
                       const isDel = confirmDel?.id === entry.id
                       return (
@@ -402,13 +537,40 @@ export default function HistoryScreen({ night }) {
 
       <div style={{ height: 20 }} />
 
+      {/* ── Edit feed modal ── */}
       {editSession && (
         <EditModal session={editSession} night={night} onSave={handleSaveEdit} onDelete={handleDeleteFeed} onClose={() => setEditSession(null)} />
       )}
 
-      {showAdd && (
-        <AddFeedModal night={night} onSave={handleAddFeed} onClose={() => setShowAdd(false)} />
+      {/* ── Add type picker ── */}
+      {addMode === 'picker' && (
+        <div onClick={() => setAddMode(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, padding: '0 0 env(safe-area-inset-bottom, 0)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: p.card, borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', border: `1px solid ${p.border}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: night ? brand.parchment : brand.bark }}>Add entry</span>
+              <button onClick={() => setAddMode(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: p.sub }}>×</button>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {[
+                { mode: 'feed',  icon: '🍼', label: 'Feed'  },
+                { mode: 'nappy', icon: '💧', label: 'Nappy' },
+                { mode: 'sleep', icon: '💤', label: 'Nap'   },
+              ].map(({ mode, icon, label }) => (
+                <button key={mode} onClick={() => setAddMode(mode)}
+                  style={{ flex: 1, padding: '18px 8px', borderRadius: 14, border: `1px solid ${p.border}`, background: p.bg, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, WebkitTapHighlightColor: 'transparent' }}>
+                  <span style={{ fontSize: 26, lineHeight: 1 }}>{icon}</span>
+                  <span style={{ fontSize: 13, color: p.text, fontWeight: 500 }}>{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
+
+      {/* ── Add modals ── */}
+      {addMode === 'feed'  && <AddFeedModal  night={night} onSave={handleAddFeed}  onClose={() => setAddMode(null)} />}
+      {addMode === 'nappy' && <AddNappyModal night={night} onSave={handleAddNappy} onClose={() => setAddMode(null)} />}
+      {addMode === 'sleep' && <AddSleepModal night={night} onSave={handleAddSleep} onClose={() => setAddMode(null)} />}
     </div>
   )
 }
