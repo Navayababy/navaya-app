@@ -9,10 +9,12 @@ const KEYS = {
   customItems:    'navaya_custom_items',
   hiddenDefaults: 'navaya_hidden_defaults',
   nappies:        'navaya_nappies',
+  sleeps:         'navaya_sleeps',
   nightMode:      'navaya_night',
   babyName:       'navaya_baby_name',
   userName:       'navaya_user_name',
   activeTimer:    'navaya_active_timer',
+  activeSleep:    'navaya_active_sleep',
 };
 
 // ── Sessions ────────────────────────────────────────────────────────────────
@@ -76,6 +78,71 @@ export function deleteNappy(id) {
   const nappies = getNappies().filter(n => n.id !== id);
   localStorage.setItem(KEYS.nappies, JSON.stringify(nappies));
   return nappies;
+}
+
+export function updateNappy(id, changes) {
+  const nappies = getNappies();
+  const idx = nappies.findIndex(n => n.id === id);
+  if (idx === -1) return nappies;
+  nappies[idx] = { ...nappies[idx], ...changes };
+  localStorage.setItem(KEYS.nappies, JSON.stringify(nappies));
+  return nappies;
+}
+
+// ── Sleeps ───────────────────────────────────────────────────────────────────
+
+export function getSleeps() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.sleeps) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function addSleep(sleep) {
+  const sleeps = getSleeps();
+  sleeps.unshift(sleep);
+  const trimmed = sleeps.slice(0, 500);
+  localStorage.setItem(KEYS.sleeps, JSON.stringify(trimmed));
+  return trimmed;
+}
+
+export function deleteSleep(id) {
+  const sleeps = getSleeps().filter(s => s.id !== id);
+  localStorage.setItem(KEYS.sleeps, JSON.stringify(sleeps));
+  return sleeps;
+}
+
+export function updateSleep(id, changes) {
+  const sleeps = getSleeps();
+  const idx = sleeps.findIndex(s => s.id === id);
+  if (idx === -1) return sleeps;
+  sleeps[idx] = { ...sleeps[idx], ...changes };
+  if (changes.startedAt || changes.endedAt) {
+    const start = new Date(sleeps[idx].startedAt).getTime();
+    const end   = new Date(sleeps[idx].endedAt).getTime();
+    sleeps[idx].durationSecs = Math.max(0, Math.round((end - start) / 1000));
+  }
+  localStorage.setItem(KEYS.sleeps, JSON.stringify(sleeps));
+  return sleeps;
+}
+
+// ── Active sleep ──────────────────────────────────────────────────────────────
+
+export function getActiveSleep() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.activeSleep) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+export function setActiveSleep(startedAt) {
+  localStorage.setItem(KEYS.activeSleep, JSON.stringify({ startedAt }));
+}
+
+export function clearActiveSleep() {
+  localStorage.removeItem(KEYS.activeSleep);
 }
 
 // ── Checklist ────────────────────────────────────────────────────────────────

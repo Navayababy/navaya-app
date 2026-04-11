@@ -71,8 +71,8 @@ export default function ChatScreen({ night }) {
 
       {/* Header */}
       <div style={{ padding: '20px 16px 12px', flexShrink: 0 }}>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Evidence-based guidance</span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, marginTop: 2 }}>Ask the advisor</span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your breastfeeding companion</span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, marginTop: 2 }}>Sage</span>
       </div>
 
       {/* Messages */}
@@ -83,14 +83,14 @@ export default function ChatScreen({ night }) {
           <div className="fade-up">
             <div style={{ background: brand.bark, borderRadius: 14, padding: '14px', marginBottom: 14 }}>
               <span style={{ display: 'block', fontSize: 13, color: brand.parchment, lineHeight: 1.6 }}>
-                Ask me anything about breastfeeding. I draw from NHS, WHO, NICE and IBCLC guidance to give you honest, practical answers.
+                Hi, I'm Sage — think of me as a knowledgeable friend who's always awake. Ask me anything about breastfeeding and I'll give you honest, practical answers grounded in NHS, WHO, NICE and IBCLC guidance.
               </span>
               <span style={{ display: 'block', fontSize: 10, color: brand.sand, marginTop: 8, lineHeight: 1.5 }}>
-                For medical concerns, always follow up with your GP, midwife or health visitor.
+                For anything that feels medical or urgent, always follow up with your GP, midwife or health visitor.
               </span>
             </div>
 
-            <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>Common questions</span>
+            <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>What's on your mind?</span>
             {SUGGESTIONS.map((s, i) => (
               <button key={i} onClick={() => send(s)}
                 style={{ width: '100%', textAlign: 'left', background: p.card, border: `1px solid ${p.border}`, borderRadius: 12, padding: '11px 12px', marginBottom: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -110,7 +110,7 @@ export default function ChatScreen({ night }) {
               </div>
             ) : (
               <div style={{ background: p.card, border: `1px solid ${m.error ? '#C0392B' : p.border}`, borderRadius: '14px 14px 14px 4px', padding: '12px 13px', maxWidth: '92%' }}>
-                <span style={{ display: 'block', fontSize: 9, color: brand.sand, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>✦ Navaya Advisor</span>
+                <span style={{ display: 'block', fontSize: 9, color: brand.sand, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>✦ Sage</span>
                 <span style={{ fontSize: 13, color: p.text, lineHeight: 1.65 }}>{m.content}</span>
               </div>
             )}
@@ -139,7 +139,7 @@ export default function ChatScreen({ night }) {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKey}
-          placeholder="Ask anything about breastfeeding…"
+          placeholder="Ask Sage anything…"
           rows={1}
           style={{
             flex:        1,
