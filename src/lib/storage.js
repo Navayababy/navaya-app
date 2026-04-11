@@ -80,6 +80,15 @@ export function deleteNappy(id) {
   return nappies;
 }
 
+export function updateNappy(id, changes) {
+  const nappies = getNappies();
+  const idx = nappies.findIndex(n => n.id === id);
+  if (idx === -1) return nappies;
+  nappies[idx] = { ...nappies[idx], ...changes };
+  localStorage.setItem(KEYS.nappies, JSON.stringify(nappies));
+  return nappies;
+}
+
 // ── Sleeps ───────────────────────────────────────────────────────────────────
 
 export function getSleeps() {
@@ -100,6 +109,20 @@ export function addSleep(sleep) {
 
 export function deleteSleep(id) {
   const sleeps = getSleeps().filter(s => s.id !== id);
+  localStorage.setItem(KEYS.sleeps, JSON.stringify(sleeps));
+  return sleeps;
+}
+
+export function updateSleep(id, changes) {
+  const sleeps = getSleeps();
+  const idx = sleeps.findIndex(s => s.id === id);
+  if (idx === -1) return sleeps;
+  sleeps[idx] = { ...sleeps[idx], ...changes };
+  if (changes.startedAt || changes.endedAt) {
+    const start = new Date(sleeps[idx].startedAt).getTime();
+    const end   = new Date(sleeps[idx].endedAt).getTime();
+    sleeps[idx].durationSecs = Math.max(0, Math.round((end - start) / 1000));
+  }
   localStorage.setItem(KEYS.sleeps, JSON.stringify(sleeps));
   return sleeps;
 }
