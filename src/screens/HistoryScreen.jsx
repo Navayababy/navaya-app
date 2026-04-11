@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, getNappies, getSleeps, updateSession, deleteSession, addSession, deleteNappy, deleteSleep, addNappy, addSleep } from '../lib/storage.js'
+import { getSessions, getNappies, updateSession, deleteSession, addSession, deleteNappy, addNappy } from '../lib/storage.js'
 
 const MOOD_EMOJI = ['😔', '😐', '🙂', '😊', '🤩']
 const MOOD_LABEL = ['Tough', 'Okay', 'Good', 'Great', 'Amazing']
@@ -250,64 +250,23 @@ function AddNappyModal({ night, onSave, onClose }) {
   )
 }
 
-// ── Add Sleep modal ────────────────────────────────────────────────────────────
-function AddSleepModal({ night, onSave, onClose }) {
-  const p = palette(night)
-  const now          = new Date()
-  const defaultEnd   = timeStr(now.toISOString())
-  const defaultStart = timeStr(new Date(now.getTime() - 30 * 60 * 1000).toISOString())
-
-  const [date,      setDate]      = useState(todayDateStr())
-  const [startTime, setStartTime] = useState(defaultStart)
-  const [endTime,   setEndTime]   = useState(defaultEnd)
-
-  const handleSave = () => {
-    const startedAt    = buildISO(date, startTime)
-    const endedAt      = buildISO(date, endTime)
-    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
-    onSave({ id: Date.now().toString(), startedAt, endedAt, durationSecs })
-  }
-
-  const inputStyle = { width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box' }
-  const labelStyle = { display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }
-
-  return (
-    <ModalShell title="Log nap" night={night} onClose={onClose}>
-      <span style={labelStyle}>Date</span>
-      <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
-
-      <span style={labelStyle}>Start time</span>
-      <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
-
-      <span style={labelStyle}>End time</span>
-      <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, marginBottom: 20 }} />
-
-      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-        Log nap
-      </button>
-    </ModalShell>
-  )
-}
-
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function HistoryScreen({ night }) {
   const p = palette(night)
 
   const [sessions,    setSessions]    = useState(() => getSessions())
   const [nappies,     setNappies]     = useState(() => getNappies())
-  const [sleeps,      setSleeps]      = useState(() => getSleeps())
   const [openDay,     setOpenDay]     = useState(null)
   const [editSession, setEditSession] = useState(null)
-  const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'sleep'
+  const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy'
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
 
   // ── Merge all entry types into one sorted timeline ────────────────────────
   const allEntries = useMemo(() => {
-    const f  = sessions.map(s => ({ ...s, _type: 'feed',  _time: s.startedAt }))
-    const n  = nappies.map(n  => ({ ...n, _type: 'nappy', _time: n.loggedAt  }))
-    const sl = sleeps.map(s   => ({ ...s, _type: 'sleep', _time: s.startedAt }))
-    return [...f, ...n, ...sl].sort((a, b) => new Date(b._time) - new Date(a._time))
-  }, [sessions, nappies, sleeps])
+    const f = sessions.map(s => ({ ...s, _type: 'feed',  _time: s.startedAt }))
+    const n = nappies.map(n  => ({ ...n, _type: 'nappy', _time: n.loggedAt  }))
+    return [...f, ...n].sort((a, b) => new Date(b._time) - new Date(a._time))
+  }, [sessions, nappies])
 
   const grouped = useMemo(() => {
     const map = {}
@@ -355,28 +314,24 @@ export default function HistoryScreen({ night }) {
   const rightCount = weekFeeds.filter(s => s.side === 'R').length
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleSaveEdit  = (id, changes) => { setSessions(updateSession(id, changes)); setEditSession(null) }
-  const handleDeleteFeed = (id)         => { setSessions(deleteSession(id));           setEditSession(null) }
-  const handleAddFeed   = (session)     => { setSessions(addSession(session));          setAddMode(null) }
-  const handleAddNappy  = (nappy)       => { setNappies(addNappy(nappy));               setAddMode(null) }
-  const handleAddSleep  = (sleep)       => { setSleeps(addSleep(sleep));                setAddMode(null) }
+  const handleSaveEdit   = (id, changes) => { setSessions(updateSession(id, changes)); setEditSession(null) }
+  const handleDeleteFeed = (id)          => { setSessions(deleteSession(id));           setEditSession(null) }
+  const handleAddFeed    = (session)     => { setSessions(addSession(session));          setAddMode(null) }
+  const handleAddNappy   = (nappy)       => { setNappies(addNappy(nappy));               setAddMode(null) }
 
   const handleDelete = ({ id, type }) => {
     if (type === 'nappy') setNappies(deleteNappy(id))
-    if (type === 'sleep') setSleeps(deleteSleep(id))
     setConfirmDel(null)
   }
 
   // ── Day summary line ──────────────────────────────────────────────────────
   function daySummary(entries) {
     const feeds   = entries.filter(e => e._type === 'feed').length
-    const naps    = entries.filter(e => e._type === 'nappy').length
-    const sls     = entries.filter(e => e._type === 'sleep').length
+    const nappies = entries.filter(e => e._type === 'nappy').length
     const feedDur = entries.filter(e => e._type === 'feed').reduce((a, e) => a + (e.durationSecs || 0), 0)
     const parts   = []
-    if (feeds > 0)   parts.push(`${feeds} feed${feeds !== 1 ? 's' : ''}`)
-    if (naps > 0)    parts.push(`${naps} napp${naps !== 1 ? 'ies' : 'y'}`)
-    if (sls > 0)     parts.push(`${sls} nap${sls !== 1 ? 's' : ''}`)
+    if (feeds   > 0) parts.push(`${feeds} feed${feeds !== 1 ? 's' : ''}`)
+    if (nappies > 0) parts.push(`${nappies} napp${nappies !== 1 ? 'ies' : 'y'}`)
     if (feedDur > 0) parts.push(fmtMins(feedDur))
     return parts.join(' · ')
   }
@@ -498,34 +453,6 @@ export default function HistoryScreen({ night }) {
                       )
                     }
 
-                    // ── Sleep row ─────────────────────────────────────────
-                    if (entry._type === 'sleep') {
-                      const isDel = confirmDel?.id === entry.id
-                      return (
-                        <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
-                          <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
-                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 13 }}>
-                            💤
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <span style={{ display: 'block', fontSize: 12, color: p.text }}>Nap</span>
-                            {entry.endedAt && <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{timeStr(entry.startedAt)} – {timeStr(entry.endedAt)}</span>}
-                          </div>
-                          <div style={{ textAlign: 'right', marginRight: isDel ? 8 : 0 }}>
-                            <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{fmt(entry.durationSecs || 0)}</span>
-                          </div>
-                          {isDel ? (
-                            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                              <button onClick={() => setConfirmDel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
-                              <button onClick={() => handleDelete({ id: entry.id, type: 'sleep' })} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
-                            </div>
-                          ) : (
-                            <button onClick={() => setConfirmDel({ id: entry.id, type: 'sleep' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
-                          )}
-                        </div>
-                      )
-                    }
-
                     return null
                   })}
                 </div>
@@ -554,7 +481,6 @@ export default function HistoryScreen({ night }) {
               {[
                 { mode: 'feed',  icon: '🍼', label: 'Feed'  },
                 { mode: 'nappy', icon: '💧', label: 'Nappy' },
-                { mode: 'sleep', icon: '💤', label: 'Nap'   },
               ].map(({ mode, icon, label }) => (
                 <button key={mode} onClick={() => setAddMode(mode)}
                   style={{ flex: 1, padding: '18px 8px', borderRadius: 14, border: `1px solid ${p.border}`, background: p.bg, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, WebkitTapHighlightColor: 'transparent' }}>
@@ -570,7 +496,6 @@ export default function HistoryScreen({ night }) {
       {/* ── Add modals ── */}
       {addMode === 'feed'  && <AddFeedModal  night={night} onSave={handleAddFeed}  onClose={() => setAddMode(null)} />}
       {addMode === 'nappy' && <AddNappyModal night={night} onSave={handleAddNappy} onClose={() => setAddMode(null)} />}
-      {addMode === 'sleep' && <AddSleepModal night={night} onSave={handleAddSleep} onClose={() => setAddMode(null)} />}
     </div>
   )
 }

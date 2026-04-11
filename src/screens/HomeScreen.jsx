@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, addSession, getSleeps, addSleep, getNappies, addNappy, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
+import { getSessions, addSession, getNappies, addNappy, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
 
 const QUOTES = [
   // — Verified breast milk facts —
@@ -36,13 +36,6 @@ function fmt(secs) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-function fmtMins(secs) {
-  const h = Math.floor(secs / 3600)
-  const m = Math.floor((secs % 3600) / 60)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
-
 function timeAgo(isoString) {
   if (!isoString) return ''
   const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000)
@@ -70,13 +63,11 @@ function greeting() {
   return 'evening'
 }
 
-export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) {
+export default function HomeScreen({ night, onNightToggle, timer }) {
   const p = palette(night)
   const { feedActive, feedSide, elapsed, startFeed, stopFeed } = timer
-  const { sleepActive, sleepElapsed, startSleep, stopSleep }   = sleepTimer
 
   const [sessions,       setSessions]      = useState(() => sortByTime(getSessions()).slice(0, 3))
-  const [sleeps,         setSleeps]        = useState(() => getSleeps())
   const [nappies,        setNappies]       = useState(() => getNappies())
   const [showMood,       setShowMood]      = useState(false)
   const [pendingSession, setPending]       = useState(null)
@@ -92,7 +83,6 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
   const nameInputRef  = useRef(null)
   const babyNameRef   = useRef(null)
 
-  const lastSleep   = sortByTime(sleeps)[0] || null
   const lastSession = sortByTime(getSessions())[0] || null
   const lastSide    = lastSession?.side || 'R'
   const suggested   = lastSide === 'L' ? 'R' : 'L'
@@ -116,11 +106,6 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
     setShowMood(true)
     setTimeout(() => { setPartnerFlash(true) }, 400)
     setTimeout(() => { setPartnerFlash(false) }, 3500)
-  }
-
-  const handleStopSleep = () => {
-    const data = stopSleep()
-    setSleeps(addSleep({ id: Date.now().toString(), ...data }))
   }
 
   const logNappy = (type) => {
@@ -214,9 +199,10 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
           )}
 
           {/* Editable baby name */}
-          <div style={{ marginTop: 3 }}>
+          <div style={{ marginTop: 10 }}>
+            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 11, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Baby</span>
             {editingBaby ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                 <input
                   ref={babyNameRef}
                   value={babyNameInput}
@@ -224,24 +210,24 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
                   onKeyDown={e => { if (e.key === 'Enter') saveBabyName() }}
                   placeholder="Baby's name"
                   style={{
-                    fontFamily: "'DM Sans', sans-serif", fontSize: 12,
-                    color: p.sub, background: 'transparent', border: 'none',
-                    borderBottom: `1px solid ${brand.sand}`, outline: 'none',
-                    width: 110, padding: '0 0 1px',
+                    fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 400,
+                    color: night ? brand.parchment : brand.bark, background: 'transparent',
+                    border: 'none', borderBottom: `1.5px solid ${brand.sand}`,
+                    outline: 'none', width: 140, lineHeight: 1.2, padding: '0 0 2px',
                   }}
                 />
                 <button onClick={saveBabyName}
-                  style={{ background: brand.bark, border: 'none', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', color: brand.sand, fontSize: 10, fontWeight: 500 }}>
+                  style={{ background: brand.bark, border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: brand.sand, fontSize: 11, fontWeight: 500 }}>
                   Save
                 </button>
               </div>
             ) : (
               <button onClick={openBabyEdit}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 11, color: p.sub }}>
-                  {babyName ? `for ${babyName}` : '+ add baby\'s name'}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 400, color: babyName ? (night ? brand.parchment : brand.bark) : p.sub, lineHeight: 1.1 }}>
+                  {babyName || 'Add name'}
                 </span>
-                {babyName && <span style={{ fontSize: 9, color: p.sub, opacity: 0.55 }}>✎</span>}
+                <span style={{ fontSize: 11, color: p.sub, marginTop: 2 }}>✎</span>
               </button>
             )}
           </div>
@@ -317,34 +303,6 @@ export default function HomeScreen({ night, onNightToggle, timer, sleepTimer }) 
             </button>
           </div>
         )}
-      </div>
-
-      {/* ── Nap tracker ── */}
-      <div style={{ margin: '10px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${sleepActive ? brand.sand : p.border}`, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 12, transition: 'border-color .2s' }}>
-        <span style={{ fontSize: 20, lineHeight: 1 }}>💤</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 12, fontWeight: 600, color: p.text }}>
-            {sleepActive ? `Napping · ${fmt(sleepElapsed)}` : 'Nap tracker'}
-          </span>
-          <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>
-            {sleepActive
-              ? `started ${timeAgo(new Date(Date.now() - sleepElapsed * 1000).toISOString())}`
-              : lastSleep?.endedAt
-                ? `Last nap ${fmtSince(lastSleep.endedAt)} ago · ${fmtMins(lastSleep.durationSecs || 0)}`
-                : 'No naps logged yet'}
-          </span>
-        </div>
-        <button
-          onClick={sleepActive ? handleStopSleep : startSleep}
-          style={{
-            padding: '7px 14px', borderRadius: 10, border: sleepActive ? `1px solid ${brand.bark}` : 'none',
-            background: sleepActive ? 'transparent' : brand.bark,
-            color: sleepActive ? brand.bark : brand.sand,
-            cursor: 'pointer', fontSize: 11, fontWeight: 500, flexShrink: 0,
-            WebkitTapHighlightColor: 'transparent',
-          }}>
-          {sleepActive ? 'End nap' : 'Start nap'}
-        </button>
       </div>
 
       {/* ── Nappy quick-log ── */}

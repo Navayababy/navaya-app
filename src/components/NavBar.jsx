@@ -1,7 +1,8 @@
 import { brand, palette } from '../theme.js'
 
 const tabs = [
-  { id: 'home',    icon: '◉', label: 'Today'   },
+  { id: 'home',    icon: '◉', label: 'Feed'    },
+  { id: 'nappy',   icon: '◈', label: 'Nappy'   },
   { id: 'history', icon: '≡', label: 'History' },
   { id: 'chat',    icon: '✦', label: 'Sage'    },
   { id: 'prepare', icon: '◎', label: 'Prepare' },
