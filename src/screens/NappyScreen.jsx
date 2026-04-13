@@ -72,7 +72,9 @@ export default function NappyScreen({ night }) {
 
   const wetToday  = todayNappies.filter(n => n.type === 'wet'  || n.type === 'both').length
   const pooToday  = todayNappies.filter(n => n.type === 'poo'  || n.type === 'both').length
-  const lastNappy = nappies[0] || null
+  const lastNappy = nappies.reduce((latest, n) =>
+    !latest || new Date(n.loggedAt) > new Date(latest.loggedAt) ? n : latest
+  , null)
 
   const needsColor = type === 'poo' || type === 'both'
   const selectedColor = POO_COLORS.find(c => c.id === pooColor)
