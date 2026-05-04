@@ -524,7 +524,8 @@ export default function HistoryScreen({ night }) {
           </span>
           <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 120, marginBottom: 8 }}>
             {insights.rows.map(r => {
-              const h = Math.max(8, r.feeds * 16)
+              const maxFeeds = Math.max(1, ...insights.rows.map(day => day.feeds))
+              const h = r.feeds ? Math.max(8, Math.round((r.feeds / maxFeeds) * 96)) : 8
               const dayMood = moodSummary(r.avgMood)
               return (
                 <div key={r.key} style={{ flex: 1, textAlign: 'center' }}>
@@ -582,7 +583,7 @@ export default function HistoryScreen({ night }) {
       {/* ── Day groups ── */}
       {!showInsights && (grouped.length === 0 ? (
         <div style={{ padding: '20px 14px' }}>
-          <span style={{ fontSize: 13, color: p.sub }}>No entries yet. Your history will appear here.</span>
+          <span style={{ fontSize: 13, color: p.sub }}>No entries yet. Your logbook will appear here.</span>
         </div>
       ) : (
         grouped.map(group => {
