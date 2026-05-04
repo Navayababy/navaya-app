@@ -5,6 +5,24 @@ import { getSessions, getNappies, getMedicines, updateSession, deleteSession, ad
 const MOOD_EMOJI = ['😔', '😐', '🙂', '😊', '🤩']
 const MOOD_LABEL = ['Tough', 'Okay', 'Good', 'Great', 'Amazing']
 
+function feedMoodMeta(score) {
+  if (!score) return null
+  const rounded = Math.min(5, Math.max(1, Math.round(score)))
+  return {
+    score,
+    rounded,
+    emoji: MOOD_EMOJI[rounded - 1],
+    label: MOOD_LABEL[rounded - 1],
+  }
+}
+
+function averageFeedMood(feeds) {
+  const rated = feeds.filter(feed => Number(feed.mood) > 0)
+  if (!rated.length) return null
+  const average = rated.reduce((total, feed) => total + Number(feed.mood), 0) / rated.length
+  return { ...feedMoodMeta(average), count: rated.length }
+}
+
 const POO_HEX    = { mustard: '#D4A843', yellow: '#EDD050', green: '#6B9E5C', brown: '#8B6347', dark: '#2D1F14' }
 const POO_LABEL  = { mustard: 'Mustard', yellow: 'Yellow',  green: 'Green',   brown: 'Brown',   dark: 'Dark/Black' }
 const POO_COLORS = [
@@ -87,12 +105,13 @@ function EditModal({ session, night, onSave, onDelete, onClose }) {
   const [endDate,    setEndDate]    = useState(session.endedAt ? dateStr(session.endedAt) : dateStr(session.startedAt))
   const [endTime,    setEndTime]    = useState(session.endedAt ? timeStr(session.endedAt) : '')
   const [side,       setSide]       = useState(session.side)
+  const [mood,       setMood]       = useState(session.mood ? Number(session.mood) : null)
   const [confirmDel, setConfirmDel] = useState(false)
 
   const handleSave = () => {
     const newStartedAt = buildISO(startDate, startTime)
     const newEndedAt   = endTime ? buildISO(endDate, endTime) : session.endedAt
-    onSave(session.id, { side, startedAt: newStartedAt, endedAt: newEndedAt })
+    onSave(session.id, { side, startedAt: newStartedAt, endedAt: newEndedAt, mood })
   }
 
   const inputStyle = { width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box' }
@@ -119,6 +138,20 @@ function EditModal({ session, night, onSave, onDelete, onClose }) {
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inputStyle, flex: 1.4 }} />
         <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+      </div>
+
+      <span style={labelStyle}>Feed rating</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 20 }}>
+        {MOOD_LABEL.map((label, i) => {
+          const score = i + 1
+          const active = mood === score
+          return (
+            <button key={label} onClick={() => setMood(active ? null : score)} style={{ flex: 1, padding: '8px 4px', borderRadius: 11, border: `1.5px solid ${active ? brand.sand : p.border}`, background: active ? brand.bark : 'transparent', cursor: 'pointer', color: active ? brand.sand : p.sub, fontSize: 9 }}>
+              <span style={{ display: 'block', fontSize: 20 }}>{MOOD_EMOJI[i]}</span>
+              {label}
+            </button>
+          )
+        })}
       </div>
 
       <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500, marginBottom: 10 }}>
@@ -150,12 +183,13 @@ function AddFeedModal({ night, onSave, onClose }) {
   const [startTime, setStartTime] = useState(defaultStart)
   const [endTime,   setEndTime]   = useState(defaultEnd)
   const [side,      setSide]      = useState('L')
+  const [mood,      setMood]      = useState(null)
 
   const handleSave = () => {
     const startedAt    = buildISO(date, startTime)
     const endedAt      = buildISO(date, endTime)
     const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
-    onSave({ id: Date.now().toString(), side, startedAt, endedAt, durationSecs, mood: null })
+    onSave({ id: Date.now().toString(), side, startedAt, endedAt, durationSecs, mood })
   }
 
   const inputStyle = { width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box' }
@@ -179,7 +213,21 @@ function AddFeedModal({ night, onSave, onClose }) {
       <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
 
       <span style={labelStyle}>End time</span>
-      <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, marginBottom: 20 }} />
+      <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
+
+      <span style={labelStyle}>Feed rating</span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 20 }}>
+        {MOOD_LABEL.map((label, i) => {
+          const score = i + 1
+          const active = mood === score
+          return (
+            <button key={label} onClick={() => setMood(active ? null : score)} style={{ flex: 1, padding: '8px 4px', borderRadius: 11, border: `1.5px solid ${active ? brand.sand : p.border}`, background: active ? brand.bark : 'transparent', cursor: 'pointer', color: active ? brand.sand : p.sub, fontSize: 9 }}>
+              <span style={{ display: 'block', fontSize: 20 }}>{MOOD_EMOJI[i]}</span>
+              {label}
+            </button>
+          )
+        })}
+      </div>
 
       <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
         Add feed
@@ -397,6 +445,7 @@ export default function HistoryScreen({ night }) {
 
   const leftCount  = weekFeeds.filter(s => s.side === 'L').length
   const rightCount = weekFeeds.filter(s => s.side === 'R').length
+  const weekMood   = useMemo(() => averageFeedMood(weekFeeds), [weekFeeds])
 
   const insights = useMemo(() => {
     const days = []
@@ -407,12 +456,16 @@ export default function HistoryScreen({ night }) {
       days.push(d)
     }
 
-    const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, feedMins: 0, meds: 0, dirty: 0 }]))
+    const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, feedMins: 0, meds: 0, dirty: 0, moodTotal: 0, moodCount: 0 }]))
     sessions.forEach(s => {
       const k = dayKey(s.startedAt)
       if (!byDay[k]) return
       byDay[k].feeds += 1
       byDay[k].feedMins += Math.round((s.durationSecs || 0) / 60)
+      if (Number(s.mood) > 0) {
+        byDay[k].moodTotal += Number(s.mood)
+        byDay[k].moodCount += 1
+      }
     })
     medicines.forEach(m => {
       const k = dayKey(m.loggedAt)
@@ -428,13 +481,20 @@ export default function HistoryScreen({ night }) {
     const rows = days.map(d => {
       const k = dateStr(d.toISOString())
       const v = byDay[k]
-      return { key: k, label: d.toLocaleDateString('en-GB', { weekday: 'short' }), ...v }
+      return {
+        key: k,
+        label: d.toLocaleDateString('en-GB', { weekday: 'short' }),
+        ...v,
+        mood: v.moodCount ? feedMoodMeta(v.moodTotal / v.moodCount) : null,
+      }
     })
 
     const totalFeeds = rows.reduce((a, r) => a + r.feeds, 0)
     const totalMeds  = rows.reduce((a, r) => a + r.meds, 0)
+    const ratedFeeds = rows.reduce((a, r) => a + r.moodCount, 0)
     const avgFeedMins = totalFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalFeeds) : 0
-    return { rows, totalFeeds, totalMeds, avgFeedMins }
+    const avgMood = ratedFeeds ? feedMoodMeta(rows.reduce((a, r) => a + r.moodTotal, 0) / ratedFeeds) : null
+    return { rows, totalFeeds, totalMeds, avgFeedMins, avgMood, ratedFeeds }
   }, [sessions, nappies, medicines])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -456,11 +516,13 @@ export default function HistoryScreen({ night }) {
     const nappies = entries.filter(e => e._type === 'nappy').length
     const meds    = entries.filter(e => e._type === 'medicine').length
     const feedDur = entries.filter(e => e._type === 'feed').reduce((a, e) => a + (e.durationSecs || 0), 0)
+    const mood    = averageFeedMood(entries.filter(e => e._type === 'feed'))
     const parts   = []
     if (feeds   > 0) parts.push(`${feeds} feed${feeds !== 1 ? 's' : ''}`)
     if (nappies > 0) parts.push(`${nappies} napp${nappies !== 1 ? 'ies' : 'y'}`)
     if (meds > 0) parts.push(`${meds} med${meds !== 1 ? 's' : ''}`)
     if (feedDur > 0) parts.push(fmtMins(feedDur))
+    if (mood) parts.push(`${mood.emoji} ${mood.label} avg`)
     return parts.join(' · ')
   }
 
@@ -503,19 +565,31 @@ export default function HistoryScreen({ night }) {
           <span style={{ display: 'block', fontSize: 11, color: p.sub, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
             Last 7 days
           </span>
+          <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: -6, marginBottom: 10 }}>Recent enough to spot patterns without overloading the log.</span>
           <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 120, marginBottom: 8 }}>
             {insights.rows.map(r => {
               const h = Math.max(8, r.feeds * 16)
               return (
                 <div key={r.key} style={{ flex: 1, textAlign: 'center' }}>
                   <div style={{ height: h, borderRadius: 8, background: brand.bark, opacity: .9 }} />
-                  <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 4 }}>{r.label}</span>
+                  <span style={{ display: 'block', fontSize: 14, lineHeight: 1.1, marginTop: 4 }}>{r.mood?.emoji || '·'}</span>
+                  <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 2 }}>{r.label}</span>
                   <span style={{ display: 'block', fontSize: 10, color: p.sub }}>{r.feeds}</span>
                 </div>
               )
             })}
           </div>
-          <span style={{ display: 'block', fontSize: 10, color: p.sub, marginBottom: 10 }}>Bars show feeds/day.</span>
+          <span style={{ display: 'block', fontSize: 10, color: p.sub, marginBottom: 10 }}>Bars show feeds/day. Emoji shows the average rating for that day when feeds were rated.</span>
+
+          {insights.avgMood && (
+            <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 28, lineHeight: 1 }}>{insights.avgMood.emoji}</span>
+              <div>
+                <span style={{ display: 'block', fontSize: 12, color: p.text, fontWeight: 600 }}>Average feed felt {insights.avgMood.label.toLowerCase()}</span>
+                <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 2 }}>Based on {insights.ratedFeeds} rated feed{insights.ratedFeeds !== 1 ? 's' : ''} from the last 7 days.</span>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: 8 }}>
@@ -541,6 +615,7 @@ export default function HistoryScreen({ night }) {
             {'This week · '}
             <span style={{ color: p.text, fontWeight: 500 }}>{weekFeeds.length} feed{weekFeeds.length !== 1 ? 's' : ''}</span>
             {weekAvgDuration > 0 && <>{' · avg '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(weekAvgDuration)}</span>{' each'}</>}
+            {weekMood && <>{' · feel: '}<span style={{ color: p.text, fontWeight: 500 }}>{weekMood.emoji} {weekMood.label}</span></>}
             {(leftCount + rightCount) > 0 && <>{' · L/R: '}<span style={{ color: p.text, fontWeight: 500 }}>{leftCount}/{rightCount}</span></>}
           </span>
         </div>
