@@ -9,6 +9,7 @@ const KEYS = {
   customItems:    'navaya_custom_items',
   hiddenDefaults: 'navaya_hidden_defaults',
   nappies:        'navaya_nappies',
+  medicines:      'navaya_medicines',
   sleeps:         'navaya_sleeps',
   nightMode:      'navaya_night',
   babyName:       'navaya_baby_name',
@@ -87,6 +88,30 @@ export function updateNappy(id, changes) {
   nappies[idx] = { ...nappies[idx], ...changes };
   localStorage.setItem(KEYS.nappies, JSON.stringify(nappies));
   return nappies;
+}
+
+// ── Medicines ────────────────────────────────────────────────────────────────
+
+export function getMedicines() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.medicines) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function addMedicine(medicine) {
+  const medicines = getMedicines();
+  medicines.unshift(medicine);
+  const trimmed = medicines.slice(0, 500);
+  localStorage.setItem(KEYS.medicines, JSON.stringify(trimmed));
+  return trimmed;
+}
+
+export function deleteMedicine(id) {
+  const medicines = getMedicines().filter(m => m.id !== id);
+  localStorage.setItem(KEYS.medicines, JSON.stringify(medicines));
+  return medicines;
 }
 
 // ── Sleeps ───────────────────────────────────────────────────────────────────

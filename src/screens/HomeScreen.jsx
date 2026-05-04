@@ -81,7 +81,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
   const nameInputRef  = useRef(null)
   const babyNameRef   = useRef(null)
 
-  const lastSession = sortByTime(getSessions())[0] || null
+  const lastSession = sessions[0] || null
   const lastSide    = lastSession?.side || 'R'
   const suggested   = lastSide === 'L' ? 'R' : 'L'
 

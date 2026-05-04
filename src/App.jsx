@@ -10,13 +10,14 @@ import NavBar        from './components/NavBar.jsx'
 export default function App() {
   const [screen, setScreen] = useState('home')
   const [night, setNight]   = useState(() => getNightMode())
+  const initialTimer = useRef(getActiveTimer())
 
   // ── Feed timer state lives here so it survives tab changes ────────────────
-  const [feedActive,    setFeedActive]    = useState(() => getActiveTimer() !== null)
-  const [feedSide,      setFeedSide]      = useState(() => getActiveTimer()?.side || 'L')
-  const [feedStartedAt, setFeedStartedAt] = useState(() => getActiveTimer()?.startedAt || null)
+  const [feedActive,    setFeedActive]    = useState(() => initialTimer.current !== null)
+  const [feedSide,      setFeedSide]      = useState(() => initialTimer.current?.side || 'L')
+  const [feedStartedAt, setFeedStartedAt] = useState(() => initialTimer.current?.startedAt || null)
   const [elapsed,       setElapsed]       = useState(() => {
-    const saved = getActiveTimer()
+    const saved = initialTimer.current
     if (!saved) return 0
     return Math.floor((Date.now() - saved.startedAt) / 1000)
   })
@@ -26,7 +27,7 @@ export default function App() {
     if (feedActive && feedStartedAt) {
       timerRef.current = setInterval(() => {
         setElapsed(Math.floor((Date.now() - feedStartedAt) / 1000))
-      }, 500)
+      }, 1000)
     } else {
       clearInterval(timerRef.current)
     }
