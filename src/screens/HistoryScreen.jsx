@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, getNappies, updateSession, deleteSession, addSession, deleteNappy, addNappy } from '../lib/storage.js'
+import { getSessions, getNappies, getMedicines, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine } from '../lib/storage.js'
 
 const MOOD_EMOJI = ['😔', '😐', '🙂', '😊', '🤩']
 const MOOD_LABEL = ['Tough', 'Okay', 'Good', 'Great', 'Amazing']
@@ -13,6 +13,13 @@ const POO_COLORS = [
   { id: 'green',   hex: '#6B9E5C', label: 'Green'      },
   { id: 'brown',   hex: '#8B6347', label: 'Brown'      },
   { id: 'dark',    hex: '#2D1F14', label: 'Dark/Black' },
+]
+
+const MEDICINE_OPTIONS = [
+  { id: 'paracetamol', label: 'Paracetamol', form: '120mg/5ml' },
+  { id: 'ibuprofen',   label: 'Ibuprofen',   form: '100mg/5ml' },
+  { id: 'amoxicillin', label: 'Amoxicillin', form: 'Prescription' },
+  { id: 'other',       label: 'Other',       form: 'Custom' },
 ]
 
 function fmt(secs) {
@@ -250,23 +257,99 @@ function AddNappyModal({ night, onSave, onClose }) {
   )
 }
 
+function AddMedicineModal({ night, onSave, onClose }) {
+  const p = palette(night)
+  const [medicineId, setMedicineId] = useState('paracetamol')
+  const [customName, setCustomName] = useState('')
+  const [doseMl,     setDoseMl]     = useState('')
+  const [date,       setDate]       = useState(todayDateStr())
+  const [logTime,    setLogTime]    = useState(timeStr(new Date().toISOString()))
+  const [notes,      setNotes]      = useState('')
+
+  const selected = MEDICINE_OPTIONS.find(m => m.id === medicineId)
+  const inputStyle = { width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box' }
+  const labelStyle = { display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }
+
+  const handleSave = () => {
+    const [y, mo, d] = date.split('-').map(Number)
+    const [h, m]     = logTime.split(':').map(Number)
+    const loggedAt   = new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
+    const name       = medicineId === 'other' ? customName.trim() : selected.label
+    if (!name) return
+    onSave({
+      id: Date.now().toString(),
+      name,
+      medicineId,
+      doseMl: doseMl ? Number(doseMl) : null,
+      form: selected.form,
+      notes: notes.trim() || null,
+      loggedAt,
+    })
+  }
+
+  return (
+    <ModalShell title="Log medicine" night={night} onClose={onClose}>
+      <span style={labelStyle}>Medicine</span>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+        {MEDICINE_OPTIONS.map(m => (
+          <button key={m.id} onClick={() => setMedicineId(m.id)}
+            style={{ padding: '11px 8px', borderRadius: 11, border: `1.5px solid ${medicineId === m.id ? brand.sand : p.border}`, background: medicineId === m.id ? brand.bark : 'transparent', color: medicineId === m.id ? brand.sand : p.sub, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {medicineId === 'other' && (
+        <>
+          <span style={labelStyle}>Custom name</span>
+          <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g. Vitamin D drops" style={{ ...inputStyle, marginBottom: 14 }} />
+        </>
+      )}
+
+      <span style={labelStyle}>Dose (ml)</span>
+      <input type="number" min="0" step="0.1" value={doseMl} onChange={e => setDoseMl(e.target.value)} placeholder="Optional" style={{ ...inputStyle, marginBottom: 14 }} />
+
+      <span style={labelStyle}>Date & time</span>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+        <input type="date" value={date}    onChange={e => setDate(e.target.value)}    style={{ ...inputStyle, flex: 1.4 }} />
+        <input type="time" value={logTime} onChange={e => setLogTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+      </div>
+
+      <span style={labelStyle}>Notes</span>
+      <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Reason, temperature, or advice from clinician" style={{ ...inputStyle, resize: 'vertical', marginBottom: 16 }} />
+
+      <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
+        <span style={{ display: 'block', fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
+          NHS quick reference (not prescribing advice): Paracetamol is usually every 4-6 hours (max 4 doses/24h). Ibuprofen is usually every 6-8 hours (max 3 doses/24h). Always follow the bottle label and your clinician advice.
+        </span>
+      </div>
+
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+        Log medicine
+      </button>
+    </ModalShell>
+  )
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function HistoryScreen({ night }) {
   const p = palette(night)
 
   const [sessions,    setSessions]    = useState(() => getSessions())
   const [nappies,     setNappies]     = useState(() => getNappies())
+  const [medicines,   setMedicines]   = useState(() => getMedicines())
   const [openDay,     setOpenDay]     = useState(null)
   const [editSession, setEditSession] = useState(null)
-  const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy'
+  const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'medicine'
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
 
   // ── Merge all entry types into one sorted timeline ────────────────────────
   const allEntries = useMemo(() => {
     const f = sessions.map(s => ({ ...s, _type: 'feed',  _time: s.startedAt }))
     const n = nappies.map(n  => ({ ...n, _type: 'nappy', _time: n.loggedAt  }))
-    return [...f, ...n].sort((a, b) => new Date(b._time) - new Date(a._time))
-  }, [sessions, nappies])
+    const m = medicines.map(m => ({ ...m, _type: 'medicine', _time: m.loggedAt }))
+    return [...f, ...n, ...m].sort((a, b) => new Date(b._time) - new Date(a._time))
+  }, [sessions, nappies, medicines])
 
   const grouped = useMemo(() => {
     const map = {}
@@ -318,9 +401,11 @@ export default function HistoryScreen({ night }) {
   const handleDeleteFeed = (id)          => { setSessions(deleteSession(id));           setEditSession(null) }
   const handleAddFeed    = (session)     => { setSessions(addSession(session));          setAddMode(null) }
   const handleAddNappy   = (nappy)       => { setNappies(addNappy(nappy));               setAddMode(null) }
+  const handleAddMedicine = (medicine)   => { setMedicines(addMedicine(medicine));       setAddMode(null) }
 
   const handleDelete = ({ id, type }) => {
     if (type === 'nappy') setNappies(deleteNappy(id))
+    if (type === 'medicine') setMedicines(deleteMedicine(id))
     setConfirmDel(null)
   }
 
@@ -328,10 +413,12 @@ export default function HistoryScreen({ night }) {
   function daySummary(entries) {
     const feeds   = entries.filter(e => e._type === 'feed').length
     const nappies = entries.filter(e => e._type === 'nappy').length
+    const meds    = entries.filter(e => e._type === 'medicine').length
     const feedDur = entries.filter(e => e._type === 'feed').reduce((a, e) => a + (e.durationSecs || 0), 0)
     const parts   = []
     if (feeds   > 0) parts.push(`${feeds} feed${feeds !== 1 ? 's' : ''}`)
     if (nappies > 0) parts.push(`${nappies} napp${nappies !== 1 ? 'ies' : 'y'}`)
+    if (meds > 0) parts.push(`${meds} med${meds !== 1 ? 's' : ''}`)
     if (feedDur > 0) parts.push(fmtMins(feedDur))
     return parts.join(' · ')
   }
@@ -453,6 +540,30 @@ export default function HistoryScreen({ night }) {
                       )
                     }
 
+                    if (entry._type === 'medicine') {
+                      const isDel = confirmDel?.id === entry.id
+                      return (
+                        <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
+                          <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.loggedAt)}</span>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
+                            💊
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ display: 'block', fontSize: 12, color: p.text }}>{entry.name}{entry.doseMl ? ` · ${entry.doseMl}ml` : ''}</span>
+                            {entry.notes && <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{entry.notes}</span>}
+                          </div>
+                          {isDel ? (
+                            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                              <button onClick={() => setConfirmDel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
+                              <button onClick={() => handleDelete({ id: entry.id, type: 'medicine' })} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setConfirmDel({ id: entry.id, type: 'medicine' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
+                          )}
+                        </div>
+                      )
+                    }
+
                     return null
                   })}
                 </div>
@@ -481,6 +592,7 @@ export default function HistoryScreen({ night }) {
               {[
                 { mode: 'feed',  icon: '🍼', label: 'Feed'  },
                 { mode: 'nappy', icon: '💧', label: 'Nappy' },
+                { mode: 'medicine', icon: '💊', label: 'Medicine' },
               ].map(({ mode, icon, label }) => (
                 <button key={mode} onClick={() => setAddMode(mode)}
                   style={{ flex: 1, padding: '18px 8px', borderRadius: 14, border: `1px solid ${p.border}`, background: p.bg, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, WebkitTapHighlightColor: 'transparent' }}>
@@ -496,6 +608,7 @@ export default function HistoryScreen({ night }) {
       {/* ── Add modals ── */}
       {addMode === 'feed'  && <AddFeedModal  night={night} onSave={handleAddFeed}  onClose={() => setAddMode(null)} />}
       {addMode === 'nappy' && <AddNappyModal night={night} onSave={handleAddNappy} onClose={() => setAddMode(null)} />}
+      {addMode === 'medicine' && <AddMedicineModal night={night} onSave={handleAddMedicine} onClose={() => setAddMode(null)} />}
     </div>
   )
 }
