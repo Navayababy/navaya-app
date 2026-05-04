@@ -491,10 +491,13 @@ export default function HistoryScreen({ night }) {
 
     const totalFeeds = rows.reduce((a, r) => a + r.feeds, 0)
     const totalMeds  = rows.reduce((a, r) => a + r.meds, 0)
+    const totalDirty = rows.reduce((a, r) => a + r.dirty, 0)
     const ratedFeeds = rows.reduce((a, r) => a + r.moodCount, 0)
     const avgFeedMins = totalFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalFeeds) : 0
     const avgMood = ratedFeeds ? feedMoodMeta(rows.reduce((a, r) => a + r.moodTotal, 0) / ratedFeeds) : null
-    return { rows, totalFeeds, totalMeds, avgFeedMins, avgMood, ratedFeeds }
+    const peakFeeds = Math.max(1, ...rows.map(r => r.feeds))
+    const quietDays = rows.filter(r => r.feeds === 0).length
+    return { rows, totalFeeds, totalMeds, totalDirty, avgFeedMins, avgMood, ratedFeeds, peakFeeds, quietDays }
   }, [sessions, nappies, medicines])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -561,55 +564,70 @@ export default function HistoryScreen({ night }) {
       </div>
 
       {showInsights && (
-        <div style={{ margin: '0 14px 12px', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px' }}>
-          <span style={{ display: 'block', fontSize: 11, color: p.sub, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
-            Last 7 days
-          </span>
-          <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: -6, marginBottom: 10 }}>Recent enough to spot patterns without overloading the log.</span>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 120, marginBottom: 8 }}>
-            {insights.rows.map(r => {
-              const h = Math.max(8, r.feeds * 16)
-              return (
-                <div key={r.key} style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{ height: h, borderRadius: 8, background: brand.bark, opacity: .9 }} />
-                  <span style={{ display: 'block', fontSize: 14, lineHeight: 1.1, marginTop: 4 }}>{r.mood?.emoji || '·'}</span>
-                  <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 2 }}>{r.label}</span>
-                  <span style={{ display: 'block', fontSize: 10, color: p.sub }}>{r.feeds}</span>
-                </div>
-              )
-            })}
+        <div style={{ margin: '0 14px 14px', background: `linear-gradient(180deg, ${p.card} 0%, ${night ? '#211A15' : '#FFFCF8'} 100%)`, borderRadius: 20, border: `1px solid ${p.border}`, padding: '16px 14px 14px', boxShadow: night ? '0 16px 38px rgba(0,0,0,0.18)' : '0 18px 42px rgba(74,55,40,0.07)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+            <div>
+              <span style={{ display: 'block', fontSize: 11, color: p.sub, textTransform: 'uppercase', letterSpacing: '.14em', marginBottom: 5 }}>
+                Last 7 days
+              </span>
+              <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 23, lineHeight: 1, color: night ? brand.parchment : brand.bark }}>
+                Feeding rhythm
+              </span>
+            </div>
+            <div style={{ borderRadius: 999, background: night ? '#30271F' : '#F3E9DD', border: `1px solid ${p.border}`, padding: '7px 10px', textAlign: 'right', flexShrink: 0 }}>
+              <span style={{ display: 'block', fontSize: 15, lineHeight: 1, color: p.text, fontWeight: 700 }}>{insights.totalFeeds}</span>
+              <span style={{ display: 'block', fontSize: 9, color: p.sub, marginTop: 2 }}>feeds</span>
+            </div>
           </div>
-          <span style={{ display: 'block', fontSize: 10, color: p.sub, marginBottom: 10 }}>Bars show feeds/day. Emoji shows the average rating for that day when feeds were rated.</span>
+
+          <div style={{ position: 'relative', height: 176, padding: '10px 4px 0', borderRadius: 16, background: night ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.48)', border: `1px solid ${night ? 'rgba(237,229,216,0.06)' : 'rgba(237,229,216,0.65)'}` }}>
+            <div style={{ position: 'absolute', left: 12, right: 12, bottom: 58, height: 1, background: night ? 'rgba(237,229,216,0.08)' : '#EEE4D7' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', alignItems: 'end', gap: 8, height: '100%' }}>
+              {insights.rows.map(r => {
+                const isToday = r.key === todayDateStr()
+                const barHeight = r.feeds ? 34 + (r.feeds / insights.peakFeeds) * 72 : 6
+                return (
+                  <div key={r.key} style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 }}>
+                    <span style={{ minHeight: 18, fontSize: 14, lineHeight: 1, marginBottom: 6 }}>{r.mood?.emoji || ''}</span>
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: 108 }}>
+                      <div style={{ width: isToday ? 30 : 22, height: barHeight, borderRadius: 999, background: r.feeds ? (isToday ? brand.bark : '#7A614E') : (night ? '#342B24' : '#E7DED3'), boxShadow: isToday && r.feeds ? '0 10px 22px rgba(74,55,40,0.18)' : 'none', opacity: r.feeds ? 1 : 0.9 }} />
+                    </div>
+                    <span style={{ display: 'block', fontSize: 10, color: isToday ? p.text : p.sub, fontWeight: isToday ? 700 : 500, marginTop: 8 }}>{isToday ? 'Today' : r.label}</span>
+                    <span style={{ display: 'block', fontSize: 11, color: r.feeds ? p.text : p.sub, fontWeight: r.feeds ? 700 : 500, marginTop: 2 }}>{r.feeds}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
 
           {insights.avgMood && (
-            <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 28, lineHeight: 1 }}>{insights.avgMood.emoji}</span>
-              <div>
-                <span style={{ display: 'block', fontSize: 12, color: p.text, fontWeight: 600 }}>Average feed felt {insights.avgMood.label.toLowerCase()}</span>
-                <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 2 }}>Based on {insights.ratedFeeds} rated feed{insights.ratedFeeds !== 1 ? 's' : ''} from the last 7 days.</span>
+            <div style={{ background: night ? '#2A231D' : '#F6EFE7', border: `1px solid ${p.border}`, borderRadius: 16, padding: '12px 13px', marginTop: 12, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ width: 44, height: 44, borderRadius: '50%', background: night ? '#342B24' : '#FFF7EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 27, lineHeight: 1, flexShrink: 0 }}>{insights.avgMood.emoji}</span>
+              <div style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 700 }}>Feeds felt {insights.avgMood.label.toLowerCase()} overall</span>
+                <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 2 }}>From {insights.ratedFeeds} rated feed{insights.ratedFeeds !== 1 ? 's' : ''} this week.</span>
               </div>
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: 8 }}>
-              <span style={{ display: 'block', fontSize: 10, color: p.sub }}>Feeds</span>
-              <span style={{ fontSize: 16, color: p.text }}>{insights.totalFeeds}</span>
-            </div>
-            <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: 8 }}>
-              <span style={{ display: 'block', fontSize: 10, color: p.sub }}>Avg feed</span>
-              <span style={{ fontSize: 16, color: p.text }}>{insights.avgFeedMins}m</span>
-            </div>
-            <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: 8 }}>
-              <span style={{ display: 'block', fontSize: 10, color: p.sub }}>Meds</span>
-              <span style={{ fontSize: 16, color: p.text }}>{insights.totalMeds}</span>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {[
+              { label: 'Avg feed', value: `${insights.avgFeedMins}m` },
+              { label: 'Medicine', value: insights.totalMeds },
+              { label: 'Dirty nappies', value: insights.totalDirty },
+              { label: 'Quiet days', value: insights.quietDays },
+            ].map(item => (
+              <div key={item.label} style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 14, padding: '11px 12px' }}>
+                <span style={{ display: 'block', fontSize: 10, color: p.sub }}>{item.label}</span>
+                <span style={{ display: 'block', fontSize: 18, lineHeight: 1.1, color: p.text, marginTop: 5, fontWeight: 600 }}>{item.value}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {/* ── This week summary ── */}
-      {weekFeeds.length > 0 && (
+      {!showInsights && weekFeeds.length > 0 && (
         <div style={{ margin: '0 14px 14px', background: p.card, borderRadius: 10, border: `1px solid ${p.border}`, padding: '8px 12px' }}>
           <span style={{ fontSize: 10, color: p.sub }}>
             {'This week · '}
