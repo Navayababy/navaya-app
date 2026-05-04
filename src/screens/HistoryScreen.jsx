@@ -16,10 +16,10 @@ const POO_COLORS = [
 ]
 
 const MEDICINE_OPTIONS = [
-  { id: 'paracetamol', label: 'Paracetamol', form: '120mg/5ml' },
-  { id: 'ibuprofen',   label: 'Ibuprofen',   form: '100mg/5ml' },
-  { id: 'amoxicillin', label: 'Amoxicillin', form: 'Prescription' },
-  { id: 'other',       label: 'Other',       form: 'Custom' },
+  { id: 'paracetamol', label: 'Paracetamol' },
+  { id: 'ibuprofen',   label: 'Ibuprofen' },
+  { id: 'amoxicillin', label: 'Amoxicillin' },
+  { id: 'other',       label: 'Other' },
 ]
 
 function fmt(secs) {
@@ -295,7 +295,6 @@ function AddMedicineModal({ night, onSave, onClose }) {
       name,
       medicineId,
       doseMl: doseMl ? Number(doseMl) : null,
-      form: selected.form,
       notes: notes.trim() || null,
       loggedAt,
     })
@@ -334,7 +333,7 @@ function AddMedicineModal({ night, onSave, onClose }) {
 
       <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
         <span style={{ display: 'block', fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
-          NHS quick reference (not prescribing advice): Paracetamol is usually every 4-6 hours (max 4 doses/24h). Ibuprofen is usually every 6-8 hours (max 3 doses/24h). Always follow the bottle label and your clinician advice.
+          Medicine log only — this app does not calculate doses, timing, or daily limits. Record what was given as directed on the medicine label, prescription, or by your clinician.
         </span>
       </div>
 
