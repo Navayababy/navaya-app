@@ -61,6 +61,7 @@ function buildISO(dateVal, timeVal) {
 }
 
 function todayDateStr() { return dateStr(new Date().toISOString()) }
+function dayKey(isoString) { return dateStr(isoString) }
 
 // ── Shared modal shell ────────────────────────────────────────────────────────
 function ModalShell({ title, night, onClose, children }) {
@@ -342,6 +343,7 @@ export default function HistoryScreen({ night }) {
   const [editSession, setEditSession] = useState(null)
   const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'medicine'
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
+  const [showInsights, setShowInsights] = useState(false)
 
   // ── Merge all entry types into one sorted timeline ────────────────────────
   const allEntries = useMemo(() => {
@@ -395,6 +397,45 @@ export default function HistoryScreen({ night }) {
 
   const leftCount  = weekFeeds.filter(s => s.side === 'L').length
   const rightCount = weekFeeds.filter(s => s.side === 'R').length
+
+  const insights = useMemo(() => {
+    const days = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date()
+      d.setHours(0, 0, 0, 0)
+      d.setDate(d.getDate() - i)
+      days.push(d)
+    }
+
+    const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, feedMins: 0, meds: 0, dirty: 0 }]))
+    sessions.forEach(s => {
+      const k = dayKey(s.startedAt)
+      if (!byDay[k]) return
+      byDay[k].feeds += 1
+      byDay[k].feedMins += Math.round((s.durationSecs || 0) / 60)
+    })
+    medicines.forEach(m => {
+      const k = dayKey(m.loggedAt)
+      if (!byDay[k]) return
+      byDay[k].meds += 1
+    })
+    nappies.forEach(n => {
+      const k = dayKey(n.loggedAt)
+      if (!byDay[k]) return
+      if (n.type === 'poo' || n.type === 'both') byDay[k].dirty += 1
+    })
+
+    const rows = days.map(d => {
+      const k = dateStr(d.toISOString())
+      const v = byDay[k]
+      return { key: k, label: d.toLocaleDateString('en-GB', { weekday: 'short' }), ...v }
+    })
+
+    const totalFeeds = rows.reduce((a, r) => a + r.feeds, 0)
+    const totalMeds  = rows.reduce((a, r) => a + r.meds, 0)
+    const avgFeedMins = totalFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalFeeds) : 0
+    return { rows, totalFeeds, totalMeds, avgFeedMins }
+  }, [sessions, nappies, medicines])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSaveEdit   = (id, changes) => { setSessions(updateSession(id, changes)); setEditSession(null) }
@@ -451,6 +492,48 @@ export default function HistoryScreen({ night }) {
         ))}
       </div>
 
+      <div style={{ padding: '0 14px 10px' }}>
+        <button onClick={() => setShowInsights(v => !v)} style={{ width: '100%', border: `1px solid ${p.border}`, borderRadius: 12, background: p.card, color: p.text, padding: '10px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+          {showInsights ? 'Back to logbook' : 'View weekly insights'}
+        </button>
+      </div>
+
+      {showInsights && (
+        <div style={{ margin: '0 14px 12px', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px' }}>
+          <span style={{ display: 'block', fontSize: 11, color: p.sub, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>
+            Last 7 days
+          </span>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 120, marginBottom: 8 }}>
+            {insights.rows.map(r => {
+              const h = Math.max(8, r.feeds * 16)
+              return (
+                <div key={r.key} style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ height: h, borderRadius: 8, background: brand.bark, opacity: .9 }} />
+                  <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 4 }}>{r.label}</span>
+                  <span style={{ display: 'block', fontSize: 10, color: p.sub }}>{r.feeds}</span>
+                </div>
+              )
+            })}
+          </div>
+          <span style={{ display: 'block', fontSize: 10, color: p.sub, marginBottom: 10 }}>Bars show feeds/day.</span>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: 8 }}>
+              <span style={{ display: 'block', fontSize: 10, color: p.sub }}>Feeds</span>
+              <span style={{ fontSize: 16, color: p.text }}>{insights.totalFeeds}</span>
+            </div>
+            <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: 8 }}>
+              <span style={{ display: 'block', fontSize: 10, color: p.sub }}>Avg feed</span>
+              <span style={{ fontSize: 16, color: p.text }}>{insights.avgFeedMins}m</span>
+            </div>
+            <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: 8 }}>
+              <span style={{ display: 'block', fontSize: 10, color: p.sub }}>Meds</span>
+              <span style={{ fontSize: 16, color: p.text }}>{insights.totalMeds}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── This week summary ── */}
       {weekFeeds.length > 0 && (
         <div style={{ margin: '0 14px 14px', background: p.card, borderRadius: 10, border: `1px solid ${p.border}`, padding: '8px 12px' }}>
@@ -464,7 +547,7 @@ export default function HistoryScreen({ night }) {
       )}
 
       {/* ── Day groups ── */}
-      {grouped.length === 0 ? (
+      {!showInsights && (grouped.length === 0 ? (
         <div style={{ padding: '20px 14px' }}>
           <span style={{ fontSize: 13, color: p.sub }}>No entries yet. Your history will appear here.</span>
         </div>
@@ -571,7 +654,7 @@ export default function HistoryScreen({ night }) {
             </div>
           )
         })
-      )}
+      ))}
 
       <div style={{ height: 20 }} />
 
