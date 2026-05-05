@@ -504,9 +504,10 @@ export default function HistoryScreen({ night }) {
     const avgFeedMins = totalFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalFeeds) : 0
     const avgMood = ratedFeeds ? feedMoodMeta(rows.reduce((a, r) => a + r.moodTotal, 0) / ratedFeeds) : null
     const peakFeeds = Math.max(1, ...rows.map(r => r.feeds))
+    const nowTs = Date.now()
     const sortedFeeds = sessions
       .map(s => new Date(s.startedAt).getTime())
-      .filter(ts => !Number.isNaN(ts) && ts >= days[0].getTime())
+      .filter(ts => !Number.isNaN(ts) && ts >= days[0].getTime() && ts <= nowTs)
       .sort((a, b) => a - b)
     const avgGapMins = sortedFeeds.length > 1
       ? Math.round(sortedFeeds.slice(1).reduce((acc, ts, idx) => acc + (ts - sortedFeeds[idx]), 0) / (sortedFeeds.length - 1) / 60000)
