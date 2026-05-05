@@ -72,7 +72,7 @@ export default function ChatScreen({ night }) {
       {/* Header */}
       <div style={{ padding: '20px 16px 12px', flexShrink: 0 }}>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your breastfeeding companion</span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, marginTop: 2 }}>Sage</span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Sage</span>
       </div>
 
       {/* Messages */}
@@ -110,7 +110,7 @@ export default function ChatScreen({ night }) {
               </div>
             ) : (
               <div style={{ background: p.card, border: `1px solid ${m.error ? '#C0392B' : p.border}`, borderRadius: '14px 14px 14px 4px', padding: '12px 13px', maxWidth: '92%' }}>
-                <span style={{ display: 'block', fontSize: 9, color: brand.sand, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>✦ Sage</span>
+                <span style={{ display: 'block', fontSize: 9, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>✦ Sage</span>
                 <span style={{ fontSize: 13, color: p.text, lineHeight: 1.65 }}>{m.content}</span>
               </div>
             )}

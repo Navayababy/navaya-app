@@ -160,7 +160,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
                 placeholder="Your name"
                 style={{
                   fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 400,
-                  color: night ? brand.parchment : brand.bark, background: 'transparent',
+                  color: p.heading, background: 'transparent',
                   border: 'none', borderBottom: `1.5px solid ${brand.sand}`,
                   outline: 'none', width: 140, lineHeight: 1.2, padding: '0 0 2px',
                 }}
@@ -173,7 +173,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
           ) : (
             <button onClick={openNameEdit}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, lineHeight: 1.1 }}>
+              <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, lineHeight: 1.1 }}>
                 {displayName}
               </span>
               <span style={{ fontSize: 11, color: p.sub, marginTop: 4 }}>✎</span>
@@ -193,7 +193,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
                   placeholder="Baby's name"
                   style={{
                     fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 400,
-                    color: night ? brand.parchment : brand.bark, background: 'transparent',
+                    color: p.heading, background: 'transparent',
                     border: 'none', borderBottom: `1.5px solid ${brand.sand}`,
                     outline: 'none', width: 140, lineHeight: 1.2, padding: '0 0 2px',
                   }}
@@ -206,7 +206,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
             ) : (
               <button onClick={openBabyEdit}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 400, color: babyName ? (night ? brand.parchment : brand.bark) : p.sub, lineHeight: 1.1 }}>
+                <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 400, color: babyName ? p.heading : p.sub, lineHeight: 1.1 }}>
                   {babyName || 'Add name'}
                 </span>
                 <span style={{ fontSize: 11, color: p.sub, marginTop: 2 }}>✎</span>
@@ -246,10 +246,10 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
         <div style={{ textAlign: 'center', padding: '18px 0 14px' }}>
           {feedActive ? (
             <>
-              <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 68, fontWeight: 300, color: night ? brand.parchment : brand.bark, lineHeight: 1, letterSpacing: '-2px' }}>
+              <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 68, fontWeight: 300, color: p.heading, lineHeight: 1, letterSpacing: '-2px' }}>
                 {fmt(elapsed)}
               </span>
-              <span style={{ display: 'block', fontSize: 10, color: brand.sand, marginTop: 4, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+              <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 4, letterSpacing: '.08em', textTransform: 'uppercase' }}>
                 in progress
               </span>
             </>
@@ -280,7 +280,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
         ) : (
           <div style={{ padding: '0 14px 14px' }}>
             <button onClick={handleStop}
-              style={{ width: '100%', padding: '15px', borderRadius: 13, border: `1.5px solid ${brand.bark}`, cursor: 'pointer', background: 'transparent', color: brand.bark, fontSize: 13, fontWeight: 500 }}>
+              style={{ width: '100%', padding: '15px', borderRadius: 13, border: `1.5px solid ${p.heading}`, cursor: 'pointer', background: 'transparent', color: p.heading, fontSize: 13, fontWeight: 500 }}>
               Finish feed
             </button>
           </div>
@@ -331,7 +331,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
           sessions.map((s, i) => (
             <div key={s.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: i < sessions.length - 1 ? `1px solid ${p.border}` : 'none' }}>
               <div style={{ width: 30, height: 30, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: brand.sand }}>{s.side}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: p.sub }}>{s.side}</span>
               </div>
               <div style={{ flex: 1 }}>
                 <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500 }}>{s.side === 'L' ? 'Left' : 'Right'} side</span>

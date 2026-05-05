@@ -133,7 +133,7 @@ export default function NappyScreen({ night }) {
       {/* Header */}
       <div style={{ padding: '20px 16px 12px' }}>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Keep track</span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, marginTop: 2 }}>Nappies</span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Nappies</span>
       </div>
 
       {/* Stats */}
@@ -144,7 +144,7 @@ export default function NappyScreen({ night }) {
           [pooToday.toString(),                  'poos today' ],
         ].map(([val, lbl]) => (
           <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 13, padding: '11px 8px', border: `1px solid ${p.border}`, textAlign: 'center' }}>
-            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: val.length > 5 ? 15 : 20, color: brand.bark, lineHeight: 1.2 }}>{val}</span>
+            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: val.length > 5 ? 15 : 20, color: p.heading, lineHeight: 1.2 }}>{val}</span>
             <span style={{ display: 'block', fontSize: 9, color: p.sub, lineHeight: 1.3, marginTop: 3 }}>{lbl}</span>
           </div>
         ))}
