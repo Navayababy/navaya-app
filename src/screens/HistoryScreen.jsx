@@ -543,16 +543,16 @@ export default function HistoryScreen({ night }) {
       </div>
 
       {/* ── Today stats ── */}
-      <div style={{ display: 'flex', gap: 8, padding: '0 14px 8px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, padding: '0 14px 8px' }}>
         {[
           { val: feedsToday.length.toString(), lbl: 'feeds today',  sub: feedTimeTodaySecs > 0 ? fmtMins(feedTimeTodaySecs) : null },
           { val: wetToday.toString(),          lbl: 'wet today',    sub: null },
           { val: dirtyToday.toString(),        lbl: 'dirty today',  sub: null },
         ].map(({ val, lbl, sub }) => (
-          <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 13, padding: '11px 8px', border: `1px solid ${p.border}`, textAlign: 'center' }}>
-            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: brand.bark }}>{val}</span>
-            <span style={{ display: 'block', fontSize: 9, color: p.sub, lineHeight: 1.3, marginTop: 2 }}>{lbl}</span>
-            {sub && <span style={{ display: 'block', fontSize: 9, color: p.sub, opacity: 0.65, marginTop: 1 }}>{sub}</span>}
+          <div key={lbl} style={{ background: p.card, borderRadius: 13, padding: '12px 10px', border: `1px solid ${p.border}`, textAlign: 'left' }}>
+            <span style={{ display: 'block', fontSize: 10, color: p.sub, lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '.08em' }}>{lbl}</span>
+            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 24, lineHeight: 1, color: brand.bark, marginTop: 6 }}>{val}</span>
+            {sub && <span style={{ display: 'block', fontSize: 10, color: p.sub, opacity: 0.85, marginTop: 6 }}>{sub}</span>}
           </div>
         ))}
       </div>
@@ -574,14 +574,14 @@ export default function HistoryScreen({ night }) {
                 Feeding rhythm
               </span>
             </div>
-            <div style={{ borderRadius: 999, background: night ? '#30271F' : '#F3E9DD', border: `1px solid ${p.border}`, padding: '7px 10px', textAlign: 'right', flexShrink: 0 }}>
-              <span style={{ display: 'block', fontSize: 15, lineHeight: 1, color: p.text, fontWeight: 700 }}>{insights.totalFeeds}</span>
-              <span style={{ display: 'block', fontSize: 9, color: p.sub, marginTop: 2 }}>feeds</span>
+            <div style={{ width: 84, height: 84, borderRadius: '50%', background: night ? '#30271F' : '#F3E9DD', border: `1px solid ${p.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', flexShrink: 0 }}>
+              <span style={{ display: 'block', fontSize: 42, lineHeight: 0.9, color: p.text, fontWeight: 600 }}>{insights.totalFeeds}</span>
+              <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 1 }}>feeds</span>
             </div>
           </div>
 
-          <div style={{ position: 'relative', height: 176, padding: '10px 4px 0', borderRadius: 16, background: night ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.48)', border: `1px solid ${night ? 'rgba(237,229,216,0.06)' : 'rgba(237,229,216,0.65)'}` }}>
-            <div style={{ position: 'absolute', left: 12, right: 12, bottom: 58, height: 1, background: night ? 'rgba(237,229,216,0.08)' : '#EEE4D7' }} />
+          <div style={{ position: 'relative', minHeight: 196, padding: '10px 4px 8px', borderRadius: 16, background: night ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.48)', border: `1px solid ${night ? 'rgba(237,229,216,0.06)' : 'rgba(237,229,216,0.65)'}` }}>
+            <div style={{ position: 'absolute', left: 12, right: 12, bottom: 70, height: 1, background: night ? 'rgba(237,229,216,0.08)' : '#EEE4D7' }} />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', alignItems: 'end', gap: 8, height: '100%' }}>
               {insights.rows.map(r => {
                 const isToday = r.key === todayDateStr()
@@ -592,7 +592,7 @@ export default function HistoryScreen({ night }) {
                     <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: 108 }}>
                       <div style={{ width: isToday ? 30 : 22, height: barHeight, borderRadius: 999, background: r.feeds ? (isToday ? brand.bark : '#7A614E') : (night ? '#342B24' : '#E7DED3'), boxShadow: isToday && r.feeds ? '0 10px 22px rgba(74,55,40,0.18)' : 'none', opacity: r.feeds ? 1 : 0.9 }} />
                     </div>
-                    <span style={{ display: 'block', fontSize: 10, color: isToday ? p.text : p.sub, fontWeight: isToday ? 700 : 500, marginTop: 8 }}>{isToday ? 'Today' : r.label}</span>
+                    <span style={{ display: 'block', fontSize: 10, color: isToday ? p.text : p.sub, fontWeight: isToday ? 700 : 500, marginTop: 8, lineHeight: 1.2 }}>{isToday ? 'Today' : r.label}</span>
                     <span style={{ display: 'block', fontSize: 11, color: r.feeds ? p.text : p.sub, fontWeight: r.feeds ? 700 : 500, marginTop: 2 }}>{r.feeds}</span>
                   </div>
                 )
@@ -628,8 +628,8 @@ export default function HistoryScreen({ night }) {
 
       {/* ── This week summary ── */}
       {!showInsights && weekFeeds.length > 0 && (
-        <div style={{ margin: '0 14px 14px', background: p.card, borderRadius: 10, border: `1px solid ${p.border}`, padding: '8px 12px' }}>
-          <span style={{ fontSize: 10, color: p.sub }}>
+        <div style={{ margin: '0 14px 14px', background: p.card, borderRadius: 10, border: `1px solid ${p.border}`, padding: '10px 12px' }}>
+          <span style={{ fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
             {'This week · '}
             <span style={{ color: p.text, fontWeight: 500 }}>{weekFeeds.length} feed{weekFeeds.length !== 1 ? 's' : ''}</span>
             {weekAvgDuration > 0 && <>{' · avg '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(weekAvgDuration)}</span>{' each'}</>}
@@ -650,10 +650,10 @@ export default function HistoryScreen({ night }) {
           return (
             <div key={group.label} style={{ margin: '0 14px 10px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, overflow: 'hidden' }}>
               <button onClick={() => setOpenDay(isOpen ? null : group.label)}
-                style={{ width: '100%', padding: '13px 14px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                style={{ width: '100%', padding: '14px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, textAlign: 'left' }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: p.text }}>{group.label}</span>
-                  <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{daySummary(group.entries)}</span>
+                  <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: p.text }}>{group.label}</span>
+                  <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 3 }}>{daySummary(group.entries)}</span>
                 </div>
                 <span style={{ color: p.sub, fontSize: 14, display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }}>›</span>
               </button>
