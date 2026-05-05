@@ -75,7 +75,7 @@ export default function PrepareScreen({ night }) {
       {/* Header */}
       <div style={{ padding: '20px 16px 12px' }}>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Feed with confidence</span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, marginTop: 2 }}>Prepare to go out</span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Prepare to go out</span>
         <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 4, lineHeight: 1.5 }}>Run through this before you leave. Everything ticked means you're ready.</span>
       </div>
 
@@ -97,7 +97,7 @@ export default function PrepareScreen({ night }) {
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <span style={{ fontSize: 12, color: p.sub }}>Getting ready</span>
-              <span style={{ fontSize: 12, color: brand.bark, fontWeight: 600 }}>{doneCount}/{totalCount}</span>
+              <span style={{ fontSize: 12, color: p.heading, fontWeight: 600 }}>{doneCount}/{totalCount}</span>
             </div>
             <div style={{ height: 3, background: p.border, borderRadius: 2, overflow: 'hidden' }}>
               <div style={{ height: '100%', background: brand.sand, width: `${progress}%`, transition: 'width .3s', borderRadius: 2 }} />

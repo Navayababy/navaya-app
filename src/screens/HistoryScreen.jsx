@@ -88,8 +88,8 @@ function ModalShell({ title, night, onClose, children }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, padding: '0 0 env(safe-area-inset-bottom, 0)' }}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: p.card, borderRadius: '20px 20px 0 0', padding: '20px 20px 28px', border: `1px solid ${p.border}`, maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: night ? brand.parchment : brand.bark }}>{title}</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: p.card === '#fff' ? '#666' : '#aaa' }}>×</button>
+          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: p.heading }}>{title}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: p.sub }}>×</button>
         </div>
         {children}
       </div>
@@ -551,7 +551,7 @@ export default function HistoryScreen({ night }) {
       <div style={{ padding: '20px 16px 12px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <div>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your journey</span>
-          <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: night ? brand.parchment : brand.bark, marginTop: 2 }}>Logbook</span>
+          <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Logbook</span>
         </div>
         <button onClick={() => setAddMode('picker')} style={{ width: 36, height: 36, borderRadius: '50%', background: brand.bark, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
           <span style={{ color: brand.sand, fontSize: 22, lineHeight: 1, marginTop: -1 }}>+</span>
@@ -567,7 +567,7 @@ export default function HistoryScreen({ night }) {
         ].map(({ val, lbl, sub }) => (
           <div key={lbl} style={{ background: p.card, borderRadius: 13, padding: '12px 10px', border: `1px solid ${p.border}`, textAlign: 'left' }}>
             <span style={{ display: 'block', fontSize: 10, color: p.sub, lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '.08em' }}>{lbl}</span>
-            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 24, lineHeight: 1, color: brand.bark, marginTop: 6 }}>{val}</span>
+            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 24, lineHeight: 1, color: p.heading, marginTop: 6 }}>{val}</span>
             {sub && <span style={{ display: 'block', fontSize: 10, color: p.sub, opacity: 0.85, marginTop: 6 }}>{sub}</span>}
           </div>
         ))}
@@ -586,7 +586,7 @@ export default function HistoryScreen({ night }) {
               <span style={{ display: 'block', fontSize: 11, color: p.sub, textTransform: 'uppercase', letterSpacing: '.14em', marginBottom: 5 }}>
                 Last 7 days
               </span>
-              <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 23, lineHeight: 1, color: night ? brand.parchment : brand.bark }}>
+              <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 23, lineHeight: 1, color: p.heading }}>
                 Feeding rhythm
               </span>
             </div>
@@ -686,7 +686,7 @@ export default function HistoryScreen({ night }) {
                         onClick={() => setEditSession(entry)}>
                         <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
                         <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
-                          <span style={{ fontSize: 10, fontWeight: 600, color: brand.sand }}>{entry.side}</span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: p.sub }}>{entry.side}</span>
                         </div>
                         <div style={{ flex: 1 }}>
                           <span style={{ display: 'block', fontSize: 12, color: p.text }}>{entry.side === 'L' ? 'Left' : 'Right'} breast</span>
@@ -776,7 +776,7 @@ export default function HistoryScreen({ night }) {
         <div onClick={() => setAddMode(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, padding: '0 0 env(safe-area-inset-bottom, 0)' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: p.card, borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', border: `1px solid ${p.border}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: night ? brand.parchment : brand.bark }}>Add entry</span>
+              <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: p.heading }}>Add entry</span>
               <button onClick={() => setAddMode(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: p.sub }}>×</button>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
