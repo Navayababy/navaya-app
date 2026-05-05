@@ -447,6 +447,14 @@ export default function HistoryScreen({ night }) {
   const rightCount = weekFeeds.filter(s => s.side === 'R').length
   const weekMood   = useMemo(() => averageFeedMood(weekFeeds), [weekFeeds])
 
+  const fmtGap = (mins) => {
+    if (mins == null) return '—'
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    if (!h) return `${m}m`
+    return m ? `${h}h ${m}m` : `${h}h`
+  }
+
   const insights = useMemo(() => {
     const days = []
     for (let i = 6; i >= 0; i--) {
@@ -496,8 +504,15 @@ export default function HistoryScreen({ night }) {
     const avgFeedMins = totalFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalFeeds) : 0
     const avgMood = ratedFeeds ? feedMoodMeta(rows.reduce((a, r) => a + r.moodTotal, 0) / ratedFeeds) : null
     const peakFeeds = Math.max(1, ...rows.map(r => r.feeds))
-    const quietDays = rows.filter(r => r.feeds === 0).length
-    return { rows, totalFeeds, totalMeds, totalDirty, avgFeedMins, avgMood, ratedFeeds, peakFeeds, quietDays }
+    const sortedFeeds = sessions
+      .map(s => new Date(s.startedAt).getTime())
+      .filter(ts => !Number.isNaN(ts) && ts >= days[0].getTime())
+      .sort((a, b) => a - b)
+    const avgGapMins = sortedFeeds.length > 1
+      ? Math.round(sortedFeeds.slice(1).reduce((acc, ts, idx) => acc + (ts - sortedFeeds[idx]), 0) / (sortedFeeds.length - 1) / 60000)
+      : null
+
+    return { rows, totalFeeds, totalMeds, totalDirty, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
   }, [sessions, nappies, medicines])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -581,7 +596,6 @@ export default function HistoryScreen({ night }) {
           </div>
 
           <div style={{ position: 'relative', minHeight: 196, padding: '10px 4px 8px', borderRadius: 16, background: night ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.48)', border: `1px solid ${night ? 'rgba(237,229,216,0.06)' : 'rgba(237,229,216,0.65)'}` }}>
-            <div style={{ position: 'absolute', left: 12, right: 12, bottom: 70, height: 1, background: night ? 'rgba(237,229,216,0.08)' : '#EEE4D7' }} />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', alignItems: 'end', gap: 8, height: '100%' }}>
               {insights.rows.map(r => {
                 const isToday = r.key === todayDateStr()
@@ -615,7 +629,7 @@ export default function HistoryScreen({ night }) {
               { label: 'Avg feed', value: `${insights.avgFeedMins}m` },
               { label: 'Medicine', value: insights.totalMeds },
               { label: 'Dirty nappies', value: insights.totalDirty },
-              { label: 'Quiet days', value: insights.quietDays },
+              { label: 'Avg gap', value: fmtGap(insights.avgGapMins) },
             ].map(item => (
               <div key={item.label} style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 14, padding: '11px 12px' }}>
                 <span style={{ display: 'block', fontSize: 10, color: p.sub }}>{item.label}</span>
