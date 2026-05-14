@@ -138,6 +138,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
   }
 
   const displayName = userName || 'there'
+  const appGuideUrl = 'https://www.navayababy.co.uk/pages/the-app'
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg }}>
@@ -344,6 +345,35 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
             </div>
           ))
         )}
+      </div>
+
+      {/* ── App guide ── */}
+      <div style={{ margin: '14px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px 14px' }}>
+        <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+          App guide
+        </span>
+        <span style={{ display: 'block', fontSize: 13, color: p.text, lineHeight: 1.45 }}>
+          Start a feed with Left or Right, then finish to save it in History. See the full walkthrough anytime.
+        </span>
+        <a
+          href={appGuideUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            marginTop: 10,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: brand.bark,
+            textDecoration: 'none',
+            fontWeight: 600,
+            letterSpacing: '.02em',
+          }}
+        >
+          Open app guide
+          <span aria-hidden="true">↗</span>
+        </a>
       </div>
 
       {/* ── Instagram link ── */}
