@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, addSession, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
+import { insertFeedSession } from '../lib/db.js'
 
 const QUOTES = [
   // — Verified breast milk facts —
@@ -63,7 +64,7 @@ function greeting() {
   return 'evening'
 }
 
-export default function HomeScreen({ night, onNightToggle, timer }) {
+export default function HomeScreen({ night, onNightToggle, timer, authUser, profile, onSessionSaved }) {
   const p = palette(night)
   const { feedActive, feedSide, elapsed, startFeed, stopFeed } = timer
 
@@ -93,14 +94,32 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
     const sessionData = stopFeed()
     setPending(sessionData)
     setShowMood(true)
-    setTimeout(() => { setPartnerFlash(true) }, 400)
-    setTimeout(() => { setPartnerFlash(false) }, 3500)
+    if (profile?.household_id) {
+      setTimeout(() => { setPartnerFlash(true) }, 400)
+      setTimeout(() => { setPartnerFlash(false) }, 3500)
+    }
+  }
+
+  const saveSession = (session) => {
+    setSessions(sortByTime(addSession(session)).slice(0, 3))
+    if (authUser && profile?.household_id) {
+      insertFeedSession({
+        householdId:  profile.household_id,
+        babyId:       null,
+        loggedBy:     authUser.id,
+        startedAt:    session.startedAt,
+        endedAt:      session.endedAt,
+        durationSecs: session.durationSecs,
+        side:         session.side,
+        moodScore:    session.mood ?? null,
+      }).then(() => onSessionSaved?.())
+    }
   }
 
   const saveMood = (mood) => {
     if (!pendingSession) return
     const session = { id: Date.now().toString(), ...pendingSession, mood }
-    setSessions(sortByTime(addSession(session)).slice(0, 3))
+    saveSession(session)
     setPending(null)
     setShowMood(false)
   }
@@ -108,7 +127,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
   const skipMood = () => {
     if (!pendingSession) return
     const session = { id: Date.now().toString(), ...pendingSession, mood: null }
-    setSessions(sortByTime(addSession(session)).slice(0, 3))
+    saveSession(session)
     setPending(null)
     setShowMood(false)
   }
@@ -292,7 +311,7 @@ export default function HomeScreen({ night, onNightToggle, timer }) {
       {partnerFlash && (
         <div className="fade-up" style={{ margin: '10px 14px 0', background: brand.green, borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: '#fff', fontSize: 13 }}>✓</span>
-          <span style={{ fontSize: 12, color: '#fff', fontWeight: 500 }}>Parm can see this feed</span>
+          <span style={{ fontSize: 12, color: '#fff', fontWeight: 500 }}>Your partner can see this feed</span>
         </div>
       )}
 
