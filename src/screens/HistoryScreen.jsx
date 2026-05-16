@@ -1,6 +1,21 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, getNappies, getMedicines, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine } from '../lib/storage.js'
+import { updateFeedSession, deleteFeedSession, insertFeedSession } from '../lib/db.js'
+
+// Convert Supabase snake_case fields to camelCase for uniform display
+function normalizeSession(s) {
+  if ('startedAt' in s) return s
+  return {
+    id:          s.id,
+    side:        s.side,
+    startedAt:   s.started_at,
+    endedAt:     s.ended_at,
+    durationSecs: s.duration_secs,
+    mood:        s.mood_score,
+    loggedBy:    s.logged_by,
+  }
+}
 
 const MOOD_EMOJI = ['😔', '😐', '🙂', '😊', '🤩']
 const MOOD_LABEL = ['Tough', 'Okay', 'Good', 'Great', 'Amazing']
@@ -381,8 +396,9 @@ function AddMedicineModal({ night, onSave, onClose }) {
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-export default function HistoryScreen({ night }) {
+export default function HistoryScreen({ night, authUser, profile, sharedSessions, onRefreshSessions }) {
   const p = palette(night)
+  const sharedMode = !!(profile?.household_id && sharedSessions)
 
   const [sessions,    setSessions]    = useState(() => getSessions())
   const [nappies,     setNappies]     = useState(() => getNappies())
@@ -393,13 +409,17 @@ export default function HistoryScreen({ night }) {
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
   const [showInsights, setShowInsights] = useState(false)
 
+  const feeds = sharedMode
+    ? sharedSessions.map(normalizeSession)
+    : sessions
+
   // ── Merge all entry types into one sorted timeline ────────────────────────
   const allEntries = useMemo(() => {
-    const f = sessions.map(s => ({ ...s, _type: 'feed',  _time: s.startedAt }))
+    const f = feeds.map(s => ({ ...s, _type: 'feed',  _time: s.startedAt }))
     const n = nappies.map(n  => ({ ...n, _type: 'nappy', _time: n.loggedAt  }))
     const m = medicines.map(m => ({ ...m, _type: 'medicine', _time: m.loggedAt }))
     return [...f, ...n, ...m].sort((a, b) => new Date(b._time) - new Date(a._time))
-  }, [sessions, nappies, medicines])
+  }, [feeds, nappies, medicines])
 
   const grouped = useMemo(() => {
     const map = {}
@@ -415,8 +435,8 @@ export default function HistoryScreen({ night }) {
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
 
   const feedsToday = useMemo(() =>
-    sessions.filter(s => new Date(s.startedAt) >= todayStart)
-  , [sessions, todayStart])
+    feeds.filter(s => new Date(s.startedAt) >= todayStart)
+  , [feeds, todayStart])
 
   const feedTimeTodaySecs = useMemo(() =>
     feedsToday.reduce((a, s) => a + (s.durationSecs || 0), 0)
@@ -435,8 +455,8 @@ export default function HistoryScreen({ night }) {
     const monday = new Date(now)
     monday.setHours(0, 0, 0, 0)
     monday.setDate(now.getDate() - (now.getDay() + 6) % 7)
-    return sessions.filter(s => new Date(s.startedAt) >= monday)
-  }, [sessions])
+    return feeds.filter(s => new Date(s.startedAt) >= monday)
+  }, [feeds])
 
   const weekAvgDuration = useMemo(() => {
     if (!weekFeeds.length) return 0
@@ -465,7 +485,7 @@ export default function HistoryScreen({ night }) {
     }
 
     const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, feedMins: 0, meds: 0, dirty: 0, moodTotal: 0, moodCount: 0 }]))
-    sessions.forEach(s => {
+    feeds.forEach(s => {
       const k = dayKey(s.startedAt)
       if (!byDay[k]) return
       byDay[k].feeds += 1
@@ -505,7 +525,7 @@ export default function HistoryScreen({ night }) {
     const avgMood = ratedFeeds ? feedMoodMeta(rows.reduce((a, r) => a + r.moodTotal, 0) / ratedFeeds) : null
     const peakFeeds = Math.max(1, ...rows.map(r => r.feeds))
     const nowTs = Date.now()
-    const sortedFeeds = sessions
+    const sortedFeeds = feeds
       .map(s => new Date(s.startedAt).getTime())
       .filter(ts => !Number.isNaN(ts) && ts >= days[0].getTime() && ts <= nowTs)
       .sort((a, b) => a - b)
@@ -514,14 +534,52 @@ export default function HistoryScreen({ night }) {
       : null
 
     return { rows, totalFeeds, totalMeds, totalDirty, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
-  }, [sessions, nappies, medicines])
+  }, [feeds, nappies, medicines])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleSaveEdit   = (id, changes) => { setSessions(updateSession(id, changes)); setEditSession(null) }
-  const handleDeleteFeed = (id)          => { setSessions(deleteSession(id));           setEditSession(null) }
-  const handleAddFeed    = (session)     => { setSessions(addSession(session));          setAddMode(null) }
-  const handleAddNappy   = (nappy)       => { setNappies(addNappy(nappy));               setAddMode(null) }
-  const handleAddMedicine = (medicine)   => { setMedicines(addMedicine(medicine));       setAddMode(null) }
+  const handleSaveEdit = async (id, changes) => {
+    setSessions(updateSession(id, changes))
+    if (sharedMode) {
+      await updateFeedSession(id, {
+        side:        changes.side,
+        startedAt:   changes.startedAt,
+        endedAt:     changes.endedAt,
+        durationSecs: changes.durationSecs,
+        moodScore:   changes.mood ?? null,
+      })
+      onRefreshSessions?.()
+    }
+    setEditSession(null)
+  }
+
+  const handleDeleteFeed = async (id) => {
+    setSessions(deleteSession(id))
+    if (sharedMode) {
+      await deleteFeedSession(id)
+      onRefreshSessions?.()
+    }
+    setEditSession(null)
+  }
+
+  const handleAddFeed = (session) => {
+    setSessions(addSession(session))
+    if (sharedMode && authUser && profile?.household_id) {
+      insertFeedSession({
+        householdId:  profile.household_id,
+        babyId:       null,
+        loggedBy:     authUser.id,
+        startedAt:    session.startedAt,
+        endedAt:      session.endedAt,
+        durationSecs: session.durationSecs,
+        side:         session.side,
+        moodScore:    session.mood ?? null,
+      }).then(() => onRefreshSessions?.())
+    }
+    setAddMode(null)
+  }
+
+  const handleAddNappy    = (nappy)    => { setNappies(addNappy(nappy));         setAddMode(null) }
+  const handleAddMedicine = (medicine) => { setMedicines(addMedicine(medicine)); setAddMode(null) }
 
   const handleDelete = ({ id, type }) => {
     if (type === 'nappy') setNappies(deleteNappy(id))
@@ -550,8 +608,22 @@ export default function HistoryScreen({ night }) {
 
       <div style={{ padding: '20px 16px 12px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <div>
-          <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your journey</span>
+          <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>
+            {sharedMode ? 'Shared logbook' : 'Your journey'}
+          </span>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Logbook</span>
+          {sharedMode && (
+            <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: p.sub, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: brand.accent, display: 'inline-block', flexShrink: 0 }} />
+                You
+              </span>
+              <span style={{ fontSize: 11, color: p.sub, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: brand.green, display: 'inline-block', flexShrink: 0 }} />
+                Partner
+              </span>
+            </div>
+          )}
         </div>
         <button onClick={() => setAddMode('picker')} style={{ width: 36, height: 36, borderRadius: '50%', background: brand.bark, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
           <span style={{ color: brand.sand, fontSize: 22, lineHeight: 1, marginTop: -1 }}>+</span>
@@ -680,24 +752,33 @@ export default function HistoryScreen({ night }) {
                     const borderStyle = isLast ? 'none' : `1px solid ${p.border}`
 
                     // ── Feed row ──────────────────────────────────────────
-                    if (entry._type === 'feed') return (
-                      <div key={entry.id}
-                        style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle, cursor: 'pointer' }}
-                        onClick={() => setEditSession(entry)}>
-                        <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
-                        <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
-                          <span style={{ fontSize: 10, fontWeight: 600, color: p.sub }}>{entry.side}</span>
+                    if (entry._type === 'feed') {
+                      const dotColour = sharedMode && entry.loggedBy
+                        ? (entry.loggedBy === authUser?.id ? brand.accent : brand.green)
+                        : null
+                      const canEdit = !sharedMode || entry.loggedBy === authUser?.id
+                      return (
+                        <div key={entry.id}
+                          style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle, cursor: canEdit ? 'pointer' : 'default' }}
+                          onClick={() => canEdit && setEditSession(entry)}>
+                          {dotColour && (
+                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColour, flexShrink: 0, marginRight: 6 }} />
+                          )}
+                          <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
+                            <span style={{ fontSize: 10, fontWeight: 600, color: p.sub }}>{entry.side}</span>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ display: 'block', fontSize: 12, color: p.text }}>{entry.side === 'L' ? 'Left' : 'Right'} breast</span>
+                            {entry.mood && <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{MOOD_EMOJI[entry.mood - 1]} {MOOD_LABEL[entry.mood - 1]}</span>}
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{fmt(entry.durationSecs || 0)}</span>
+                            {canEdit && <span style={{ fontSize: 10, color: p.sub, opacity: 0.5 }}>edit</span>}
+                          </div>
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <span style={{ display: 'block', fontSize: 12, color: p.text }}>{entry.side === 'L' ? 'Left' : 'Right'} breast</span>
-                          {entry.mood && <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{MOOD_EMOJI[entry.mood - 1]} {MOOD_LABEL[entry.mood - 1]}</span>}
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{fmt(entry.durationSecs || 0)}</span>
-                          <span style={{ fontSize: 10, color: p.sub, opacity: 0.5 }}>edit</span>
-                        </div>
-                      </div>
-                    )
+                      )
+                    }
 
                     // ── Nappy row ─────────────────────────────────────────
                     if (entry._type === 'nappy') {

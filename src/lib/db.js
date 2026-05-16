@@ -166,6 +166,30 @@ export async function getRecentSessions(householdId, limit = 50) {
   return { data: data || [], error }
 }
 
+export async function updateFeedSession(id, { side, startedAt, endedAt, durationSecs, moodScore }) {
+  const { data, error } = await supabase
+    .from('feed_sessions')
+    .update({
+      side,
+      started_at:    startedAt,
+      ended_at:      endedAt,
+      duration_secs: durationSecs,
+      mood_score:    moodScore ?? null,
+    })
+    .eq('id', id)
+    .select()
+    .single()
+  return { data, error }
+}
+
+export async function deleteFeedSession(id) {
+  const { error } = await supabase
+    .from('feed_sessions')
+    .delete()
+    .eq('id', id)
+  return { error }
+}
+
 // ── Realtime subscription ─────────────────────────────────────────────────────
 
 export function subscribeToFeeds(householdId, onNewSession) {

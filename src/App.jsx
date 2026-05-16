@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer } from './lib/storage.js'
+import { getSession, getProfile, subscribeToFeeds, getRecentSessions } from './lib/db.js'
+import { supabase } from './lib/supabase.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
 import NappyScreen   from './screens/NappyScreen.jsx'
 import ChatScreen    from './screens/ChatScreen.jsx'
 import PrepareScreen from './screens/PrepareScreen.jsx'
+import SettingsScreen from './screens/SettingsScreen.jsx'
 import NavBar        from './components/NavBar.jsx'
 
 function getViewportHeight() {
@@ -17,6 +20,12 @@ export default function App() {
   const [night, setNight]   = useState(() => getNightMode())
   const [viewportHeight, setViewportHeight] = useState(() => getViewportHeight())
   const initialTimer = useRef(getActiveTimer())
+
+  // ── Auth & shared session state ────────────────────────────────────────────
+  const [authUser,       setAuthUser]       = useState(null)
+  const [profile,        setProfile]        = useState(null)
+  const [sharedSessions, setSharedSessions] = useState(null)
+  const realtimeUnsub = useRef(null)
 
   // ── Feed timer state lives here so it survives tab changes ────────────────
   const [feedActive,    setFeedActive]    = useState(() => initialTimer.current !== null)
@@ -59,6 +68,59 @@ export default function App() {
     }
   }, [])
 
+  // ── Auth init ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    getSession().then(session => {
+      if (session?.user) {
+        setAuthUser(session.user)
+        loadProfile(session.user.id)
+      }
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user || null
+      setAuthUser(user)
+      if (user) {
+        loadProfile(user.id)
+      } else {
+        setProfile(null)
+        setSharedSessions(null)
+        if (realtimeUnsub.current) { realtimeUnsub.current(); realtimeUnsub.current = null }
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadProfile = async (userId) => {
+    const { data } = await getProfile(userId)
+    if (!data) return
+    setProfile(data)
+    if (data.household_id) {
+      loadSharedSessions(data.household_id)
+      if (realtimeUnsub.current) realtimeUnsub.current()
+      realtimeUnsub.current = subscribeToFeeds(data.household_id, (newSession) => {
+        setSharedSessions(prev =>
+          prev ? [newSession, ...prev.filter(s => s.id !== newSession.id)] : [newSession]
+        )
+      })
+    }
+  }
+
+  const loadSharedSessions = async (householdId) => {
+    const { data } = await getRecentSessions(householdId, 200)
+    if (data) setSharedSessions(data)
+  }
+
+  const refreshProfile = () => {
+    if (authUser) loadProfile(authUser.id)
+  }
+
+  const refreshSharedSessions = () => {
+    if (profile?.household_id) loadSharedSessions(profile.household_id)
+  }
+
+  // ── Feed timer ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (feedActive && feedStartedAt) {
       timerRef.current = setInterval(() => {
@@ -110,11 +172,12 @@ export default function App() {
       overflow:      'hidden',
     }}>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} timer={timerProps} />}
+        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} timer={timerProps} authUser={authUser} profile={profile} onSessionSaved={refreshSharedSessions} />}
         {screen === 'nappy'   && <NappyScreen   night={night} />}
-        {screen === 'history' && <HistoryScreen night={night} />}
+        {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onRefreshSessions={refreshSharedSessions} />}
         {screen === 'chat'    && <ChatScreen    night={night} />}
         {screen === 'prepare' && <PrepareScreen night={night} />}
+        {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} onProfileUpdate={refreshProfile} />}
       </div>
       <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={feedActive} />
     </div>
