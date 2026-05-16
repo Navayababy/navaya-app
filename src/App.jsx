@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer } from './lib/storage.js'
 import { getSession, getProfile, subscribeToFeeds, getRecentSessions } from './lib/db.js'
-import { supabase } from './lib/supabase.js'
+import { supabase, isSupabaseConfigured } from './lib/supabase.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
 import NappyScreen   from './screens/NappyScreen.jsx'
@@ -68,8 +68,10 @@ export default function App() {
     }
   }, [])
 
-  // ── Auth init ──────────────────────────────────────────────────────────────
+  // ── Auth init (only when Supabase is configured) ───────────────────────────
   useEffect(() => {
+    if (!isSupabaseConfigured) return
+
     getSession().then(session => {
       if (session?.user) {
         setAuthUser(session.user)

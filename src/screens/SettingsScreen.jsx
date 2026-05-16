@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { brand, palette } from '../theme.js'
 import { signIn, signUp, signOut, createHousehold, createInviteCode, acceptInvite } from '../lib/db.js'
+import { isSupabaseConfigured } from '../lib/supabase.js'
 
 function Card({ children, p }) {
   return (
@@ -139,7 +140,16 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
       </div>
 
       {/* ── Auth card ── */}
-      {!authUser ? (
+      {!isSupabaseConfigured ? (
+        <Card p={p}>
+          <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 10 }}>
+            Sharing unavailable
+          </span>
+          <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.6 }}>
+            Partner sharing requires Supabase credentials. Add <code style={{ background: p.bg, borderRadius: 5, padding: '1px 5px', fontSize: 11 }}>VITE_SUPABASE_URL</code> and <code style={{ background: p.bg, borderRadius: 5, padding: '1px 5px', fontSize: 11 }}>VITE_SUPABASE_ANON_KEY</code> to your environment, then redeploy.
+          </span>
+        </Card>
+      ) : !authUser ? (
         <Card p={p}>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 12 }}>
             Sign in to share feeds
