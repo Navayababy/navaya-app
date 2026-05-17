@@ -185,6 +185,43 @@ export async function deleteMedicineLog(id) {
 
 // ── Migrations ────────────────────────────────────────────────────────────────
 
+export async function userHasDataInHousehold(householdId, userId) {
+  const { data } = await supabase
+    .from('feed_sessions')
+    .select('id')
+    .eq('household_id', householdId)
+    .eq('logged_by', userId)
+    .limit(1)
+  return !!(data?.length)
+}
+
+export async function deduplicateHouseholdData(householdId) {
+  const dedupTable = async (table, keyFn) => {
+    const { data } = await supabase
+      .from(table)
+      .select('id, logged_by, ' + (table === 'feed_sessions' ? 'started_at, side' : 'logged_at, ' + (table === 'nappy_logs' ? 'type' : 'name')))
+      .eq('household_id', householdId)
+      .order('created_at', { ascending: true })
+      .limit(2000)
+    if (!data?.length) return
+    const seen = new Set()
+    const toDelete = []
+    for (const row of data) {
+      const key = keyFn(row)
+      if (seen.has(key)) toDelete.push(row.id)
+      else seen.add(key)
+    }
+    for (let i = 0; i < toDelete.length; i += 50) {
+      await supabase.from(table).delete().in('id', toDelete.slice(i, i + 50))
+    }
+    return toDelete.length
+  }
+
+  await dedupTable('feed_sessions', r => `${r.logged_by}|${r.started_at}|${r.side}`)
+  await dedupTable('nappy_logs',    r => `${r.logged_by}|${r.logged_at}|${r.type}`)
+  await dedupTable('medicine_logs', r => `${r.logged_by}|${r.logged_at}|${r.name}`)
+}
+
 export async function migrateLocalSessions(householdId, userId, localSessions) {
   if (!localSessions?.length) return
   const rows = localSessions.map(s => ({
