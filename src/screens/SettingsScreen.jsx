@@ -11,7 +11,7 @@ function Card({ children, p }) {
   )
 }
 
-export default function SettingsScreen({ night, authUser, profile, onProfileUpdate }) {
+export default function SettingsScreen({ night, authUser, profile, onProfileUpdate, onResync }) {
   const p = palette(night)
 
   // ── Auth form state ────────────────────────────────────────────────────────
@@ -28,6 +28,8 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
   const [householdLoading, setHouseholdLoading] = useState(false)
   const [householdMsg,     setHouseholdMsg]     = useState(null)  // { text, isError }
   const [copied,           setCopied]           = useState(false)
+  const [syncing,          setSyncing]          = useState(false)
+  const [syncDone,         setSyncDone]         = useState(false)
 
   const inputStyle = {
     width: '100%', background: p.bg, border: `1px solid ${p.border}`,
@@ -124,6 +126,15 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
       onProfileUpdate()
     }
     setHouseholdLoading(false)
+  }
+
+  const handleResync = async () => {
+    setSyncing(true)
+    setSyncDone(false)
+    await onResync?.()
+    setSyncing(false)
+    setSyncDone(true)
+    setTimeout(() => setSyncDone(false), 2500)
   }
 
   return (
@@ -351,6 +362,26 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
               </div>
             </div>
           )}
+
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${p.border}` }}>
+            <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.5, marginBottom: 10 }}>
+              Pull the latest feeds, nappies and medicines from the shared logbook.
+            </span>
+            <button
+              onClick={handleResync}
+              disabled={syncing}
+              style={{
+                ...secondaryBtn, marginTop: 0,
+                background: syncDone ? `${brand.green}18` : 'transparent',
+                borderColor: syncDone ? brand.green : p.border,
+                color:       syncDone ? brand.green  : p.text,
+                opacity: syncing ? 0.6 : 1,
+                transition: 'all .3s',
+              }}
+            >
+              {syncing ? 'Syncing…' : syncDone ? '✓ Up to date' : 'Sync now'}
+            </button>
+          </div>
         </Card>
       )}
 
