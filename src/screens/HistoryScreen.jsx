@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, getNappies, getMedicines, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine } from '../lib/storage.js'
-import { updateFeedSession, deleteFeedSession, insertFeedSession } from '../lib/db.js'
+import { updateFeedSession, deleteFeedSession, insertFeedSession, insertNappyLog, deleteNappyLog, insertMedicineLog, deleteMedicineLog } from '../lib/db.js'
 
 // Convert Supabase snake_case fields to camelCase for uniform display
 function normalizeSession(s) {
@@ -396,13 +396,19 @@ function AddMedicineModal({ night, onSave, onClose }) {
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-export default function HistoryScreen({ night, authUser, profile, sharedSessions, onRefreshSessions }) {
+export default function HistoryScreen({ night, authUser, profile, sharedSessions, sharedNappies, sharedMedicines, onRefreshSessions, onRefreshNappies, onRefreshMedicines }) {
   const p = palette(night)
   const sharedMode = !!(profile?.household_id && sharedSessions)
 
   const [sessions,    setSessions]    = useState(() => getSessions())
   const [nappies,     setNappies]     = useState(() => getNappies())
   const [medicines,   setMedicines]   = useState(() => getMedicines())
+
+  const normalizeNappy = (n) => 'loggedAt' in n ? n : { id: n.id, type: n.type, pooColor: n.poo_color, loggedAt: n.logged_at }
+  const normalizeMedicine = (m) => 'loggedAt' in m ? m : { id: m.id, name: m.name, medicineId: m.medicine_id, doseMl: m.dose_ml, form: m.form, notes: m.notes, loggedAt: m.logged_at }
+
+  const nappyList    = sharedMode && sharedNappies   ? sharedNappies.map(normalizeNappy)     : nappies
+  const medicineList = sharedMode && sharedMedicines ? sharedMedicines.map(normalizeMedicine) : medicines
   const [openDay,     setOpenDay]     = useState(null)
   const [editSession, setEditSession] = useState(null)
   const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'medicine'
@@ -415,11 +421,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
   // ── Merge all entry types into one sorted timeline ────────────────────────
   const allEntries = useMemo(() => {
-    const f = feeds.map(s => ({ ...s, _type: 'feed',  _time: s.startedAt }))
-    const n = nappies.map(n  => ({ ...n, _type: 'nappy', _time: n.loggedAt  }))
-    const m = medicines.map(m => ({ ...m, _type: 'medicine', _time: m.loggedAt }))
+    const f = feeds.map(s      => ({ ...s, _type: 'feed',     _time: s.startedAt }))
+    const n = nappyList.map(n  => ({ ...n, _type: 'nappy',    _time: n.loggedAt  }))
+    const m = medicineList.map(m => ({ ...m, _type: 'medicine', _time: m.loggedAt }))
     return [...f, ...n, ...m].sort((a, b) => new Date(b._time) - new Date(a._time))
-  }, [feeds, nappies, medicines])
+  }, [feeds, nappyList, medicineList])
 
   const grouped = useMemo(() => {
     const map = {}
@@ -443,12 +449,12 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   , [feedsToday])
 
   const wetToday = useMemo(() =>
-    nappies.filter(n => new Date(n.loggedAt) >= todayStart && (n.type === 'wet' || n.type === 'both')).length
-  , [nappies, todayStart])
+    nappyList.filter(n => new Date(n.loggedAt) >= todayStart && (n.type === 'wet' || n.type === 'both')).length
+  , [nappyList, todayStart])
 
   const dirtyToday = useMemo(() =>
-    nappies.filter(n => new Date(n.loggedAt) >= todayStart && (n.type === 'poo' || n.type === 'both')).length
-  , [nappies, todayStart])
+    nappyList.filter(n => new Date(n.loggedAt) >= todayStart && (n.type === 'poo' || n.type === 'both')).length
+  , [nappyList, todayStart])
 
   const weekFeeds = useMemo(() => {
     const now    = new Date()
@@ -495,12 +501,12 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
         byDay[k].moodCount += 1
       }
     })
-    medicines.forEach(m => {
+    medicineList.forEach(m => {
       const k = dayKey(m.loggedAt)
       if (!byDay[k]) return
       byDay[k].meds += 1
     })
-    nappies.forEach(n => {
+    nappyList.forEach(n => {
       const k = dayKey(n.loggedAt)
       if (!byDay[k]) return
       if (n.type === 'poo' || n.type === 'both') byDay[k].dirty += 1
@@ -534,7 +540,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       : null
 
     return { rows, totalFeeds, totalMeds, totalDirty, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
-  }, [feeds, nappies, medicines])
+  }, [feeds, nappyList, medicineList])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSaveEdit = async (id, changes) => {
@@ -578,12 +584,33 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     setAddMode(null)
   }
 
-  const handleAddNappy    = (nappy)    => { setNappies(addNappy(nappy));         setAddMode(null) }
-  const handleAddMedicine = (medicine) => { setMedicines(addMedicine(medicine)); setAddMode(null) }
+  const handleAddNappy = (nappy) => {
+    setNappies(addNappy(nappy))
+    if (sharedMode && authUser && profile?.household_id) {
+      insertNappyLog({ householdId: profile.household_id, loggedBy: authUser.id, type: nappy.type, pooColor: nappy.pooColor, loggedAt: nappy.loggedAt })
+        .then(() => onRefreshNappies?.())
+    }
+    setAddMode(null)
+  }
 
-  const handleDelete = ({ id, type }) => {
-    if (type === 'nappy') setNappies(deleteNappy(id))
-    if (type === 'medicine') setMedicines(deleteMedicine(id))
+  const handleAddMedicine = (medicine) => {
+    setMedicines(addMedicine(medicine))
+    if (sharedMode && authUser && profile?.household_id) {
+      insertMedicineLog({ householdId: profile.household_id, loggedBy: authUser.id, ...medicine, loggedAt: medicine.loggedAt })
+        .then(() => onRefreshMedicines?.())
+    }
+    setAddMode(null)
+  }
+
+  const handleDelete = async ({ id, type }) => {
+    if (type === 'nappy') {
+      setNappies(deleteNappy(id))
+      if (sharedMode) { await deleteNappyLog(id); onRefreshNappies?.() }
+    }
+    if (type === 'medicine') {
+      setMedicines(deleteMedicine(id))
+      if (sharedMode) { await deleteMedicineLog(id); onRefreshMedicines?.() }
+    }
     setConfirmDel(null)
   }
 

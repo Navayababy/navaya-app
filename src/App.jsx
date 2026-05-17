@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer, getSessions } from './lib/storage.js'
-import { getSession, getProfile, subscribeToFeeds, getRecentSessions, migrateLocalSessions } from './lib/db.js'
+import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer, getSessions, getNappies, getMedicines } from './lib/storage.js'
+import { getSession, getProfile, subscribeToFeeds, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, migrateLocalNappies, migrateLocalMedicines } from './lib/db.js'
 import { supabase, isSupabaseConfigured } from './lib/supabase.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
@@ -22,9 +22,11 @@ export default function App() {
   const initialTimer = useRef(getActiveTimer())
 
   // ── Auth & shared session state ────────────────────────────────────────────
-  const [authUser,       setAuthUser]       = useState(null)
-  const [profile,        setProfile]        = useState(null)
-  const [sharedSessions, setSharedSessions] = useState(null)
+  const [authUser,        setAuthUser]        = useState(null)
+  const [profile,         setProfile]         = useState(null)
+  const [sharedSessions,  setSharedSessions]  = useState(null)
+  const [sharedNappies,   setSharedNappies]   = useState(null)
+  const [sharedMedicines, setSharedMedicines] = useState(null)
   const realtimeUnsub = useRef(null)
 
   // ── Feed timer state lives here so it survives tab changes ────────────────
@@ -87,6 +89,8 @@ export default function App() {
       } else {
         setProfile(null)
         setSharedSessions(null)
+        setSharedNappies(null)
+        setSharedMedicines(null)
         if (realtimeUnsub.current) { realtimeUnsub.current(); realtimeUnsub.current = null }
       }
     })
@@ -102,13 +106,14 @@ export default function App() {
       // One-time migration: upload existing local sessions when first joining a household
       const migrationKey = `navaya_migrated_${data.household_id}`
       if (!localStorage.getItem(migrationKey)) {
-        const localSessions = getSessions()
-        if (localSessions.length > 0) {
-          await migrateLocalSessions(data.household_id, userId, localSessions)
-        }
+        await migrateLocalSessions(data.household_id, userId, getSessions())
+        await migrateLocalNappies(data.household_id, userId, getNappies())
+        await migrateLocalMedicines(data.household_id, userId, getMedicines())
         localStorage.setItem(migrationKey, '1')
       }
       loadSharedSessions(data.household_id)
+      loadSharedNappies(data.household_id)
+      loadSharedMedicines(data.household_id)
       if (realtimeUnsub.current) realtimeUnsub.current()
       realtimeUnsub.current = subscribeToFeeds(data.household_id, (newSession) => {
         setSharedSessions(prev =>
@@ -123,13 +128,23 @@ export default function App() {
     if (data) setSharedSessions(data)
   }
 
+  const loadSharedNappies = async (householdId) => {
+    const { data } = await getRecentNappyLogs(householdId, 200)
+    if (data) setSharedNappies(data)
+  }
+
+  const loadSharedMedicines = async (householdId) => {
+    const { data } = await getRecentMedicineLogs(householdId, 200)
+    if (data) setSharedMedicines(data)
+  }
+
   const refreshProfile = () => {
     if (authUser) loadProfile(authUser.id)
   }
 
-  const refreshSharedSessions = () => {
-    if (profile?.household_id) loadSharedSessions(profile.household_id)
-  }
+  const refreshSharedSessions  = () => { if (profile?.household_id) loadSharedSessions(profile.household_id) }
+  const refreshSharedNappies   = () => { if (profile?.household_id) loadSharedNappies(profile.household_id) }
+  const refreshSharedMedicines = () => { if (profile?.household_id) loadSharedMedicines(profile.household_id) }
 
   // ── Feed timer ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -184,8 +199,8 @@ export default function App() {
     }}>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} timer={timerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onSessionSaved={refreshSharedSessions} />}
-        {screen === 'nappy'   && <NappyScreen   night={night} />}
-        {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onRefreshSessions={refreshSharedSessions} />}
+        {screen === 'nappy'   && <NappyScreen   night={night} authUser={authUser} profile={profile} sharedNappies={sharedNappies} onNappySaved={refreshSharedNappies} />}
+        {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} />}
         {screen === 'chat'    && <ChatScreen    night={night} />}
         {screen === 'prepare' && <PrepareScreen night={night} />}
         {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} onProfileUpdate={refreshProfile} />}
