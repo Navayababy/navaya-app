@@ -114,12 +114,8 @@ export default function App() {
         }
         localStorage.setItem(migrationKey, '1')
       }
-      // One-time dedup: remove any duplicates caused by multi-device migration
-      const dedupKey = `navaya_deduped_${data.household_id}`
-      if (!localStorage.getItem(dedupKey)) {
-        await deduplicateHouseholdData(data.household_id)
-        localStorage.setItem(dedupKey, '1')
-      }
+      // Always deduplicate on load — fast if nothing to clean, removes any stale dupes
+      await deduplicateHouseholdData(data.household_id)
       loadSharedSessions(data.household_id)
       loadSharedNappies(data.household_id)
       loadSharedMedicines(data.household_id)
@@ -157,6 +153,7 @@ export default function App() {
 
   const resyncAll = async () => {
     if (!profile?.household_id) return
+    await deduplicateHouseholdData(profile.household_id)
     await Promise.all([
       loadSharedSessions(profile.household_id),
       loadSharedNappies(profile.household_id),

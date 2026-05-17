@@ -201,7 +201,7 @@ export async function deduplicateHouseholdData(householdId) {
       .from(table)
       .select('id, logged_by, ' + (table === 'feed_sessions' ? 'started_at, side' : 'logged_at, ' + (table === 'nappy_logs' ? 'type' : 'name')))
       .eq('household_id', householdId)
-      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
       .limit(2000)
     if (!data?.length) return
     const seen = new Set()
