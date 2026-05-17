@@ -135,6 +135,24 @@ export async function acceptInvite(code, userId) {
   return { data: { household_id: invite.household_id } }
 }
 
+export async function migrateLocalSessions(householdId, userId, localSessions) {
+  if (!localSessions?.length) return
+  const rows = localSessions.map(s => ({
+    household_id:  householdId,
+    baby_id:       null,
+    logged_by:     userId,
+    started_at:    s.startedAt,
+    ended_at:      s.endedAt,
+    duration_secs: s.durationSecs,
+    side:          s.side,
+    mood_score:    s.mood ?? null,
+  }))
+  const BATCH = 50
+  for (let i = 0; i < rows.length; i += BATCH) {
+    await supabase.from('feed_sessions').insert(rows.slice(i, i + BATCH))
+  }
+}
+
 // ── Feed sessions ─────────────────────────────────────────────────────────────
 
 export async function insertFeedSession({ householdId, babyId, loggedBy, startedAt, endedAt, durationSecs, side, moodScore }) {
