@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer, getSessions, getNappies, getMedicines } from './lib/storage.js'
-import { getSession, getProfile, subscribeToFeeds, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, migrateLocalNappies, migrateLocalMedicines } from './lib/db.js'
+import { getSession, getProfile, subscribeToFeeds, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, migrateLocalNappies, migrateLocalMedicines, userHasDataInHousehold, deduplicateHouseholdData } from './lib/db.js'
 import { supabase, isSupabaseConfigured } from './lib/supabase.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
@@ -103,14 +103,19 @@ export default function App() {
     if (!data) return
     setProfile(data)
     if (data.household_id) {
-      // One-time migration: upload existing local sessions when first joining a household
+      // One-time migration: upload local data only if this user has no records in Supabase yet
       const migrationKey = `navaya_migrated_${data.household_id}`
       if (!localStorage.getItem(migrationKey)) {
-        await migrateLocalSessions(data.household_id, userId, getSessions())
-        await migrateLocalNappies(data.household_id, userId, getNappies())
-        await migrateLocalMedicines(data.household_id, userId, getMedicines())
+        const alreadySynced = await userHasDataInHousehold(data.household_id, userId)
+        if (!alreadySynced) {
+          await migrateLocalSessions(data.household_id, userId, getSessions())
+          await migrateLocalNappies(data.household_id, userId, getNappies())
+          await migrateLocalMedicines(data.household_id, userId, getMedicines())
+        }
         localStorage.setItem(migrationKey, '1')
       }
+      // Always deduplicate on load — fast if nothing to clean, removes any stale dupes
+      await deduplicateHouseholdData(data.household_id)
       loadSharedSessions(data.household_id)
       loadSharedNappies(data.household_id)
       loadSharedMedicines(data.household_id)
@@ -148,6 +153,7 @@ export default function App() {
 
   const resyncAll = async () => {
     if (!profile?.household_id) return
+    await deduplicateHouseholdData(profile.household_id)
     await Promise.all([
       loadSharedSessions(profile.household_id),
       loadSharedNappies(profile.household_id),
