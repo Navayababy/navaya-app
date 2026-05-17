@@ -51,22 +51,21 @@ export async function updateProfile(userId, updates) {
 // ── Household setup ───────────────────────────────────────────────────────────
 
 export async function createHousehold(userId) {
-  // Create the household
-  const { data: household, error: hErr } = await supabase
+  // Generate ID client-side so we can link the profile without a post-insert SELECT
+  const id = crypto.randomUUID()
+
+  const { error: hErr } = await supabase
     .from('households')
-    .insert({})
-    .select()
-    .single()
+    .insert({ id })
 
   if (hErr) return { error: hErr }
 
-  // Link the user to it
   const { error: pErr } = await supabase
     .from('profiles')
-    .update({ household_id: household.id, role: 'primary' })
+    .update({ household_id: id, role: 'primary' })
     .eq('id', userId)
 
-  return { data: household, error: pErr }
+  return { data: { id }, error: pErr }
 }
 
 // ── Baby ──────────────────────────────────────────────────────────────────────
