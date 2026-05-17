@@ -64,7 +64,7 @@ function greeting() {
   return 'evening'
 }
 
-export default function HomeScreen({ night, onNightToggle, timer, authUser, profile, onSessionSaved }) {
+export default function HomeScreen({ night, onNightToggle, setScreen, timer, authUser, profile, onSessionSaved }) {
   const p = palette(night)
   const { feedActive, feedSide, elapsed, startFeed, stopFeed } = timer
 
@@ -235,10 +235,17 @@ export default function HomeScreen({ night, onNightToggle, timer, authUser, prof
           </div>
         </div>
 
-        <button onClick={onNightToggle}
-          style={{ background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '5px 12px', cursor: 'pointer', color: p.sub, fontSize: 11, marginTop: 4 }}>
-          {night ? '☀' : '☽'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+          {/* Account / sharing button */}
+          <button onClick={() => setScreen('settings')}
+            style={{ position: 'relative', background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '5px 12px', cursor: 'pointer', color: profile?.household_id ? brand.green : p.sub, fontSize: 11 }}>
+            {profile?.household_id ? '● Sharing' : '⊕ Account'}
+          </button>
+          <button onClick={onNightToggle}
+            style={{ background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '5px 12px', cursor: 'pointer', color: p.sub, fontSize: 11 }}>
+            {night ? '☀' : '☽'}
+          </button>
+        </div>
       </div>
 
       {/* ── Motivational quote ── */}

@@ -145,9 +145,19 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 10 }}>
             Sharing unavailable
           </span>
-          <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.6 }}>
-            Partner sharing requires Supabase credentials. Add <code style={{ background: p.bg, borderRadius: 5, padding: '1px 5px', fontSize: 11 }}>VITE_SUPABASE_URL</code> and <code style={{ background: p.bg, borderRadius: 5, padding: '1px 5px', fontSize: 11 }}>VITE_SUPABASE_ANON_KEY</code> to your environment, then redeploy.
+          <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.6, marginBottom: 14 }}>
+            The Supabase credentials haven't reached this build. Check each step below.
           </span>
+          {[
+            'In Vercel → Settings → Environment Variables, both VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be present (names must start with VITE_)',
+            'Both variables must have the Preview environment ticked, not just Production',
+            'After saving the variables you must trigger a fresh deploy — Vercel bakes them in at build time',
+          ].map((step, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
+              <span style={{ width: 20, height: 20, borderRadius: '50%', background: p.bg, border: `1px solid ${p.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: p.sub, flexShrink: 0, marginTop: 1 }}>{i + 1}</span>
+              <span style={{ fontSize: 12, color: p.sub, lineHeight: 1.55 }}>{step}</span>
+            </div>
+          ))}
         </Card>
       ) : !authUser ? (
         <Card p={p}>
