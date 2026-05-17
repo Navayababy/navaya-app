@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, addSession, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
 import { insertFeedSession } from '../lib/db.js'
@@ -64,11 +64,25 @@ function greeting() {
   return 'evening'
 }
 
-export default function HomeScreen({ night, onNightToggle, setScreen, timer, authUser, profile, onSessionSaved }) {
+export default function HomeScreen({ night, onNightToggle, setScreen, timer, authUser, profile, sharedSessions, onSessionSaved }) {
   const p = palette(night)
   const { feedActive, feedSide, elapsed, startFeed, stopFeed } = timer
 
   const [sessions,       setSessions]      = useState(() => sortByTime(getSessions()).slice(0, 3))
+
+  // Keep "Recent feeds" in sync with shared sessions when in shared mode
+  useEffect(() => {
+    if (!sharedSessions?.length) return
+    const normalized = sharedSessions.slice(0, 3).map(s => ({
+      id:          s.id,
+      side:        s.side,
+      startedAt:   s.started_at ?? s.startedAt,
+      endedAt:     s.ended_at   ?? s.endedAt,
+      durationSecs: s.duration_secs ?? s.durationSecs,
+      mood:        s.mood_score  ?? s.mood,
+    }))
+    setSessions(sortByTime(normalized).slice(0, 3))
+  }, [sharedSessions])
   const [showMood,       setShowMood]      = useState(false)
   const [pendingSession, setPending]       = useState(null)
   const [partnerFlash,   setPartnerFlash]  = useState(false)

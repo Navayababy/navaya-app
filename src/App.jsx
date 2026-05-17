@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer } from './lib/storage.js'
-import { getSession, getProfile, subscribeToFeeds, getRecentSessions } from './lib/db.js'
+import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer, getSessions } from './lib/storage.js'
+import { getSession, getProfile, subscribeToFeeds, getRecentSessions, migrateLocalSessions } from './lib/db.js'
 import { supabase, isSupabaseConfigured } from './lib/supabase.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
@@ -99,6 +99,15 @@ export default function App() {
     if (!data) return
     setProfile(data)
     if (data.household_id) {
+      // One-time migration: upload existing local sessions when first joining a household
+      const migrationKey = `navaya_migrated_${data.household_id}`
+      if (!localStorage.getItem(migrationKey)) {
+        const localSessions = getSessions()
+        if (localSessions.length > 0) {
+          await migrateLocalSessions(data.household_id, userId, localSessions)
+        }
+        localStorage.setItem(migrationKey, '1')
+      }
       loadSharedSessions(data.household_id)
       if (realtimeUnsub.current) realtimeUnsub.current()
       realtimeUnsub.current = subscribeToFeeds(data.household_id, (newSession) => {
@@ -174,7 +183,7 @@ export default function App() {
       overflow:      'hidden',
     }}>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} timer={timerProps} authUser={authUser} profile={profile} onSessionSaved={refreshSharedSessions} />}
+        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} timer={timerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onSessionSaved={refreshSharedSessions} />}
         {screen === 'nappy'   && <NappyScreen   night={night} />}
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onRefreshSessions={refreshSharedSessions} />}
         {screen === 'chat'    && <ChatScreen    night={night} />}
