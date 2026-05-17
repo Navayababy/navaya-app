@@ -135,6 +135,56 @@ export async function acceptInvite(code, userId) {
   return { data: { household_id: invite.household_id } }
 }
 
+// ── Nappy logs ────────────────────────────────────────────────────────────────
+
+export async function insertNappyLog({ householdId, loggedBy, type, pooColor, loggedAt }) {
+  const { error } = await supabase
+    .from('nappy_logs')
+    .insert({ household_id: householdId, logged_by: loggedBy, type, poo_color: pooColor || null, logged_at: loggedAt })
+  return { error }
+}
+
+export async function getRecentNappyLogs(householdId, limit = 200) {
+  const { data, error } = await supabase
+    .from('nappy_logs')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('logged_at', { ascending: false })
+    .limit(limit)
+  return { data: data || [], error }
+}
+
+export async function deleteNappyLog(id) {
+  const { error } = await supabase.from('nappy_logs').delete().eq('id', id)
+  return { error }
+}
+
+// ── Medicine logs ─────────────────────────────────────────────────────────────
+
+export async function insertMedicineLog({ householdId, loggedBy, name, medicineId, doseMl, form, notes, loggedAt }) {
+  const { error } = await supabase
+    .from('medicine_logs')
+    .insert({ household_id: householdId, logged_by: loggedBy, name, medicine_id: medicineId || null, dose_ml: doseMl || null, form: form || null, notes: notes || null, logged_at: loggedAt })
+  return { error }
+}
+
+export async function getRecentMedicineLogs(householdId, limit = 200) {
+  const { data, error } = await supabase
+    .from('medicine_logs')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('logged_at', { ascending: false })
+    .limit(limit)
+  return { data: data || [], error }
+}
+
+export async function deleteMedicineLog(id) {
+  const { error } = await supabase.from('medicine_logs').delete().eq('id', id)
+  return { error }
+}
+
+// ── Migrations ────────────────────────────────────────────────────────────────
+
 export async function migrateLocalSessions(householdId, userId, localSessions) {
   if (!localSessions?.length) return
   const rows = localSessions.map(s => ({
@@ -150,6 +200,31 @@ export async function migrateLocalSessions(householdId, userId, localSessions) {
   const BATCH = 50
   for (let i = 0; i < rows.length; i += BATCH) {
     await supabase.from('feed_sessions').insert(rows.slice(i, i + BATCH))
+  }
+}
+
+export async function migrateLocalNappies(householdId, userId, localNappies) {
+  if (!localNappies?.length) return
+  const rows = localNappies.map(n => ({
+    household_id: householdId, logged_by: userId,
+    type: n.type, poo_color: n.pooColor || null, logged_at: n.loggedAt,
+  }))
+  const BATCH = 50
+  for (let i = 0; i < rows.length; i += BATCH) {
+    await supabase.from('nappy_logs').insert(rows.slice(i, i + BATCH))
+  }
+}
+
+export async function migrateLocalMedicines(householdId, userId, localMedicines) {
+  if (!localMedicines?.length) return
+  const rows = localMedicines.map(m => ({
+    household_id: householdId, logged_by: userId,
+    name: m.name, medicine_id: m.medicineId || null, dose_ml: m.doseMl || null,
+    form: m.form || null, notes: m.notes || null, logged_at: m.loggedAt,
+  }))
+  const BATCH = 50
+  for (let i = 0; i < rows.length; i += BATCH) {
+    await supabase.from('medicine_logs').insert(rows.slice(i, i + BATCH))
   }
 }
 

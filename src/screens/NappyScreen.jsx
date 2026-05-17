@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
 import { getNappies, addNappy, deleteNappy } from '../lib/storage.js'
+import { insertNappyLog, deleteNappyLog } from '../lib/db.js'
 
 // Poo colours — ordered lightest to darkest, with clinical notes where relevant
 const POO_COLORS = [
@@ -53,10 +54,18 @@ function todayMidnight() {
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-export default function NappyScreen({ night }) {
+export default function NappyScreen({ night, authUser, profile, sharedNappies, onNappySaved }) {
   const p = palette(night)
+  const sharedMode = !!(profile?.household_id && sharedNappies)
 
   const [nappies,      setNappies]      = useState(() => getNappies())
+
+  useEffect(() => {
+    if (!sharedNappies?.length) return
+    setNappies(sharedNappies.map(n => ({
+      id: n.id, type: n.type, pooColor: n.poo_color ?? n.pooColor, loggedAt: n.logged_at ?? n.loggedAt,
+    })))
+  }, [sharedNappies])
   const [type,         setType]         = useState(null)     // 'wet' | 'poo' | 'both'
   const [pooColor,     setPooColor]     = useState('mustard')
   const [logDate,      setLogDate]      = useState(() => dateStr())
@@ -84,13 +93,12 @@ export default function NappyScreen({ night }) {
     const [y, mo, d] = logDate.split('-').map(Number)
     const [h, m]     = logTime.split(':').map(Number)
     const loggedAt   = new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
-    const nappy = {
-      id:       Date.now().toString(),
-      type,
-      pooColor: needsColor ? pooColor : null,
-      loggedAt,
-    }
+    const nappy = { id: Date.now().toString(), type, pooColor: needsColor ? pooColor : null, loggedAt }
     setNappies(addNappy(nappy))
+    if (authUser && profile?.household_id) {
+      insertNappyLog({ householdId: profile.household_id, loggedBy: authUser.id, type, pooColor: nappy.pooColor, loggedAt })
+        .then(() => onNappySaved?.())
+    }
     setType(null)
     setEditingTime(false)
     setLogDate(dateStr())
@@ -101,6 +109,7 @@ export default function NappyScreen({ night }) {
 
   const handleDelete = (id) => {
     setNappies(deleteNappy(id))
+    if (sharedMode) deleteNappyLog(id).then(() => onNappySaved?.())
     setConfirmDel(null)
   }
 
