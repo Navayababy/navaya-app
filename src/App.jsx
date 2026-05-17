@@ -174,7 +174,7 @@ export default function App() {
       overflow:      'hidden',
     }}>
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} timer={timerProps} authUser={authUser} profile={profile} onSessionSaved={refreshSharedSessions} />}
+        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} timer={timerProps} authUser={authUser} profile={profile} onSessionSaved={refreshSharedSessions} />}
         {screen === 'nappy'   && <NappyScreen   night={night} />}
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onRefreshSessions={refreshSharedSessions} />}
         {screen === 'chat'    && <ChatScreen    night={night} />}
