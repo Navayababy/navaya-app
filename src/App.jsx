@@ -146,6 +146,15 @@ export default function App() {
   const refreshSharedNappies   = () => { if (profile?.household_id) loadSharedNappies(profile.household_id) }
   const refreshSharedMedicines = () => { if (profile?.household_id) loadSharedMedicines(profile.household_id) }
 
+  const resyncAll = async () => {
+    if (!profile?.household_id) return
+    await Promise.all([
+      loadSharedSessions(profile.household_id),
+      loadSharedNappies(profile.household_id),
+      loadSharedMedicines(profile.household_id),
+    ])
+  }
+
   // ── Feed timer ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (feedActive && feedStartedAt) {
@@ -203,7 +212,7 @@ export default function App() {
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} />}
         {screen === 'chat'    && <ChatScreen    night={night} />}
         {screen === 'prepare' && <PrepareScreen night={night} />}
-        {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} onProfileUpdate={refreshProfile} />}
+        {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} onProfileUpdate={refreshProfile} onResync={resyncAll} />}
       </div>
       <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={feedActive} />
     </div>
