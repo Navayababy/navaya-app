@@ -39,9 +39,14 @@ export async function getProfile(userId) {
 }
 
 export async function updateProfile(userId, updates) {
+  const payload = {}
+  if (typeof updates?.display_name === 'string') {
+    payload.display_name = updates.display_name
+  }
+
   const { data, error } = await supabase
     .from('profiles')
-    .update(updates)
+    .update(payload)
     .eq('id', userId)
     .select()
     .single()
@@ -50,22 +55,9 @@ export async function updateProfile(userId, updates) {
 
 // ── Household setup ───────────────────────────────────────────────────────────
 
-export async function createHousehold(userId) {
-  // Generate ID client-side so we can link the profile without a post-insert SELECT
-  const id = crypto.randomUUID()
-
-  const { error: hErr } = await supabase
-    .from('households')
-    .insert({ id })
-
-  if (hErr) return { error: hErr }
-
-  const { error: pErr } = await supabase
-    .from('profiles')
-    .update({ household_id: id, role: 'primary' })
-    .eq('id', userId)
-
-  return { data: { id }, error: pErr }
+export async function createHousehold() {
+  const { data, error } = await supabase.rpc('create_household_for_current_user')
+  return { data: data ? { id: data } : null, error }
 }
 
 // ── Baby ──────────────────────────────────────────────────────────────────────
@@ -92,47 +84,16 @@ export async function getBaby(householdId) {
 
 // ── Partner invite ────────────────────────────────────────────────────────────
 
-function randomCode() {
-  return Math.random().toString(36).substring(2, 10).toUpperCase()
+export async function createInviteCode() {
+  const { data, error } = await supabase.rpc('create_household_invite')
+  return { data, error, code: data || null }
 }
 
-export async function createInviteCode(householdId) {
-  const code = randomCode()
-  const { data, error } = await supabase
-    .from('household_invites')
-    .insert({ household_id: householdId, invite_code: code })
-    .select()
-    .single()
-  return { data, error, code }
-}
-
-export async function acceptInvite(code, userId) {
-  // Find the invite
-  const { data: invite, error: findErr } = await supabase
-    .from('household_invites')
-    .select('*')
-    .eq('invite_code', code.toUpperCase())
-    .is('accepted_at', null)
-    .single()
-
-  if (findErr || !invite) return { error: { message: 'Invalid or expired invite code.' } }
-  if (new Date(invite.expires_at) < new Date()) return { error: { message: 'This invite code has expired.' } }
-
-  // Link user to the household
-  const { error: profileErr } = await supabase
-    .from('profiles')
-    .update({ household_id: invite.household_id, role: 'partner' })
-    .eq('id', userId)
-
-  if (profileErr) return { error: profileErr }
-
-  // Mark invite as accepted
-  await supabase
-    .from('household_invites')
-    .update({ accepted_at: new Date().toISOString() })
-    .eq('id', invite.id)
-
-  return { data: { household_id: invite.household_id } }
+export async function acceptInvite(code) {
+  const { data, error } = await supabase.rpc('accept_household_invite', {
+    p_invite_code: code.trim().toUpperCase(),
+  })
+  return { data: data ? { household_id: data } : null, error }
 }
 
 // ── Nappy logs ────────────────────────────────────────────────────────────────
