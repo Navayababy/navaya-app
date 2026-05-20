@@ -86,7 +86,7 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
   const handleCreateHousehold = async () => {
     setHouseholdLoading(true)
     setHouseholdMsg(null)
-    const { error } = await createHousehold(authUser.id)
+    const { error } = await createHousehold()
     if (error) {
       setHouseholdMsg({ text: error.message, isError: true })
     } else {
@@ -98,7 +98,7 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
   const handleGetInviteCode = async () => {
     setHouseholdLoading(true)
     setHouseholdMsg(null)
-    const { code, error } = await createInviteCode(profile.household_id)
+    const { code, error } = await createInviteCode()
     if (error) {
       setHouseholdMsg({ text: error.message, isError: true })
     } else {
@@ -118,7 +118,7 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
     if (!joinCode.trim()) return
     setHouseholdLoading(true)
     setHouseholdMsg(null)
-    const { error } = await acceptInvite(joinCode.trim(), authUser.id)
+    const { error } = await acceptInvite(joinCode.trim())
     if (error) {
       setHouseholdMsg({ text: error.message, isError: true })
     } else {
