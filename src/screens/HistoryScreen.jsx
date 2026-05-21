@@ -126,7 +126,10 @@ function EditModal({ session, night, onSave, onDelete, onClose }) {
   const handleSave = () => {
     const newStartedAt = buildISO(startDate, startTime)
     const newEndedAt   = endTime ? buildISO(endDate, endTime) : session.endedAt
-    onSave(session.id, { side, startedAt: newStartedAt, endedAt: newEndedAt, mood })
+    const durationSecs = newEndedAt
+      ? Math.max(0, Math.round((new Date(newEndedAt) - new Date(newStartedAt)) / 1000))
+      : session.durationSecs
+    onSave(session.id, { side, startedAt: newStartedAt, endedAt: newEndedAt, durationSecs, mood })
   }
 
   const inputStyle = { width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '11px 13px', fontSize: 16, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box' }
