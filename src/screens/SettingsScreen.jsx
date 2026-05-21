@@ -15,12 +15,13 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
   const p = palette(night)
 
   // ── Auth form state ────────────────────────────────────────────────────────
-  const [authTab,     setAuthTab]     = useState('signin')
-  const [email,       setEmail]       = useState('')
-  const [password,    setPassword]    = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
-  const [authMsg,     setAuthMsg]     = useState(null)  // { text, isError }
+  const [authTab,      setAuthTab]      = useState('signin')
+  const [email,        setEmail]        = useState('')
+  const [password,     setPassword]     = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [displayName,  setDisplayName]  = useState('')
+  const [authLoading,  setAuthLoading]  = useState(false)
+  const [authMsg,      setAuthMsg]      = useState(null)  // { text, isError }
 
   // ── Household state ────────────────────────────────────────────────────────
   const [inviteCode,       setInviteCode]       = useState(null)
@@ -182,7 +183,7 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
           {/* Tab toggle */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             {[{ id: 'signin', label: 'Sign in' }, { id: 'signup', label: 'Create account' }].map(t => (
-              <button key={t.id} onClick={() => { setAuthTab(t.id); setAuthMsg(null) }}
+              <button key={t.id} onClick={() => { setAuthTab(t.id); setAuthMsg(null); setPassword('') }}
                 style={{ flex: 1, padding: '9px', borderRadius: 10, border: `1.5px solid ${authTab === t.id ? brand.sand : p.border}`, background: authTab === t.id ? brand.bark : 'transparent', color: authTab === t.id ? brand.sand : p.sub, cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
                 {t.label}
               </button>
@@ -212,14 +213,24 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
           />
 
           <span style={labelStyle}>Password</span>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') authTab === 'signin' ? handleSignIn() : handleSignUp() }}
-            placeholder="••••••••"
-            style={{ ...inputStyle, marginBottom: 14 }}
-          />
+          <div style={{ position: 'relative', marginBottom: 14 }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') authTab === 'signin' ? handleSignIn() : handleSignUp() }}
+              placeholder={authTab === 'signin' ? 'Enter your password' : 'Create a password'}
+              autoComplete={authTab === 'signin' ? 'current-password' : 'new-password'}
+              style={{ ...inputStyle, paddingRight: 56 }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: p.sub, fontSize: 12, padding: '4px 4px', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </div>
 
           {authMsg && (
             <div style={{ fontSize: 12, color: authMsg.isError ? '#c0392b' : brand.green, marginBottom: 10, lineHeight: 1.4 }}>
@@ -229,8 +240,8 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
 
           <button
             onClick={authTab === 'signin' ? handleSignIn : handleSignUp}
-            disabled={authLoading}
-            style={{ ...primaryBtn, opacity: authLoading ? 0.6 : 1 }}
+            disabled={authLoading || !email || !password}
+            style={{ ...primaryBtn, opacity: (authLoading || !email || !password) ? 0.6 : 1 }}
           >
             {authLoading ? 'Please wait…' : authTab === 'signin' ? 'Sign in' : 'Create account'}
           </button>
