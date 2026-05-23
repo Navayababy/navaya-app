@@ -25,6 +25,7 @@ export default function App() {
   const [authUser,        setAuthUser]        = useState(null)
   const [profile,         setProfile]         = useState(null)
   const [householdMembers, setHouseholdMembers] = useState(null)
+  const [householdMembersError, setHouseholdMembersError] = useState(null)
   const [sharedSessions,  setSharedSessions]  = useState(null)
   const [sharedNappies,   setSharedNappies]   = useState(null)
   const [sharedMedicines, setSharedMedicines] = useState(null)
@@ -90,6 +91,7 @@ export default function App() {
       } else {
         setProfile(null)
         setHouseholdMembers(null)
+        setHouseholdMembersError(null)
         setSharedSessions(null)
         setSharedNappies(null)
         setSharedMedicines(null)
@@ -106,6 +108,7 @@ export default function App() {
     setProfile(data)
     if (data.household_id) {
       setHouseholdMembers(null)
+      setHouseholdMembersError(null)
       loadHouseholdMembers()
       // One-time migration: upload local data only if this user has no records in Supabase yet
       const migrationKey = `navaya_migrated_${data.household_id}`
@@ -131,12 +134,19 @@ export default function App() {
       })
     } else {
       setHouseholdMembers([])
+      setHouseholdMembersError(null)
     }
   }
 
   const loadHouseholdMembers = useCallback(async () => {
-    const { data } = await getHouseholdMembers()
+    const { data, error } = await getHouseholdMembers()
+    if (error) {
+      setHouseholdMembers([])
+      setHouseholdMembersError(error.message || 'Unable to load household members')
+      return []
+    }
     setHouseholdMembers(data || [])
+    setHouseholdMembersError(null)
     return data || []
   }, [])
 
@@ -230,7 +240,7 @@ export default function App() {
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} />}
         {screen === 'chat'    && <ChatScreen    night={night} />}
         {screen === 'prepare' && <PrepareScreen night={night} />}
-        {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} householdMembers={householdMembers} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
+        {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
       </div>
       <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={feedActive} />
     </div>

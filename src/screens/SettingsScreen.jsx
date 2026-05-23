@@ -11,12 +11,13 @@ function Card({ children, p }) {
   )
 }
 
-export default function SettingsScreen({ night, authUser, profile, householdMembers = [], onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
+export default function SettingsScreen({ night, authUser, profile, householdMembers = [], householdMembersError, onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
   const p = palette(night)
   const householdMembersReady = Array.isArray(householdMembers)
   const memberList = householdMembersReady ? householdMembers : []
   const connectedMembers = memberList.filter(member => member.id !== authUser?.id)
   const hasConnectedFamily = connectedMembers.length > 0
+  const canInvitePartner = householdMembersReady && !householdMembersError && profile?.role === 'primary' && !hasConnectedFamily
 
   // ── Auth form state ────────────────────────────────────────────────────────
   const [authTab,      setAuthTab]      = useState('signin')
@@ -341,6 +342,17 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
             </span>
           )}
 
+          {householdMembersError && (
+            <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 12, padding: '11px 12px', marginBottom: 14 }}>
+              <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 600, marginBottom: 4 }}>
+                Family group status unavailable
+              </span>
+              <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.5 }}>
+                The app could not load the connected accounts yet. Sync again after the latest database update has been applied.
+              </span>
+            </div>
+          )}
+
           {memberList.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.5, marginBottom: 10 }}>
@@ -369,7 +381,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
             </div>
           )}
 
-          {householdMembersReady && (profile.role === 'primary' && !hasConnectedFamily ? (
+          {householdMembersReady && !householdMembersError && (canInvitePartner ? (
             <>
               <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.5, marginBottom: 14 }}>
                 Your partner can join by entering an invite code. Generate one below and send it to them.
