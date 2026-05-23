@@ -96,6 +96,25 @@ function buildISO(dateVal, timeVal) {
 function todayDateStr() { return dateStr(new Date().toISOString()) }
 function dayKey(isoString) { return dateStr(isoString) }
 
+function getEntryCreatorId(entry) {
+  return entry?.loggedBy || entry?.createdBy || entry?.partnerId || entry?.logged_by || entry?.created_by || entry?.partner_id || null
+}
+
+function PartnerAttributionIndicator({ entry, sharedMode, authUser }) {
+  const creatorId = getEntryCreatorId(entry)
+  if (!sharedMode || !creatorId) return null
+  const dotColour = creatorId === authUser?.id ? brand.accent : brand.green
+  const label = creatorId === authUser?.id ? 'Logged by you' : 'Logged by partner'
+
+  return (
+    <span
+      aria-label={label}
+      title={label}
+      style={{ width: 7, height: 7, borderRadius: '50%', background: dotColour, flexShrink: 0, marginRight: 6 }}
+    />
+  )
+}
+
 // ── Shared modal shell ────────────────────────────────────────────────────────
 function ModalShell({ title, night, onClose, children }) {
   const p = palette(night)
@@ -407,8 +426,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const [nappies,     setNappies]     = useState(() => getNappies())
   const [medicines,   setMedicines]   = useState(() => getMedicines())
 
-  const normalizeNappy = (n) => 'loggedAt' in n ? n : { id: n.id, type: n.type, pooColor: n.poo_color, loggedAt: n.logged_at }
-  const normalizeMedicine = (m) => 'loggedAt' in m ? m : { id: m.id, name: m.name, medicineId: m.medicine_id, doseMl: m.dose_ml, form: m.form, notes: m.notes, loggedAt: m.logged_at }
+  const normalizeNappy = (n) => 'loggedAt' in n ? n : { id: n.id, type: n.type, pooColor: n.poo_color, loggedAt: n.logged_at, loggedBy: n.logged_by, createdBy: n.created_by, partnerId: n.partner_id }
+  const normalizeMedicine = (m) => 'loggedAt' in m ? m : { id: m.id, name: m.name, medicineId: m.medicine_id, doseMl: m.dose_ml, form: m.form, notes: m.notes, loggedAt: m.logged_at, loggedBy: m.logged_by, createdBy: m.created_by, partnerId: m.partner_id }
 
   const nappyList    = sharedMode && sharedNappies   ? sharedNappies.map(normalizeNappy)     : nappies
   const medicineList = sharedMode && sharedMedicines ? sharedMedicines.map(normalizeMedicine) : medicines
@@ -783,17 +802,13 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
                     // ── Feed row ──────────────────────────────────────────
                     if (entry._type === 'feed') {
-                      const dotColour = sharedMode && entry.loggedBy
-                        ? (entry.loggedBy === authUser?.id ? brand.accent : brand.green)
-                        : null
-                      const canEdit = !sharedMode || entry.loggedBy === authUser?.id
+                      const creatorId = getEntryCreatorId(entry)
+                      const canEdit = !sharedMode || creatorId === authUser?.id
                       return (
                         <div key={entry.id}
                           style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle, cursor: canEdit ? 'pointer' : 'default' }}
                           onClick={() => canEdit && setEditSession(entry)}>
-                          {dotColour && (
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColour, flexShrink: 0, marginRight: 6 }} />
-                          )}
+                          <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
                             <span style={{ fontSize: 10, fontWeight: 600, color: p.sub }}>{entry.side}</span>
@@ -817,6 +832,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                       const isDel      = confirmDel?.id === entry.id
                       return (
                         <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
+                          <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.loggedAt)}</span>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 13 }}>
                             {nappyEmoji}
@@ -846,6 +862,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                       const isDel = confirmDel?.id === entry.id
                       return (
                         <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
+                          <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.loggedAt)}</span>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
                             💊
