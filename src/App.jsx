@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer, getSessions, getNappies, getMedicines } from './lib/storage.js'
-import { getSession, getProfile, subscribeToFeeds, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, migrateLocalNappies, migrateLocalMedicines, userHasDataInHousehold, deduplicateHouseholdData } from './lib/db.js'
+import { getSession, getProfile, getHouseholdMembers, subscribeToFeeds, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, migrateLocalNappies, migrateLocalMedicines, userHasDataInHousehold, deduplicateHouseholdData } from './lib/db.js'
 import { supabase, isSupabaseConfigured } from './lib/supabase.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
@@ -24,6 +24,7 @@ export default function App() {
   // ── Auth & shared session state ────────────────────────────────────────────
   const [authUser,        setAuthUser]        = useState(null)
   const [profile,         setProfile]         = useState(null)
+  const [householdMembers, setHouseholdMembers] = useState(null)
   const [sharedSessions,  setSharedSessions]  = useState(null)
   const [sharedNappies,   setSharedNappies]   = useState(null)
   const [sharedMedicines, setSharedMedicines] = useState(null)
@@ -88,6 +89,7 @@ export default function App() {
         loadProfile(user.id)
       } else {
         setProfile(null)
+        setHouseholdMembers(null)
         setSharedSessions(null)
         setSharedNappies(null)
         setSharedMedicines(null)
@@ -103,6 +105,8 @@ export default function App() {
     if (!data) return
     setProfile(data)
     if (data.household_id) {
+      setHouseholdMembers(null)
+      loadHouseholdMembers()
       // One-time migration: upload local data only if this user has no records in Supabase yet
       const migrationKey = `navaya_migrated_${data.household_id}`
       if (!localStorage.getItem(migrationKey)) {
@@ -125,8 +129,16 @@ export default function App() {
           prev ? [newSession, ...prev.filter(s => s.id !== newSession.id)] : [newSession]
         )
       })
+    } else {
+      setHouseholdMembers([])
     }
   }
+
+  const loadHouseholdMembers = useCallback(async () => {
+    const { data } = await getHouseholdMembers()
+    setHouseholdMembers(data || [])
+    return data || []
+  }, [])
 
   const loadSharedSessions = async (householdId) => {
     const { data } = await getRecentSessions(householdId, 200)
@@ -218,7 +230,7 @@ export default function App() {
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} />}
         {screen === 'chat'    && <ChatScreen    night={night} />}
         {screen === 'prepare' && <PrepareScreen night={night} />}
-        {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} onProfileUpdate={refreshProfile} onResync={resyncAll} />}
+        {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} householdMembers={householdMembers} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
       </div>
       <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={feedActive} />
     </div>
