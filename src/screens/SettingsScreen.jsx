@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { brand, palette } from '../theme.js'
 import { signIn, signUp, signOut, createHousehold, createInviteCode, acceptInvite } from '../lib/db.js'
 import { isSupabaseConfigured } from '../lib/supabase.js'
@@ -11,8 +11,12 @@ function Card({ children, p }) {
   )
 }
 
-export default function SettingsScreen({ night, authUser, profile, onProfileUpdate, onResync }) {
+export default function SettingsScreen({ night, authUser, profile, householdMembers = [], onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
   const p = palette(night)
+  const householdMembersReady = Array.isArray(householdMembers)
+  const memberList = householdMembersReady ? householdMembers : []
+  const connectedMembers = memberList.filter(member => member.id !== authUser?.id)
+  const hasConnectedFamily = connectedMembers.length > 0
 
   // ── Auth form state ────────────────────────────────────────────────────────
   const [authTab,      setAuthTab]      = useState('signin')
@@ -133,10 +137,20 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
     setSyncing(true)
     setSyncDone(false)
     await onResync?.()
+    await onRefreshHouseholdMembers?.()
     setSyncing(false)
     setSyncDone(true)
     setTimeout(() => setSyncDone(false), 2500)
   }
+
+  useEffect(() => {
+    if (!authUser || !profile?.household_id) return
+    onRefreshHouseholdMembers?.()
+    const refreshTimer = setInterval(() => {
+      onRefreshHouseholdMembers?.()
+    }, 30000)
+    return () => clearInterval(refreshTimer)
+  }, [authUser, profile?.household_id, onRefreshHouseholdMembers])
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg }}>
@@ -321,7 +335,41 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
             Shared logbook
           </span>
 
-          {profile.role === 'primary' ? (
+          {!householdMembersReady && (
+            <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.5, marginBottom: 14 }}>
+              Checking your family group...
+            </span>
+          )}
+
+          {memberList.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.5, marginBottom: 10 }}>
+                {hasConnectedFamily ? 'Your family group is connected.' : 'Your household is ready. Invite your partner when you are ready to share.'}
+              </span>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {memberList.map(member => {
+                  const isYou = member.id === authUser.id
+                  return (
+                    <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: 10, background: p.bg, border: `1px solid ${p.border}`, borderRadius: 12, padding: '10px 12px' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: isYou ? brand.accent : brand.green, display: 'inline-block', flexShrink: 0 }} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {member.display_name || member.email || 'Family member'}{isYou ? ' (you)' : ''}
+                        </span>
+                        {member.email && (
+                          <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {member.email}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {householdMembersReady && (profile.role === 'primary' && !hasConnectedFamily ? (
             <>
               <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.5, marginBottom: 14 }}>
                 Your partner can join by entering an invite code. Generate one below and send it to them.
@@ -365,14 +413,14 @@ export default function SettingsScreen({ night, authUser, profile, onProfileUpda
           ) : (
             <div>
               <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.5, marginBottom: 4 }}>
-                You've joined a shared household.
+                {hasConnectedFamily ? 'Sharing is active for this family group.' : "You've joined a shared household."}
               </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: brand.green, display: 'inline-block', flexShrink: 0 }} />
                 <span style={{ fontSize: 13, color: p.text, fontWeight: 500 }}>Sharing active</span>
               </div>
             </div>
-          )}
+          ))}
 
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${p.border}` }}>
             <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.5, marginBottom: 10 }}>

@@ -53,6 +53,11 @@ export async function updateProfile(userId, updates) {
   return { data, error }
 }
 
+export async function getHouseholdMembers() {
+  const { data, error } = await supabase.rpc('get_household_members')
+  return { data: data || [], error }
+}
+
 // ── Household setup ───────────────────────────────────────────────────────────
 
 export async function createHousehold() {
