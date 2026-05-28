@@ -2,15 +2,8 @@ import { useState, useMemo, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
 import { getNappies, addNappy, deleteNappy } from '../lib/storage.js'
 import { insertNappyLog, deleteNappyLog } from '../lib/db.js'
-
-// Poo colours — ordered lightest to darkest, with clinical notes where relevant
-const POO_COLORS = [
-  { id: 'mustard', hex: '#D4A843', label: 'Mustard',    note: null },
-  { id: 'yellow',  hex: '#EDD050', label: 'Yellow',     note: null },
-  { id: 'green',   hex: '#6B9E5C', label: 'Green',      note: 'Green poo can indicate a foremilk/hindmilk imbalance — try longer feeds on one side.' },
-  { id: 'brown',   hex: '#8B6347', label: 'Brown',      note: null },
-  { id: 'dark',    hex: '#2D1F14', label: 'Dark/Black', note: '⚠ Dark or black poo in a baby over 5 days old should be checked by your midwife or GP.' },
-]
+import { dateStr, timeStr } from '../utils/time.js'
+import { POO_COLORS } from '../lib/constants.js'
 
 function timeSinceShort(iso) {
   if (!iso) return '—'
@@ -41,13 +34,6 @@ function fmtDateTime(iso) {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' · ' + time
 }
 
-function dateStr(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-function timeStr(d = new Date()) {
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
 
 function todayMidnight() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime()
@@ -62,10 +48,12 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
 
   useEffect(() => {
     if (!sharedNappies?.length) return
+    // Guard: don't overwrite state while user is actively composing a nappy entry
+    if (type !== null) return
     setNappies(sharedNappies.map(n => ({
       id: n.id, type: n.type, pooColor: n.poo_color ?? n.pooColor, loggedAt: n.logged_at ?? n.loggedAt,
     })))
-  }, [sharedNappies])
+  }, [sharedNappies, type])
   const [type,         setType]         = useState(null)     // 'wet' | 'poo' | 'both'
   const [pooColor,     setPooColor]     = useState('mustard')
   const [logDate,      setLogDate]      = useState(() => dateStr())

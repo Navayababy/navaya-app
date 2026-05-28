@@ -41,6 +41,8 @@ export default function App() {
     return Math.floor((Date.now() - saved.startedAt) / 1000)
   })
   const timerRef = useRef(null)
+  const feedStartedAtRef = useRef(feedStartedAt)
+  feedStartedAtRef.current = feedStartedAt
 
   useLayoutEffect(() => {
     let rafId = null
@@ -110,27 +112,45 @@ export default function App() {
       setHouseholdMembers(null)
       setHouseholdMembersError(null)
       loadHouseholdMembers()
-      // One-time migration: upload local data only if this user has no records in Supabase yet
+      // One-time migration: upload local data only if this user has no records in Supabase yet.
+      // Flag is only set on full success so a failed migration can be retried on next login.
       const migrationKey = `navaya_migrated_${data.household_id}`
       if (!localStorage.getItem(migrationKey)) {
         const alreadySynced = await userHasDataInHousehold(data.household_id, userId)
         if (!alreadySynced) {
-          await migrateLocalSessions(data.household_id, userId, getSessions())
-          await migrateLocalNappies(data.household_id, userId, getNappies())
-          await migrateLocalMedicines(data.household_id, userId, getMedicines())
+          try {
+            await migrateLocalSessions(data.household_id, userId, getSessions())
+            await migrateLocalNappies(data.household_id, userId, getNappies())
+            await migrateLocalMedicines(data.household_id, userId, getMedicines())
+            localStorage.setItem(migrationKey, '1')
+          } catch (err) {
+            console.error('Migration failed, will retry next login:', err)
+          }
+        } else {
+          localStorage.setItem(migrationKey, '1')
         }
-        localStorage.setItem(migrationKey, '1')
       }
-      // Always deduplicate on load — fast if nothing to clean, removes any stale dupes
-      await deduplicateHouseholdData(data.household_id)
+      // Deduplicate at most once per 24 hours to avoid O(n) queries on every login.
+      const dedupKey = `navaya_dedup_${data.household_id}`
+      const lastDedup = parseInt(localStorage.getItem(dedupKey) || '0', 10)
+      if (Date.now() - lastDedup > 24 * 60 * 60 * 1000) {
+        await deduplicateHouseholdData(data.household_id)
+        localStorage.setItem(dedupKey, String(Date.now()))
+      }
       loadSharedSessions(data.household_id)
       loadSharedNappies(data.household_id)
       loadSharedMedicines(data.household_id)
       if (realtimeUnsub.current) realtimeUnsub.current()
-      realtimeUnsub.current = subscribeToFeeds(data.household_id, (newSession) => {
-        setSharedSessions(prev =>
-          prev ? [newSession, ...prev.filter(s => s.id !== newSession.id)] : [newSession]
-        )
+      realtimeUnsub.current = subscribeToFeeds(data.household_id, {
+        onInsert: (s) => setSharedSessions(prev =>
+          prev ? [s, ...prev.filter(x => x.id !== s.id)] : [s]
+        ),
+        onUpdate: (s) => setSharedSessions(prev =>
+          prev ? prev.map(x => x.id === s.id ? s : x) : [s]
+        ),
+        onDelete: (s) => setSharedSessions(prev =>
+          prev ? prev.filter(x => x.id !== s.id) : []
+        ),
       })
     } else {
       setHouseholdMembers([])
@@ -184,16 +204,17 @@ export default function App() {
   }
 
   // ── Feed timer ─────────────────────────────────────────────────────────────
+  // feedStartedAt is read via ref inside the interval to avoid restarting on every tick.
   useEffect(() => {
-    if (feedActive && feedStartedAt) {
+    if (feedActive) {
       timerRef.current = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - feedStartedAt) / 1000))
+        setElapsed(Math.floor((Date.now() - feedStartedAtRef.current) / 1000))
       }, 1000)
     } else {
       clearInterval(timerRef.current)
     }
     return () => clearInterval(timerRef.current)
-  }, [feedActive, feedStartedAt])
+  }, [feedActive])
 
   const startFeed = (side) => {
     const now = Date.now()
