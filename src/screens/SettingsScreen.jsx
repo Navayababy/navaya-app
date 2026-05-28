@@ -495,6 +495,18 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
         </a>
       </Card>
 
+      {/* ── Legal ── */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 24, margin: '0 14px 8px' }}>
+        <a href="https://www.navayababy.co.uk/policies/privacy-policy" target="_blank" rel="noopener noreferrer"
+          style={{ fontSize: 11, color: p.sub, textDecoration: 'none', letterSpacing: '.04em' }}>
+          Privacy Policy
+        </a>
+        <a href="https://www.navayababy.co.uk/policies/terms-of-service" target="_blank" rel="noopener noreferrer"
+          style={{ fontSize: 11, color: p.sub, textDecoration: 'none', letterSpacing: '.04em' }}>
+          Terms of Use
+        </a>
+      </div>
+
       <div style={{ height: 20 }} />
     </div>
   )
