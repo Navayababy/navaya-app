@@ -474,7 +474,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
           If something isn't working or you have a question about the app, we're here.
         </span>
         <a
-          href="mailto:support@navaya.co.uk"
+          href="mailto:support@navayababy.co.uk"
           style={{
             display: 'block',
             width: '100%',
