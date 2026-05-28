@@ -286,19 +286,17 @@ export async function deleteFeedSession(id) {
 
 // ── Realtime subscription ─────────────────────────────────────────────────────
 
-export function subscribeToFeeds(householdId, onNewSession) {
+export function subscribeToFeeds(householdId, { onInsert, onUpdate, onDelete }) {
+  const filter = `household_id=eq.${householdId}`
   const channel = supabase
     .channel(`feeds:${householdId}`)
-    .on('postgres_changes', {
-      event:  'INSERT',
-      schema: 'public',
-      table:  'feed_sessions',
-      filter: `household_id=eq.${householdId}`,
-    }, payload => {
-      onNewSession(payload.new)
-    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'feed_sessions', filter },
+      payload => onInsert?.(payload.new))
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'feed_sessions', filter },
+      payload => onUpdate?.(payload.new))
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'feed_sessions', filter },
+      payload => onDelete?.(payload.old))
     .subscribe()
 
-  // Return unsubscribe function
   return () => supabase.removeChannel(channel)
 }

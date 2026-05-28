@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, addSession, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
 import { insertFeedSession } from '../lib/db.js'
+import { fmt, timeAgo, fmtSince } from '../utils/time.js'
+import { normalizeFeedSession } from '../lib/normalize.js'
 
 const QUOTES = [
   // — Verified breast milk facts —
@@ -31,29 +33,6 @@ const QUOTES = [
   "The research is clear: what you are doing has effects that last decades. You just can't see them yet.",
 ]
 
-function fmt(secs) {
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
-function timeAgo(isoString) {
-  if (!isoString) return ''
-  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000)
-  if (diff < 60)   return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m ago`
-}
-
-function fmtSince(isoString) {
-  if (!isoString) return null
-  const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000)
-  if (diff < 60) return 'just now'
-  const h = Math.floor(diff / 3600)
-  const m = Math.floor((diff % 3600) / 60)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
 
 const sortByTime = arr => [...arr].sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
 
@@ -73,15 +52,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
   // Keep "Recent feeds" in sync with shared sessions when in shared mode
   useEffect(() => {
     if (!sharedSessions?.length) return
-    const normalized = sharedSessions.slice(0, 3).map(s => ({
-      id:          s.id,
-      side:        s.side,
-      startedAt:   s.started_at ?? s.startedAt,
-      endedAt:     s.ended_at   ?? s.endedAt,
-      durationSecs: s.duration_secs ?? s.durationSecs,
-      mood:        s.mood_score  ?? s.mood,
-    }))
-    setSessions(sortByTime(normalized).slice(0, 3))
+    setSessions(sortByTime(sharedSessions.slice(0, 3).map(normalizeFeedSession)).slice(0, 3))
   }, [sharedSessions])
   const [showMood,       setShowMood]      = useState(false)
   const [pendingSession, setPending]       = useState(null)
@@ -95,6 +66,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
   const [quote] = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)])
   const nameInputRef  = useRef(null)
   const babyNameRef   = useRef(null)
+  const flashTimersRef = useRef([])
 
   const lastSession = sessions[0] || null
   const lastSide    = lastSession?.side || 'R'
@@ -109,10 +81,15 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
     setPending(sessionData)
     setShowMood(true)
     if (profile?.household_id) {
-      setTimeout(() => { setPartnerFlash(true) }, 400)
-      setTimeout(() => { setPartnerFlash(false) }, 3500)
+      flashTimersRef.current.forEach(clearTimeout)
+      flashTimersRef.current = [
+        setTimeout(() => setPartnerFlash(true),  400),
+        setTimeout(() => setPartnerFlash(false), 3500),
+      ]
     }
   }
+
+  useEffect(() => () => flashTimersRef.current.forEach(clearTimeout), [])
 
   const saveSession = (session) => {
     setSessions(sortByTime(addSession(session)).slice(0, 3))
@@ -205,12 +182,12 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
               </button>
             </div>
           ) : (
-            <button onClick={openNameEdit}
+            <button onClick={openNameEdit} aria-label="Edit your name"
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, lineHeight: 1.1 }}>
                 {displayName}
               </span>
-              <span style={{ fontSize: 11, color: p.sub, marginTop: 4 }}>✎</span>
+              <span aria-hidden="true" style={{ fontSize: 11, color: p.sub, marginTop: 4 }}>✎</span>
             </button>
           )}
 
@@ -238,12 +215,12 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
                 </button>
               </div>
             ) : (
-              <button onClick={openBabyEdit}
+              <button onClick={openBabyEdit} aria-label="Edit baby name"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
                 <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 400, color: babyName ? p.heading : p.sub, lineHeight: 1.1 }}>
                   {babyName || 'Add name'}
                 </span>
-                <span style={{ fontSize: 11, color: p.sub, marginTop: 2 }}>✎</span>
+                <span aria-hidden="true" style={{ fontSize: 11, color: p.sub, marginTop: 2 }}>✎</span>
               </button>
             )}
           </div>
@@ -255,7 +232,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
             style={{ position: 'relative', background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '5px 12px', cursor: 'pointer', color: profile?.household_id ? brand.green : p.sub, fontSize: 11 }}>
             {profile?.household_id ? '● Sharing' : '⊕ Account'}
           </button>
-          <button onClick={onNightToggle}
+          <button onClick={onNightToggle} aria-label={night ? 'Switch to light mode' : 'Switch to night mode'}
             style={{ background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '5px 12px', cursor: 'pointer', color: p.sub, fontSize: 11 }}>
             {night ? '☀' : '☽'}
           </button>

@@ -26,34 +26,38 @@ export default function ChatScreen({ night }) {
     const q = text.trim()
     if (!q || loading) return
 
-    const userMsg  = { role: 'user', content: q }
-    const history  = [...messages, userMsg]
+    const userMsg = { id: `${Date.now()}-user`, role: 'user', content: q }
+    const history = [...messages, userMsg]
     setMessages(history)
     setInput('')
     setLoading(true)
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 20000)
+
     try {
-      // Call our Vercel serverless function, which keeps the API key secure
       const res = await fetch('/api/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           messages: history.map(m => ({ role: m.role, content: m.content }))
         }),
+        signal: controller.signal,
       })
 
+      clearTimeout(timeoutId)
       const data = await res.json()
 
       if (!res.ok) throw new Error(data.error || 'API error')
 
-      setMessages(h => [...h, { role: 'assistant', content: data.reply }])
+      setMessages(h => [...h, { id: `${Date.now()}-assistant`, role: 'assistant', content: data.reply }])
 
     } catch (err) {
-      setMessages(h => [...h, {
-        role:    'assistant',
-        content: 'Something went wrong. Please check your connection and try again.',
-        error:   true,
-      }])
+      clearTimeout(timeoutId)
+      const msg = err.name === 'AbortError'
+        ? 'The request timed out. Please check your connection and try again.'
+        : 'Something went wrong. Please check your connection and try again.'
+      setMessages(h => [...h, { id: `${Date.now()}-error`, role: 'assistant', content: msg, error: true }])
     }
 
     setLoading(false)
@@ -76,7 +80,7 @@ export default function ChatScreen({ night }) {
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 14px' }}>
+      <div role="log" aria-live="polite" aria-label="Conversation with Sage" style={{ flex: 1, overflowY: 'auto', padding: '0 14px' }}>
 
         {/* Empty state */}
         {messages.length === 0 && (
@@ -91,8 +95,8 @@ export default function ChatScreen({ night }) {
             </div>
 
             <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>What's on your mind?</span>
-            {SUGGESTIONS.map((s, i) => (
-              <button key={i} onClick={() => send(s)}
+            {SUGGESTIONS.map((s) => (
+              <button key={s} onClick={() => send(s)}
                 style={{ width: '100%', textAlign: 'left', background: p.card, border: `1px solid ${p.border}`, borderRadius: 12, padding: '11px 12px', marginBottom: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ color: brand.sand, fontSize: 12, flexShrink: 0 }}>✦</span>
                 <span style={{ fontSize: 12, color: p.text, lineHeight: 1.4 }}>{s}</span>
@@ -102,8 +106,8 @@ export default function ChatScreen({ night }) {
         )}
 
         {/* Message list */}
-        {messages.map((m, i) => (
-          <div key={i} className="fade-up" style={{ marginBottom: 10, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+        {messages.map((m) => (
+          <div key={m.id} className="fade-up" style={{ marginBottom: 10, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
             {m.role === 'user' ? (
               <div style={{ background: brand.bark, borderRadius: '14px 14px 4px 14px', padding: '10px 13px', maxWidth: '84%' }}>
                 <span style={{ fontSize: 13, color: brand.parchment, lineHeight: 1.5 }}>{m.content}</span>
