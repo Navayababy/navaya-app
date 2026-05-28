@@ -465,6 +465,36 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
         </div>
       )}
 
+      {/* ── Support ── */}
+      <Card p={p}>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 6 }}>
+          Need help?
+        </span>
+        <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.6, marginBottom: 14 }}>
+          If something isn't working or you have a question about the app, we're here.
+        </span>
+        <a
+          href="mailto:support@navaya.co.uk"
+          style={{
+            display: 'block',
+            width: '100%',
+            padding: '13px',
+            borderRadius: 13,
+            border: 'none',
+            background: brand.bark,
+            color: brand.sand,
+            fontSize: 14,
+            fontFamily: "'DM Sans', sans-serif",
+            fontWeight: 500,
+            textAlign: 'center',
+            textDecoration: 'none',
+            boxSizing: 'border-box',
+          }}
+        >
+          Email support
+        </a>
+      </Card>
+
       <div style={{ height: 20 }} />
     </div>
   )
