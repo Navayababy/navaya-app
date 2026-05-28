@@ -45,15 +45,6 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
   const sharedMode = !!(profile?.household_id && sharedNappies)
 
   const [nappies,      setNappies]      = useState(() => getNappies())
-
-  useEffect(() => {
-    if (!sharedNappies?.length) return
-    // Guard: don't overwrite state while user is actively composing a nappy entry
-    if (type !== null) return
-    setNappies(sharedNappies.map(n => ({
-      id: n.id, type: n.type, pooColor: n.poo_color ?? n.pooColor, loggedAt: n.logged_at ?? n.loggedAt,
-    })))
-  }, [sharedNappies, type])
   const [type,         setType]         = useState(null)     // 'wet' | 'poo' | 'both'
   const [pooColor,     setPooColor]     = useState('mustard')
   const [logDate,      setLogDate]      = useState(() => dateStr())
@@ -61,6 +52,15 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
   const [editingTime,  setEditingTime]  = useState(false)
   const [justLogged,   setJustLogged]   = useState(false)
   const [confirmDel,   setConfirmDel]   = useState(null)
+
+  // Guard: don't overwrite state while user is actively composing a nappy entry
+  useEffect(() => {
+    if (!sharedNappies?.length) return
+    if (type !== null) return
+    setNappies(sharedNappies.map(n => ({
+      id: n.id, type: n.type, pooColor: n.poo_color ?? n.pooColor, loggedAt: n.logged_at ?? n.loggedAt,
+    })))
+  }, [sharedNappies, type])
 
   const todayNappies = useMemo(() => {
     const start = todayMidnight()
