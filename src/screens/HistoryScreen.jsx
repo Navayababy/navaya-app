@@ -4,7 +4,7 @@ import { getSessions, getNappies, getMedicines, updateSession, deleteSession, ad
 import { updateFeedSession, deleteFeedSession, insertFeedSession, insertNappyLog, deleteNappyLog, insertMedicineLog, deleteMedicineLog } from '../lib/db.js'
 import { fmt, fmtMins, dayLabel, timeStr, dateStr, todayDateStr, dayKey } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine } from '../lib/normalize.js'
-import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL, POO_COLORS } from '../lib/constants.js'
+import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL } from '../lib/constants.js'
 import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
