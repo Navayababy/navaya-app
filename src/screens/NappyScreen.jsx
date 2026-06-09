@@ -4,6 +4,7 @@ import { getNappies, addNappy, deleteNappy } from '../lib/storage.js'
 import { insertNappyLog, deleteNappyLog } from '../lib/db.js'
 import { dateStr, timeStr } from '../utils/time.js'
 import { POO_COLORS } from '../lib/constants.js'
+import { newId } from '../lib/id.js'
 
 function timeSinceShort(iso) {
   if (!iso) return '—'
@@ -89,11 +90,14 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
     const [y, mo, d] = logDate.split('-').map(Number)
     const [h, m]     = logTime.split(':').map(Number)
     const loggedAt   = new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
-    const nappy = { id: Date.now().toString(), type, pooColor: needsColor ? pooColor : null, loggedAt }
+    const nappy = { id: newId(), type, pooColor: needsColor ? pooColor : null, loggedAt }
     setNappies(addNappy(nappy))
     if (authUser && profile?.household_id) {
-      insertNappyLog({ householdId: profile.household_id, loggedBy: authUser.id, type, pooColor: nappy.pooColor, loggedAt })
-        .then(() => onNappySaved?.())
+      insertNappyLog({ id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type, pooColor: nappy.pooColor, loggedAt })
+        .then(({ error }) => {
+          if (error) console.error('Failed to share nappy log:', error)
+          else onNappySaved?.()
+        })
     }
     setType(null)
     setEditingTime(false)

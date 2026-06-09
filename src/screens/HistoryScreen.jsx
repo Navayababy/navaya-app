@@ -149,6 +149,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     setSessions(addSession(session))
     if (sharedMode && authUser && profile?.household_id) {
       insertFeedSession({
+        id:           session.id,
         householdId:  profile.household_id,
         babyId:       null,
         loggedBy:     authUser.id,
@@ -157,7 +158,10 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
         durationSecs: session.durationSecs,
         side:         session.side,
         moodScore:    session.mood ?? null,
-      }).then(() => onRefreshSessions?.())
+      }).then(({ error }) => {
+        if (error) console.error('Failed to share feed:', error)
+        else onRefreshSessions?.()
+      })
     }
     setAddMode(null)
   }
@@ -165,8 +169,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const handleAddNappy = (nappy) => {
     setNappies(addNappy(nappy))
     if (sharedMode && authUser && profile?.household_id) {
-      insertNappyLog({ householdId: profile.household_id, loggedBy: authUser.id, type: nappy.type, pooColor: nappy.pooColor, loggedAt: nappy.loggedAt })
-        .then(() => onRefreshNappies?.())
+      insertNappyLog({ id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type: nappy.type, pooColor: nappy.pooColor, loggedAt: nappy.loggedAt })
+        .then(({ error }) => {
+          if (error) console.error('Failed to share nappy log:', error)
+          else onRefreshNappies?.()
+        })
     }
     setAddMode(null)
   }
@@ -174,8 +181,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const handleAddMedicine = (medicine) => {
     setMedicines(addMedicine(medicine))
     if (sharedMode && authUser && profile?.household_id) {
-      insertMedicineLog({ householdId: profile.household_id, loggedBy: authUser.id, ...medicine, loggedAt: medicine.loggedAt })
-        .then(() => onRefreshMedicines?.())
+      insertMedicineLog({ ...medicine, householdId: profile.household_id, loggedBy: authUser.id })
+        .then(({ error }) => {
+          if (error) console.error('Failed to share medicine log:', error)
+          else onRefreshMedicines?.()
+        })
     }
     setAddMode(null)
   }

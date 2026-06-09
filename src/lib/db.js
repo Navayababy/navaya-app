@@ -103,10 +103,10 @@ export async function acceptInvite(code) {
 
 // ── Nappy logs ────────────────────────────────────────────────────────────────
 
-export async function insertNappyLog({ householdId, loggedBy, type, pooColor, loggedAt }) {
+export async function insertNappyLog({ id, householdId, loggedBy, type, pooColor, loggedAt }) {
   const { error } = await supabase
     .from('nappy_logs')
-    .insert({ household_id: householdId, logged_by: loggedBy, type, poo_color: pooColor || null, logged_at: loggedAt })
+    .insert({ ...(id ? { id } : {}), household_id: householdId, logged_by: loggedBy, type, poo_color: pooColor || null, logged_at: loggedAt })
   return { error }
 }
 
@@ -127,10 +127,10 @@ export async function deleteNappyLog(id) {
 
 // ── Medicine logs ─────────────────────────────────────────────────────────────
 
-export async function insertMedicineLog({ householdId, loggedBy, name, medicineId, doseMl, form, notes, loggedAt }) {
+export async function insertMedicineLog({ id, householdId, loggedBy, name, medicineId, doseMl, form, notes, loggedAt }) {
   const { error } = await supabase
     .from('medicine_logs')
-    .insert({ household_id: householdId, logged_by: loggedBy, name, medicine_id: medicineId || null, dose_ml: doseMl || null, form: form || null, notes: notes || null, logged_at: loggedAt })
+    .insert({ ...(id ? { id } : {}), household_id: householdId, logged_by: loggedBy, name, medicine_id: medicineId || null, dose_ml: doseMl || null, form: form || null, notes: notes || null, logged_at: loggedAt })
   return { error }
 }
 
@@ -232,10 +232,11 @@ export async function migrateLocalMedicines(householdId, userId, localMedicines)
 
 // ── Feed sessions ─────────────────────────────────────────────────────────────
 
-export async function insertFeedSession({ householdId, babyId, loggedBy, startedAt, endedAt, durationSecs, side, moodScore }) {
+export async function insertFeedSession({ id, householdId, babyId, loggedBy, startedAt, endedAt, durationSecs, side, moodScore }) {
   const { data, error } = await supabase
     .from('feed_sessions')
     .insert({
+      ...(id ? { id } : {}),
       household_id:  householdId,
       baby_id:       babyId,
       logged_by:     loggedBy,

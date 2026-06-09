@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { brand, palette } from '../../theme.js'
 import { timeStr, todayDateStr } from '../../utils/time.js'
+import { newId } from '../../lib/id.js'
 import { MEDICINE_OPTIONS } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
@@ -15,6 +16,7 @@ export default function AddMedicineModal({ night, onSave, onClose }) {
   const [date,       setDate]       = useState(todayDateStr())
   const [logTime,    setLogTime]    = useState(timeStr())
   const [notes,      setNotes]      = useState('')
+  const [error,      setError]      = useState(null)
 
   const selected = MEDICINE_OPTIONS.find(m => m.id === medicineId)
 
@@ -24,8 +26,14 @@ export default function AddMedicineModal({ night, onSave, onClose }) {
     const loggedAt   = new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
     const name       = medicineId === 'other' ? customName.trim() : selected.label
     if (!name) return
+    // Matches the database constraint (0–50ml) so shared saves can't silently fail
+    if (doseMl && (Number.isNaN(Number(doseMl)) || Number(doseMl) < 0 || Number(doseMl) > 50)) {
+      setError('Dose must be between 0 and 50ml.')
+      return
+    }
+    setError(null)
     onSave({
-      id: Date.now().toString(),
+      id: newId(),
       name,
       medicineId,
       doseMl: doseMl ? Number(doseMl) : null,
@@ -50,12 +58,12 @@ export default function AddMedicineModal({ night, onSave, onClose }) {
       {medicineId === 'other' && (
         <>
           <span style={labelStyle}>Custom name</span>
-          <input value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g. Vitamin D drops" style={{ ...inputStyle, marginBottom: 14 }} />
+          <input value={customName} maxLength={100} onChange={e => setCustomName(e.target.value)} placeholder="e.g. Vitamin D drops" style={{ ...inputStyle, marginBottom: 14 }} />
         </>
       )}
 
       <span style={labelStyle}>Dose (ml)</span>
-      <input type="number" min="0" step="0.1" value={doseMl} onChange={e => setDoseMl(e.target.value)} placeholder="Optional" style={{ ...inputStyle, marginBottom: 14 }} />
+      <input type="number" min="0" max="50" step="0.1" value={doseMl} onChange={e => setDoseMl(e.target.value)} placeholder="Optional" style={{ ...inputStyle, marginBottom: 14 }} />
 
       <span style={labelStyle}>Date & time</span>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -64,7 +72,13 @@ export default function AddMedicineModal({ night, onSave, onClose }) {
       </div>
 
       <span style={labelStyle}>Notes</span>
-      <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Reason, temperature, or advice from clinician" style={{ ...inputStyle, resize: 'vertical', marginBottom: 16 }} />
+      <textarea value={notes} maxLength={500} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Reason, temperature, or advice from clinician" style={{ ...inputStyle, resize: 'vertical', marginBottom: 16 }} />
+
+      {error && (
+        <div style={{ fontSize: 12, color: '#c0392b', marginBottom: 12, lineHeight: 1.4 }}>
+          {error}
+        </div>
+      )}
 
       <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
         <span style={{ display: 'block', fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
