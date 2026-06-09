@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { brand, palette } from '../../theme.js'
 import { timeStr, buildISO, todayDateStr } from '../../utils/time.js'
+import { newId } from '../../lib/id.js'
 import { MOOD_EMOJI, MOOD_LABEL } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
@@ -23,7 +24,7 @@ export default function AddFeedModal({ night, onSave, onClose }) {
     const startedAt    = buildISO(date, startTime)
     const endedAt      = buildISO(date, endTime)
     const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
-    onSave({ id: Date.now().toString(), side, startedAt, endedAt, durationSecs, mood })
+    onSave({ id: newId(), side, startedAt, endedAt, durationSecs, mood })
   }
 
   return (

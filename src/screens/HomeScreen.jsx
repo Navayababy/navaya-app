@@ -4,6 +4,7 @@ import { getSessions, addSession, updateSession, getBabyName, setBabyName, getUs
 import { insertFeedSession, updateFeedSession } from '../lib/db.js'
 import { fmt, timeAgo, fmtSince } from '../utils/time.js'
 import { normalizeFeedSession } from '../lib/normalize.js'
+import { newId } from '../lib/id.js'
 
 const QUOTES = [
   // — Verified breast milk facts —
@@ -90,12 +91,13 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
 
   const handleStop = () => {
     const sessionData = stopFeed()
-    const session = { id: Date.now().toString(), ...sessionData, mood: null }
+    const session = { id: newId(), ...sessionData, mood: null }
     setSessions(sortByTime(addSession(session)).slice(0, 3))
 
     pendingRemoteRef.current = null
     if (authUser && profile?.household_id) {
       pendingRemoteRef.current = insertFeedSession({
+        id:           session.id,
         householdId:  profile.household_id,
         babyId:       null,
         loggedBy:     authUser.id,
@@ -129,9 +131,10 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
     setSessions(sortByTime(updateSession(pendingSession.id, { mood })).slice(0, 3))
     const remote = pendingRemoteRef.current
     if (remote) {
+      // Same UUID in both stores — wait for the insert to land, then patch it
       remote.then(row => {
         if (!row) return
-        updateFeedSession(row.id, {
+        updateFeedSession(pendingSession.id, {
           side:         pendingSession.side,
           startedAt:    pendingSession.startedAt,
           endedAt:      pendingSession.endedAt,

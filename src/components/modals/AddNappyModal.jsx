@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { brand, palette } from '../../theme.js'
 import { timeStr, todayDateStr } from '../../utils/time.js'
+import { newId } from '../../lib/id.js'
 import { POO_COLORS } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
@@ -20,7 +21,7 @@ export default function AddNappyModal({ night, onSave, onClose }) {
     const [y, mo, d] = date.split('-').map(Number)
     const [h, m]     = logTime.split(':').map(Number)
     const loggedAt   = new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
-    onSave({ id: Date.now().toString(), type, pooColor: needsColor ? pooColor : null, loggedAt })
+    onSave({ id: newId(), type, pooColor: needsColor ? pooColor : null, loggedAt })
   }
 
   return (
