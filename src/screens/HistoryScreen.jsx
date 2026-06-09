@@ -2,27 +2,15 @@ import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, getNappies, getMedicines, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine } from '../lib/storage.js'
 import { updateFeedSession, deleteFeedSession, insertFeedSession, insertNappyLog, deleteNappyLog, insertMedicineLog, deleteMedicineLog } from '../lib/db.js'
-import { fmt, fmtMins, dayLabel, timeStr, dateStr, todayDateStr, dayKey } from '../utils/time.js'
+import { fmt, fmtMins, dayLabel, timeStr, todayDateStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine } from '../lib/normalize.js'
 import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL } from '../lib/constants.js'
+import { averageFeedMood, computeWeeklyInsights } from '../lib/stats.js'
 import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
 import AddMedicineModal from '../components/modals/AddMedicineModal.jsx'
 
-
-function feedMoodMeta(score) {
-  if (!score) return null
-  const rounded = Math.min(5, Math.max(1, Math.round(score)))
-  return { score, rounded, emoji: MOOD_EMOJI[rounded - 1], label: MOOD_LABEL[rounded - 1] }
-}
-
-function averageFeedMood(feeds) {
-  const rated = feeds.filter(feed => Number(feed.mood) > 0)
-  if (!rated.length) return null
-  const average = rated.reduce((total, feed) => total + Number(feed.mood), 0) / rated.length
-  return { ...feedMoodMeta(average), count: rated.length }
-}
 
 function getEntryCreatorId(entry) {
   return entry?.loggedBy || entry?.createdBy || entry?.partnerId || entry?.logged_by || entry?.created_by || entry?.partner_id || null
@@ -127,66 +115,10 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     return m ? `${h}h ${m}m` : `${h}h`
   }
 
-  const insights = useMemo(() => {
-    const days = []
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date()
-      d.setHours(0, 0, 0, 0)
-      d.setDate(d.getDate() - i)
-      days.push(d)
-    }
-
-    const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, feedMins: 0, meds: 0, dirty: 0, moodTotal: 0, moodCount: 0 }]))
-    feeds.forEach(s => {
-      const k = dayKey(s.startedAt)
-      if (!byDay[k]) return
-      byDay[k].feeds += 1
-      byDay[k].feedMins += Math.round((s.durationSecs || 0) / 60)
-      if (Number(s.mood) > 0) {
-        byDay[k].moodTotal += Number(s.mood)
-        byDay[k].moodCount += 1
-      }
-    })
-    medicineList.forEach(m => {
-      const k = dayKey(m.loggedAt)
-      if (!byDay[k]) return
-      byDay[k].meds += 1
-    })
-    nappyList.forEach(n => {
-      const k = dayKey(n.loggedAt)
-      if (!byDay[k]) return
-      if (n.type === 'poo' || n.type === 'both') byDay[k].dirty += 1
-    })
-
-    const rows = days.map(d => {
-      const k = dateStr(d.toISOString())
-      const v = byDay[k]
-      return {
-        key: k,
-        label: d.toLocaleDateString('en-GB', { weekday: 'short' }),
-        ...v,
-        mood: v.moodCount ? feedMoodMeta(v.moodTotal / v.moodCount) : null,
-      }
-    })
-
-    const totalFeeds = rows.reduce((a, r) => a + r.feeds, 0)
-    const totalMeds  = rows.reduce((a, r) => a + r.meds, 0)
-    const totalDirty = rows.reduce((a, r) => a + r.dirty, 0)
-    const ratedFeeds = rows.reduce((a, r) => a + r.moodCount, 0)
-    const avgFeedMins = totalFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalFeeds) : 0
-    const avgMood = ratedFeeds ? feedMoodMeta(rows.reduce((a, r) => a + r.moodTotal, 0) / ratedFeeds) : null
-    const peakFeeds = Math.max(1, ...rows.map(r => r.feeds))
-    const nowTs = Date.now()
-    const sortedFeeds = feeds
-      .map(s => new Date(s.startedAt).getTime())
-      .filter(ts => !Number.isNaN(ts) && ts >= days[0].getTime() && ts <= nowTs)
-      .sort((a, b) => a - b)
-    const avgGapMins = sortedFeeds.length > 1
-      ? Math.round(sortedFeeds.slice(1).reduce((acc, ts, idx) => acc + (ts - sortedFeeds[idx]), 0) / (sortedFeeds.length - 1) / 60000)
-      : null
-
-    return { rows, totalFeeds, totalMeds, totalDirty, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
-  }, [feeds, nappyList, medicineList])
+  const insights = useMemo(
+    () => computeWeeklyInsights(feeds, nappyList, medicineList),
+    [feeds, nappyList, medicineList]
+  )
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSaveEdit = async (id, changes) => {

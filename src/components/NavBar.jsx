@@ -1,4 +1,4 @@
-import { brand, palette } from '../theme.js'
+import { palette } from '../theme.js'
 
 const tabs = [
   { id: 'home',    icon: '◉', label: 'Feed'    },

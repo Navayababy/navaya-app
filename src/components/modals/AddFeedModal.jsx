@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { brand, palette } from '../../theme.js'
-import { timeStr, dateStr, buildISO, todayDateStr } from '../../utils/time.js'
+import { timeStr, buildISO, todayDateStr } from '../../utils/time.js'
 import { MOOD_EMOJI, MOOD_LABEL } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
