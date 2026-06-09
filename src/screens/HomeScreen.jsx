@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, addSession, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
-import { insertFeedSession } from '../lib/db.js'
+import { getSessions, addSession, updateSession, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
+import { insertFeedSession, updateFeedSession } from '../lib/db.js'
 import { fmt, timeAgo, fmtSince } from '../utils/time.js'
 import { normalizeFeedSession } from '../lib/normalize.js'
 
@@ -49,11 +49,19 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
 
   const [sessions,       setSessions]      = useState(() => sortByTime(getSessions()).slice(0, 3))
 
-  // Keep "Recent feeds" in sync with shared sessions when in shared mode
+  // Keep "Recent feeds" in sync with shared sessions when in shared mode.
+  // Runs for an empty array too, so the list clears when the household has no entries.
   useEffect(() => {
-    if (!sharedSessions?.length) return
+    if (!sharedSessions) return
     setSessions(sortByTime(sharedSessions.slice(0, 3).map(normalizeFeedSession)).slice(0, 3))
   }, [sharedSessions])
+
+  // Re-render every 30s so "Xh Ym since last feed" stays current while the screen is open
+  const [, setClockTick] = useState(0)
+  useEffect(() => {
+    const tick = setInterval(() => setClockTick(t => t + 1), 30000)
+    return () => clearInterval(tick)
+  }, [])
   const [showMood,       setShowMood]      = useState(false)
   const [pendingSession, setPending]       = useState(null)
   const [partnerFlash,   setPartnerFlash]  = useState(false)
@@ -76,25 +84,18 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
     ? fmtSince(lastSession.endedAt)
     : null
 
+  // The feed is saved the moment it stops — the mood check-in only patches it
+  // afterwards, so navigating away or closing the app can never lose the feed.
+  const pendingRemoteRef = useRef(null)
+
   const handleStop = () => {
     const sessionData = stopFeed()
-    setPending(sessionData)
-    setShowMood(true)
-    if (profile?.household_id) {
-      flashTimersRef.current.forEach(clearTimeout)
-      flashTimersRef.current = [
-        setTimeout(() => setPartnerFlash(true),  400),
-        setTimeout(() => setPartnerFlash(false), 3500),
-      ]
-    }
-  }
-
-  useEffect(() => () => flashTimersRef.current.forEach(clearTimeout), [])
-
-  const saveSession = (session) => {
+    const session = { id: Date.now().toString(), ...sessionData, mood: null }
     setSessions(sortByTime(addSession(session)).slice(0, 3))
+
+    pendingRemoteRef.current = null
     if (authUser && profile?.household_id) {
-      insertFeedSession({
+      pendingRemoteRef.current = insertFeedSession({
         householdId:  profile.household_id,
         babyId:       null,
         loggedBy:     authUser.id,
@@ -102,23 +103,49 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
         endedAt:      session.endedAt,
         durationSecs: session.durationSecs,
         side:         session.side,
-        moodScore:    session.mood ?? null,
-      }).then(() => onSessionSaved?.())
+        moodScore:    null,
+      }).then(({ data, error }) => {
+        if (error || !data) {
+          console.error('Failed to share feed:', error)
+          return null
+        }
+        onSessionSaved?.()
+        // Only claim the partner can see the feed once the write has succeeded
+        flashTimersRef.current.forEach(clearTimeout)
+        setPartnerFlash(true)
+        flashTimersRef.current = [setTimeout(() => setPartnerFlash(false), 3100)]
+        return data
+      })
     }
+
+    setPending(session)
+    setShowMood(true)
   }
+
+  useEffect(() => () => flashTimersRef.current.forEach(clearTimeout), [])
 
   const saveMood = (mood) => {
     if (!pendingSession) return
-    const session = { id: Date.now().toString(), ...pendingSession, mood }
-    saveSession(session)
+    setSessions(sortByTime(updateSession(pendingSession.id, { mood })).slice(0, 3))
+    const remote = pendingRemoteRef.current
+    if (remote) {
+      remote.then(row => {
+        if (!row) return
+        updateFeedSession(row.id, {
+          side:         pendingSession.side,
+          startedAt:    pendingSession.startedAt,
+          endedAt:      pendingSession.endedAt,
+          durationSecs: pendingSession.durationSecs,
+          moodScore:    mood,
+        }).then(() => onSessionSaved?.())
+      })
+    }
     setPending(null)
     setShowMood(false)
   }
 
   const skipMood = () => {
-    if (!pendingSession) return
-    const session = { id: Date.now().toString(), ...pendingSession, mood: null }
-    saveSession(session)
+    // Feed is already saved with no mood — just dismiss the check-in
     setPending(null)
     setShowMood(false)
   }

@@ -18,6 +18,9 @@ function getViewportHeight() {
 export default function App() {
   const [screen, setScreen] = useState('home')
   const [night, setNight]   = useState(() => getNightMode())
+  // Chat history lives here so the conversation survives tab changes
+  // (screens are conditionally rendered, so ChatScreen unmounts on navigation).
+  const [chatMessages, setChatMessages] = useState([])
   const [viewportHeight, setViewportHeight] = useState(() => getViewportHeight())
   const initialTimer = useRef(getActiveTimer())
 
@@ -229,11 +232,14 @@ export default function App() {
     clearInterval(timerRef.current)
     setFeedActive(false)
     clearActiveTimer()
+    // Duration is derived from the timestamps, not the ticking elapsed state,
+    // which can lag behind when the tab has been backgrounded.
+    const endedAt = Date.now()
     return {
       side:         feedSide,
       startedAt:    new Date(feedStartedAt).toISOString(),
-      endedAt:      new Date().toISOString(),
-      durationSecs: elapsed,
+      endedAt:      new Date(endedAt).toISOString(),
+      durationSecs: Math.max(0, Math.round((endedAt - feedStartedAt) / 1000)),
     }
   }
 
@@ -259,7 +265,7 @@ export default function App() {
         {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} timer={timerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onSessionSaved={refreshSharedSessions} />}
         {screen === 'nappy'   && <NappyScreen   night={night} authUser={authUser} profile={profile} sharedNappies={sharedNappies} onNappySaved={refreshSharedNappies} />}
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} />}
-        {screen === 'chat'    && <ChatScreen    night={night} />}
+        {screen === 'chat'    && <ChatScreen    night={night} messages={chatMessages} setMessages={setChatMessages} />}
         {screen === 'prepare' && <PrepareScreen night={night} />}
         {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
       </div>
