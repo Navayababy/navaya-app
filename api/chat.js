@@ -15,8 +15,19 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000
 const RATE_LIMIT_MAX = 10
 const rateLimitMap = new Map()
 
+// Payload limits — keeps a misbehaving client from running up the token bill
+const MAX_MESSAGES = 50
+const MAX_MESSAGE_CHARS = 4000
+const MAX_TOTAL_CHARS = 24000
+
 function isRateLimited(ip) {
   const now = Date.now()
+  // Drop expired entries so the map can't grow without bound
+  if (rateLimitMap.size > 1000) {
+    for (const [key, value] of rateLimitMap) {
+      if (now - value.windowStart > RATE_LIMIT_WINDOW_MS) rateLimitMap.delete(key)
+    }
+  }
   const entry = rateLimitMap.get(ip) || { count: 0, windowStart: now }
   if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
     entry.count = 1
@@ -44,9 +55,29 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'messages array required' })
   }
 
-  if (messages.length > 50) {
+  if (messages.length > MAX_MESSAGES) {
     return res.status(400).json({ error: 'Message history too long' })
   }
+
+  let totalChars = 0
+  for (const m of messages) {
+    if (!m || typeof m !== 'object' || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string' || !m.content.trim()) {
+      return res.status(400).json({ error: 'Invalid message format' })
+    }
+    if (m.content.length > MAX_MESSAGE_CHARS) {
+      return res.status(400).json({ error: 'Message too long' })
+    }
+    totalChars += m.content.length
+  }
+  if (totalChars > MAX_TOTAL_CHARS) {
+    return res.status(400).json({ error: 'Conversation too long. Please start a new chat.' })
+  }
+  if (messages[messages.length - 1].role !== 'user') {
+    return res.status(400).json({ error: 'Last message must be from the user' })
+  }
+
+  // Forward only the validated fields — never the raw client objects
+  const sanitized = messages.map(m => ({ role: m.role, content: m.content }))
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 15000)
@@ -63,7 +94,7 @@ export default async function handler(req, res) {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 600,
         system: SYSTEM,
-        messages,
+        messages: sanitized,
       }),
       signal: controller.signal,
     })

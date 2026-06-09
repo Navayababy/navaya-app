@@ -53,14 +53,22 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
   const [justLogged,   setJustLogged]   = useState(false)
   const [confirmDel,   setConfirmDel]   = useState(null)
 
-  // Guard: don't overwrite state while user is actively composing a nappy entry
+  // Guard: don't overwrite state while user is actively composing a nappy entry.
+  // Runs for an empty array too, so the list clears when the household has no entries.
   useEffect(() => {
-    if (!sharedNappies?.length) return
+    if (!sharedNappies) return
     if (type !== null) return
     setNappies(sharedNappies.map(n => ({
       id: n.id, type: n.type, pooColor: n.poo_color ?? n.pooColor, loggedAt: n.logged_at ?? n.loggedAt,
     })))
   }, [sharedNappies, type])
+
+  // Re-render every 30s so "last change" and the relative times stay current
+  const [, setClockTick] = useState(0)
+  useEffect(() => {
+    const tick = setInterval(() => setClockTick(t => t + 1), 30000)
+    return () => clearInterval(tick)
+  }, [])
 
   const todayNappies = useMemo(() => {
     const start = todayMidnight()

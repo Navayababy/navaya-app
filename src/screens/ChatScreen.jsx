@@ -10,9 +10,8 @@ const SUGGESTIONS = [
   "My milk supply feels low — what can I do?",
 ]
 
-export default function ChatScreen({ night }) {
+export default function ChatScreen({ night, messages, setMessages }) {
   const p = palette(night)
-  const [messages, setMessages] = useState([])
   const [input,    setInput]    = useState('')
   const [loading,  setLoading]  = useState(false)
   const bottomRef = useRef(null)
@@ -35,12 +34,17 @@ export default function ChatScreen({ night }) {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 20000)
 
+    // Send only recent turns (excluding error bubbles) to stay under the API
+    // limits; the API requires the first message to be from the user.
+    let recent = history.filter(m => !m.error).slice(-20)
+    while (recent.length && recent[0].role !== 'user') recent = recent.slice(1)
+
     try {
       const res = await fetch('/api/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          messages: history.map(m => ({ role: m.role, content: m.content }))
+          messages: recent.map(m => ({ role: m.role, content: m.content }))
         }),
         signal: controller.signal,
       })
@@ -48,7 +52,11 @@ export default function ChatScreen({ night }) {
       clearTimeout(timeoutId)
       const data = await res.json()
 
-      if (!res.ok) throw new Error(data.error || 'API error')
+      if (!res.ok) {
+        setMessages(h => [...h, { id: `${Date.now()}-error`, role: 'assistant', content: data.error || 'Something went wrong. Please try again.', error: true }])
+        setLoading(false)
+        return
+      }
 
       setMessages(h => [...h, { id: `${Date.now()}-assistant`, role: 'assistant', content: data.reply }])
 
