@@ -8,6 +8,7 @@ import {
   insertFeedSession, updateFeedSession, deleteFeedSession,
   insertNappyLog, deleteNappyLog,
   insertMedicineLog, deleteMedicineLog,
+  insertSleepLog, deleteSleepLog,
 } from './db.js'
 import { isSupabaseConfigured } from './supabase.js'
 import { getOutbox, saveOutbox, enqueue } from './outbox.js'
@@ -22,6 +23,8 @@ const HANDLERS = {
   'nappy.delete':    (p) => deleteNappyLog(p.id),
   'medicine.insert': (p) => insertMedicineLog(p),
   'medicine.delete': (p) => deleteMedicineLog(p.id),
+  'sleep.insert':    (p) => insertSleepLog(p),
+  'sleep.delete':    (p) => deleteSleepLog(p.id),
 }
 
 // Integrity (23xxx) and data (22xxx) errors will never succeed on retry.

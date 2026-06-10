@@ -126,6 +126,30 @@ export async function deleteNappyLog(id) {
   return { error }
 }
 
+// ── Sleep logs ────────────────────────────────────────────────────────────────
+
+export async function insertSleepLog({ id, householdId, loggedBy, startedAt, endedAt, durationSecs }) {
+  const { error } = await supabase
+    .from('sleep_logs')
+    .insert({ ...(id ? { id } : {}), household_id: householdId, logged_by: loggedBy, started_at: startedAt, ended_at: endedAt, duration_secs: durationSecs ?? null })
+  return { error }
+}
+
+export async function getRecentSleepLogs(householdId, limit = 200) {
+  const { data, error } = await supabase
+    .from('sleep_logs')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('started_at', { ascending: false })
+    .limit(limit)
+  return { data: data || [], error }
+}
+
+export async function deleteSleepLog(id) {
+  const { error } = await supabase.from('sleep_logs').delete().eq('id', id)
+  return { error }
+}
+
 // ── Medicine logs ─────────────────────────────────────────────────────────────
 
 export async function insertMedicineLog({ id, householdId, loggedBy, name, medicineId, doseMl, form, notes, loggedAt }) {
@@ -229,6 +253,16 @@ export async function migrateLocalNappies(householdId, userId, localNappies) {
   await insertMigratedRows('nappy_logs', rows)
 }
 
+export async function migrateLocalSleeps(householdId, userId, localSleeps) {
+  if (!localSleeps?.length) return
+  const rows = localSleeps.map(s => ({
+    id: isUuid(s.id) ? s.id : null,
+    household_id: householdId, logged_by: userId,
+    started_at: s.startedAt, ended_at: s.endedAt, duration_secs: s.durationSecs ?? null,
+  }))
+  await insertMigratedRows('sleep_logs', rows)
+}
+
 export async function migrateLocalMedicines(householdId, userId, localMedicines) {
   if (!localMedicines?.length) return
   const rows = localMedicines.map(m => ({
@@ -301,7 +335,7 @@ export async function deleteFeedSession(id) {
 // feeds/nappies/medicines to { onInsert, onUpdate, onDelete }. Tables that are
 // not yet in the supabase_realtime publication simply never emit events, so
 // this degrades gracefully to the existing refresh-after-write behaviour.
-const REALTIME_TABLES = { feeds: 'feed_sessions', nappies: 'nappy_logs', medicines: 'medicine_logs' }
+const REALTIME_TABLES = { feeds: 'feed_sessions', nappies: 'nappy_logs', medicines: 'medicine_logs', sleeps: 'sleep_logs' }
 
 export function subscribeToHousehold(householdId, handlersByTable) {
   const filter = `household_id=eq.${householdId}`
