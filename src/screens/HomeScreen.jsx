@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, addSession, updateSession, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
+import { getSessions, addSession, updateSession, getBabyName, setBabyName, getUserName, setUserName, getChecked, getCustomItems, getHiddenDefaults } from '../lib/storage.js'
+import { PREPARE_DEFAULT_ITEMS } from '../lib/constants.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtSince, fmtDayTime } from '../utils/time.js'
 import { normalizeFeedSession } from '../lib/normalize.js'
@@ -179,6 +180,15 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
   const displayName = userName || 'there'
   const appGuideUrl = 'https://www.navayababy.co.uk/pages/the-app'
 
+  // Prepare checklist progress for the card below. Read once on mount — the
+  // screen remounts on every tab change, so it stays fresh after editing.
+  const [prepProgress] = useState(() => {
+    const checked = getChecked()
+    const hidden  = getHiddenDefaults()
+    const items   = [...PREPARE_DEFAULT_ITEMS.filter(i => !hidden.includes(i.id)), ...getCustomItems()]
+    return { done: items.filter(i => checked[i.id]).length, total: items.length }
+  })
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg }}>
 
@@ -346,7 +356,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
       {showMood && (
         <div className="fade-up" style={{ margin: '10px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '14px' }}>
           <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500, marginBottom: 4 }}>How did that feed go?</span>
-          <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 12 }}>This gets saved to your history.</span>
+          <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 12 }}>This gets saved to your logbook.</span>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             {[
               { emoji: '😔', label: 'Tough'   },
@@ -393,13 +403,34 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
         )}
       </div>
 
+      {/* ── Prepare to go out ── */}
+      <button onClick={() => setScreen('prepare')}
+        style={{ display: 'block', width: 'calc(100% - 28px)', margin: '14px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+              Going out?
+            </span>
+            <span style={{ display: 'block', fontSize: 13, color: p.text, lineHeight: 1.45 }}>
+              Run through the prepare checklist before you leave.
+            </span>
+            <span style={{ display: 'block', fontSize: 11, color: prepProgress.done === prepProgress.total && prepProgress.total > 0 ? brand.green : p.sub, marginTop: 6, fontWeight: 500 }}>
+              {prepProgress.done === prepProgress.total && prepProgress.total > 0
+                ? '✓ All packed'
+                : `${prepProgress.done}/${prepProgress.total} packed`}
+            </span>
+          </div>
+          <span style={{ color: p.sub, fontSize: 16, flexShrink: 0, marginLeft: 10 }}>›</span>
+        </div>
+      </button>
+
       {/* ── App guide ── */}
       <div style={{ margin: '14px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px 14px' }}>
         <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>
           App guide
         </span>
         <span style={{ display: 'block', fontSize: 13, color: p.text, lineHeight: 1.45 }}>
-          Start a feed with Left or Right, then finish to save it in History. See the full walkthrough anytime.
+          Start a feed with Left or Right, then finish to save it to your Logbook. See the full walkthrough anytime.
         </span>
         <a
           href={appGuideUrl}

@@ -15,6 +15,16 @@ export const POO_COLORS = [
   { id: 'dark',    hex: '#2D1F14', label: 'Dark/Black', note: '⚠ Dark or black poo in a baby over 5 days old should be checked by your midwife or GP.' },
 ]
 
+// Default prepare-checklist items (shared by PrepareScreen and the Home card)
+export const PREPARE_DEFAULT_ITEMS = [
+  { id: 'cover',  emoji: '🌿', label: 'Navaya cover packed'            },
+  { id: 'seat',   emoji: '🪑', label: 'Comfortable seat identified'    },
+  { id: 'water',  emoji: '💧', label: 'Water bottle filled'            },
+  { id: 'phone',  emoji: '🔋', label: 'Phone charged'                  },
+  { id: 'pads',   emoji: '✨', label: 'Breast pads in bag'             },
+  { id: 'muslin', emoji: '🤍', label: 'Muslin cloth packed'            },
+]
+
 export const MEDICINE_OPTIONS = [
   { id: 'paracetamol', label: 'Paracetamol', form: '120mg/5ml' },
   { id: 'ibuprofen',   label: 'Ibuprofen',   form: '100mg/5ml' },
