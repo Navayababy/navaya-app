@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer, getSessions, getNappies, getMedicines } from './lib/storage.js'
-import { getSession, getProfile, getHouseholdMembers, subscribeToFeeds, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, migrateLocalNappies, migrateLocalMedicines, userHasDataInHousehold, deduplicateHouseholdData } from './lib/db.js'
+import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, migrateLocalNappies, migrateLocalMedicines, userHasDataInHousehold, deduplicateHouseholdData } from './lib/db.js'
+import { flushOutbox } from './lib/sync.js'
 import { supabase, isSupabaseConfigured } from './lib/supabase.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
@@ -140,20 +141,21 @@ export default function App() {
         await deduplicateHouseholdData(data.household_id)
         localStorage.setItem(dedupKey, String(Date.now()))
       }
+      // Deliver any writes queued while offline before refreshing the lists
+      await flushOutbox()
       loadSharedSessions(data.household_id)
       loadSharedNappies(data.household_id)
       loadSharedMedicines(data.household_id)
       if (realtimeUnsub.current) realtimeUnsub.current()
-      realtimeUnsub.current = subscribeToFeeds(data.household_id, {
-        onInsert: (s) => setSharedSessions(prev =>
-          prev ? [s, ...prev.filter(x => x.id !== s.id)] : [s]
-        ),
-        onUpdate: (s) => setSharedSessions(prev =>
-          prev ? prev.map(x => x.id === s.id ? s : x) : [s]
-        ),
-        onDelete: (s) => setSharedSessions(prev =>
-          prev ? prev.filter(x => x.id !== s.id) : []
-        ),
+      const listHandlers = (setList) => ({
+        onInsert: (row) => setList(prev => prev ? [row, ...prev.filter(x => x.id !== row.id)] : [row]),
+        onUpdate: (row) => setList(prev => prev ? prev.map(x => x.id === row.id ? row : x) : [row]),
+        onDelete: (row) => setList(prev => prev ? prev.filter(x => x.id !== row.id) : []),
+      })
+      realtimeUnsub.current = subscribeToHousehold(data.household_id, {
+        feeds:     listHandlers(setSharedSessions),
+        nappies:   listHandlers(setSharedNappies),
+        medicines: listHandlers(setSharedMedicines),
       })
     } else {
       setHouseholdMembers([])
@@ -198,6 +200,7 @@ export default function App() {
 
   const resyncAll = async () => {
     if (!profile?.household_id) return
+    await flushOutbox()
     await deduplicateHouseholdData(profile.household_id)
     await Promise.all([
       loadSharedSessions(profile.household_id),
@@ -205,6 +208,19 @@ export default function App() {
       loadSharedMedicines(profile.household_id),
     ])
   }
+
+  // Drain queued offline writes when connectivity returns, and once a minute
+  // as a safety net (no-op when the outbox is empty).
+  useEffect(() => {
+    if (!isSupabaseConfigured) return
+    const onOnline = () => flushOutbox()
+    window.addEventListener('online', onOnline)
+    const drainTimer = setInterval(() => flushOutbox(), 60000)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      clearInterval(drainTimer)
+    }
+  }, [])
 
   // ── Feed timer ─────────────────────────────────────────────────────────────
   // feedStartedAt is read via ref inside the interval to avoid restarting on every tick.

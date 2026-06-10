@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, getNappies, getMedicines, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine } from '../lib/storage.js'
-import { updateFeedSession, deleteFeedSession, insertFeedSession, insertNappyLog, deleteNappyLog, insertMedicineLog, deleteMedicineLog } from '../lib/db.js'
+import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, timeStr, todayDateStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine } from '../lib/normalize.js'
 import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL } from '../lib/constants.js'
@@ -124,14 +124,15 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const handleSaveEdit = async (id, changes) => {
     setSessions(updateSession(id, changes))
     if (sharedMode) {
-      await updateFeedSession(id, {
+      const { ok } = await syncWrite('feed.update', {
+        id,
         side:        changes.side,
         startedAt:   changes.startedAt,
         endedAt:     changes.endedAt,
         durationSecs: changes.durationSecs,
         moodScore:   changes.mood ?? null,
       })
-      onRefreshSessions?.()
+      if (ok) onRefreshSessions?.()
     }
     setEditSession(null)
   }
@@ -139,8 +140,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const handleDeleteFeed = async (id) => {
     setSessions(deleteSession(id))
     if (sharedMode) {
-      await deleteFeedSession(id)
-      onRefreshSessions?.()
+      const { ok } = await syncWrite('feed.delete', { id })
+      if (ok) onRefreshSessions?.()
     }
     setEditSession(null)
   }
@@ -148,7 +149,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const handleAddFeed = (session) => {
     setSessions(addSession(session))
     if (sharedMode && authUser && profile?.household_id) {
-      insertFeedSession({
+      syncWrite('feed.insert', {
         id:           session.id,
         householdId:  profile.household_id,
         babyId:       null,
@@ -158,10 +159,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
         durationSecs: session.durationSecs,
         side:         session.side,
         moodScore:    session.mood ?? null,
-      }).then(({ error }) => {
-        if (error) console.error('Failed to share feed:', error)
-        else onRefreshSessions?.()
-      })
+      }).then(({ ok }) => { if (ok) onRefreshSessions?.() })
     }
     setAddMode(null)
   }
@@ -169,11 +167,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const handleAddNappy = (nappy) => {
     setNappies(addNappy(nappy))
     if (sharedMode && authUser && profile?.household_id) {
-      insertNappyLog({ id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type: nappy.type, pooColor: nappy.pooColor, loggedAt: nappy.loggedAt })
-        .then(({ error }) => {
-          if (error) console.error('Failed to share nappy log:', error)
-          else onRefreshNappies?.()
-        })
+      syncWrite('nappy.insert', { id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type: nappy.type, pooColor: nappy.pooColor, loggedAt: nappy.loggedAt })
+        .then(({ ok }) => { if (ok) onRefreshNappies?.() })
     }
     setAddMode(null)
   }
@@ -181,11 +176,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const handleAddMedicine = (medicine) => {
     setMedicines(addMedicine(medicine))
     if (sharedMode && authUser && profile?.household_id) {
-      insertMedicineLog({ ...medicine, householdId: profile.household_id, loggedBy: authUser.id })
-        .then(({ error }) => {
-          if (error) console.error('Failed to share medicine log:', error)
-          else onRefreshMedicines?.()
-        })
+      syncWrite('medicine.insert', { ...medicine, householdId: profile.household_id, loggedBy: authUser.id })
+        .then(({ ok }) => { if (ok) onRefreshMedicines?.() })
     }
     setAddMode(null)
   }
@@ -193,11 +185,17 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const handleDelete = async ({ id, type }) => {
     if (type === 'nappy') {
       setNappies(deleteNappy(id))
-      if (sharedMode) { await deleteNappyLog(id); onRefreshNappies?.() }
+      if (sharedMode) {
+        const { ok } = await syncWrite('nappy.delete', { id })
+        if (ok) onRefreshNappies?.()
+      }
     }
     if (type === 'medicine') {
       setMedicines(deleteMedicine(id))
-      if (sharedMode) { await deleteMedicineLog(id); onRefreshMedicines?.() }
+      if (sharedMode) {
+        const { ok } = await syncWrite('medicine.delete', { id })
+        if (ok) onRefreshMedicines?.()
+      }
     }
     setConfirmDel(null)
   }

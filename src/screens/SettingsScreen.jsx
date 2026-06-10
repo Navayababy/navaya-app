@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { brand, palette } from '../theme.js'
 import { signIn, signUp, signOut, createHousehold, createInviteCode, acceptInvite } from '../lib/db.js'
 import { isSupabaseConfigured } from '../lib/supabase.js'
+import { outboxSize } from '../lib/outbox.js'
 
 function Card({ children, p }) {
   return (
@@ -36,6 +37,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
   const [copied,           setCopied]           = useState(false)
   const [syncing,          setSyncing]          = useState(false)
   const [syncDone,         setSyncDone]         = useState(false)
+  const [pendingSync,      setPendingSync]      = useState(() => outboxSize())
 
   const inputStyle = {
     width: '100%', background: p.bg, border: `1px solid ${p.border}`,
@@ -139,6 +141,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
     setSyncDone(false)
     await onResync?.()
     await onRefreshHouseholdMembers?.()
+    setPendingSync(outboxSize())
     setSyncing(false)
     setSyncDone(true)
     setTimeout(() => setSyncDone(false), 2500)
@@ -438,6 +441,11 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
             <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.5, marginBottom: 10 }}>
               Pull the latest feeds, nappies and medicines from the shared logbook.
             </span>
+            {pendingSync > 0 && (
+              <span style={{ display: 'block', fontSize: 11, color: brand.accent, lineHeight: 1.5, marginBottom: 10 }}>
+                {pendingSync} change{pendingSync !== 1 ? 's' : ''} from this device waiting to sync — they'll retry automatically, or tap Sync now.
+              </span>
+            )}
             <button
               onClick={handleResync}
               disabled={syncing}

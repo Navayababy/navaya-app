@@ -3,6 +3,7 @@
 // Screens import what they need from this file.
 
 import { supabase } from './supabase.js'
+import { isUuid } from './id.js'
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -187,9 +188,25 @@ export async function deduplicateHouseholdData(householdId) {
   await dedupTable('medicine_logs', r => `${r.logged_by}|${r.logged_at}|${r.name}`)
 }
 
+// Rows that carry a client UUID are upserted (ignore duplicates), making a
+// re-run of the migration idempotent. Legacy rows without a UUID id fall back
+// to plain inserts, where the daily dedup pass still covers them.
+async function insertMigratedRows(table, rows) {
+  const BATCH = 50
+  const withId    = rows.filter(r => r.id)
+  const withoutId = rows.filter(r => !r.id).map(({ id: _id, ...rest }) => rest)
+  for (let i = 0; i < withId.length; i += BATCH) {
+    await supabase.from(table).upsert(withId.slice(i, i + BATCH), { onConflict: 'id', ignoreDuplicates: true })
+  }
+  for (let i = 0; i < withoutId.length; i += BATCH) {
+    await supabase.from(table).insert(withoutId.slice(i, i + BATCH))
+  }
+}
+
 export async function migrateLocalSessions(householdId, userId, localSessions) {
   if (!localSessions?.length) return
   const rows = localSessions.map(s => ({
+    id:            isUuid(s.id) ? s.id : null,
     household_id:  householdId,
     baby_id:       null,
     logged_by:     userId,
@@ -199,35 +216,28 @@ export async function migrateLocalSessions(householdId, userId, localSessions) {
     side:          s.side,
     mood_score:    s.mood ?? null,
   }))
-  const BATCH = 50
-  for (let i = 0; i < rows.length; i += BATCH) {
-    await supabase.from('feed_sessions').insert(rows.slice(i, i + BATCH))
-  }
+  await insertMigratedRows('feed_sessions', rows)
 }
 
 export async function migrateLocalNappies(householdId, userId, localNappies) {
   if (!localNappies?.length) return
   const rows = localNappies.map(n => ({
+    id: isUuid(n.id) ? n.id : null,
     household_id: householdId, logged_by: userId,
     type: n.type, poo_color: n.pooColor || null, logged_at: n.loggedAt,
   }))
-  const BATCH = 50
-  for (let i = 0; i < rows.length; i += BATCH) {
-    await supabase.from('nappy_logs').insert(rows.slice(i, i + BATCH))
-  }
+  await insertMigratedRows('nappy_logs', rows)
 }
 
 export async function migrateLocalMedicines(householdId, userId, localMedicines) {
   if (!localMedicines?.length) return
   const rows = localMedicines.map(m => ({
+    id: isUuid(m.id) ? m.id : null,
     household_id: householdId, logged_by: userId,
     name: m.name, medicine_id: m.medicineId || null, dose_ml: m.doseMl || null,
     form: m.form || null, notes: m.notes || null, logged_at: m.loggedAt,
   }))
-  const BATCH = 50
-  for (let i = 0; i < rows.length; i += BATCH) {
-    await supabase.from('medicine_logs').insert(rows.slice(i, i + BATCH))
-  }
+  await insertMigratedRows('medicine_logs', rows)
 }
 
 // ── Feed sessions ─────────────────────────────────────────────────────────────
@@ -287,17 +297,28 @@ export async function deleteFeedSession(id) {
 
 // ── Realtime subscription ─────────────────────────────────────────────────────
 
-export function subscribeToFeeds(householdId, { onInsert, onUpdate, onDelete }) {
-  const filter = `household_id=eq.${householdId}`
-  const channel = supabase
-    .channel(`feeds:${householdId}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'feed_sessions', filter },
-      payload => onInsert?.(payload.new))
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'feed_sessions', filter },
-      payload => onUpdate?.(payload.new))
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'feed_sessions', filter },
-      payload => onDelete?.(payload.old))
-    .subscribe()
+// Subscribes to live changes for the whole household. `handlersByTable` maps
+// feeds/nappies/medicines to { onInsert, onUpdate, onDelete }. Tables that are
+// not yet in the supabase_realtime publication simply never emit events, so
+// this degrades gracefully to the existing refresh-after-write behaviour.
+const REALTIME_TABLES = { feeds: 'feed_sessions', nappies: 'nappy_logs', medicines: 'medicine_logs' }
 
+export function subscribeToHousehold(householdId, handlersByTable) {
+  const filter = `household_id=eq.${householdId}`
+  const channel = supabase.channel(`household:${householdId}`)
+
+  for (const [key, handlers] of Object.entries(handlersByTable)) {
+    const table = REALTIME_TABLES[key]
+    if (!table || !handlers) continue
+    channel
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table, filter },
+        payload => handlers.onInsert?.(payload.new))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table, filter },
+        payload => handlers.onUpdate?.(payload.new))
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table, filter },
+        payload => handlers.onDelete?.(payload.old))
+  }
+
+  channel.subscribe()
   return () => supabase.removeChannel(channel)
 }
