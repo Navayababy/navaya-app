@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, deleteSleep } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
-import { fmt, fmtMins, dayLabel, timeStr, todayDateStr } from '../utils/time.js'
+import { fmt, fmtMins, dayLabel, dayShort, timeStr, todayDateStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep } from '../lib/normalize.js'
 import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL } from '../lib/constants.js'
 import { averageFeedMood, computeWeeklyInsights, sleepSecsOnDay } from '../lib/stats.js'
@@ -67,13 +67,28 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
   const grouped = useMemo(() => {
     const map = {}
+    const ensureGroup = (time) => {
+      const key = new Date(time).toDateString()
+      if (!map[key]) map[key] = { label: dayLabel(time), date: new Date(time), entries: [] }
+      return map[key]
+    }
     allEntries.forEach(entry => {
-      const key = new Date(entry._time).toDateString()
-      if (!map[key]) map[key] = { label: dayLabel(entry._time), date: new Date(entry._time), entries: [] }
-      map[key].entries.push(entry)
+      ensureGroup(entry._time).entries.push(entry)
     })
-    return Object.values(map)
-  }, [allEntries])
+    // A sleep that crosses midnight also belongs to the day it ended: ensure
+    // that day's group exists and add a continuation row, so the after-midnight
+    // portion is visible even when the end day has no other entries.
+    sleepList.forEach(s => {
+      if (!s.endedAt) return
+      if (new Date(s.startedAt).toDateString() === new Date(s.endedAt).toDateString()) return
+      const dayStart = new Date(s.endedAt)
+      dayStart.setHours(0, 0, 0, 0)
+      ensureGroup(s.endedAt).entries.push({ ...s, _type: 'sleepContinuation', _time: dayStart.toISOString() })
+    })
+    const groups = Object.values(map)
+    groups.forEach(g => g.entries.sort((a, b) => new Date(b._time) - new Date(a._time)))
+    return groups.sort((a, b) => b.date - a.date)
+  }, [allEntries, sleepList])
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
@@ -449,6 +464,23 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           ) : (
                             <button onClick={() => setConfirmDel({ id: entry.id, type: 'nappy' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
                           )}
+                        </div>
+                      )
+                    }
+
+                    // ── Sleep continuation row (after-midnight portion) ───
+                    if (entry._type === 'sleepContinuation') {
+                      return (
+                        <div key={`${entry.id}-cont`} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
+                          <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
+                          <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>00:00</span>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
+                            😴
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ display: 'block', fontSize: 12, color: p.text }}>Sleep · until {timeStr(entry.endedAt)}</span>
+                            <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>started {dayShort(entry.startedAt).toLowerCase()} {timeStr(entry.startedAt)}</span>
+                          </div>
                         </div>
                       )
                     }
