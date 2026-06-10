@@ -491,7 +491,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       {/* ── Add modals ── */}
       {addMode === 'feed'  && <AddFeedModal  night={night} onSave={handleAddFeed}  onClose={() => setAddMode(null)} />}
       {addMode === 'nappy' && <AddNappyModal night={night} onSave={handleAddNappy} onClose={() => setAddMode(null)} />}
-      {addMode === 'medicine' && <AddMedicineModal night={night} onSave={handleAddMedicine} onClose={() => setAddMode(null)} />}
+      {addMode === 'medicine' && <AddMedicineModal night={night} recentMedicines={medicineList} onSave={handleAddMedicine} onClose={() => setAddMode(null)} />}
     </div>
   )
 }

@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { brand, palette } from '../../theme.js'
-import { timeStr, todayDateStr } from '../../utils/time.js'
+import { timeStr, todayDateStr, timeAgo } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { MEDICINE_OPTIONS } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
 
-export default function AddMedicineModal({ night, onSave, onClose }) {
+export default function AddMedicineModal({ night, onSave, onClose, recentMedicines = [] }) {
   const p = palette(night)
   const { input: inputStyle, label: labelStyle } = makeModalStyles(p)
 
@@ -19,6 +19,15 @@ export default function AddMedicineModal({ night, onSave, onClose }) {
   const [error,      setError]      = useState(null)
 
   const selected = MEDICINE_OPTIONS.find(m => m.id === medicineId)
+
+  // Purely informational: the most recent logged entry for the selected
+  // medicine. A factual record only — never dosing advice or "due" times.
+  const matchName = (medicineId === 'other' ? customName.trim() : selected.label).toLowerCase()
+  const lastDose = matchName
+    ? recentMedicines
+        .filter(m => (m.name || '').toLowerCase() === matchName)
+        .reduce((latest, m) => !latest || new Date(m.loggedAt) > new Date(latest.loggedAt) ? m : latest, null)
+    : null
 
   const handleSave = () => {
     const [y, mo, d] = date.split('-').map(Number)
@@ -60,6 +69,15 @@ export default function AddMedicineModal({ night, onSave, onClose }) {
           <span style={labelStyle}>Custom name</span>
           <input value={customName} maxLength={100} onChange={e => setCustomName(e.target.value)} placeholder="e.g. Vitamin D drops" style={{ ...inputStyle, marginBottom: 14 }} />
         </>
+      )}
+
+      {lastDose && (
+        <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: '9px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, flexShrink: 0 }} aria-hidden="true">🕐</span>
+          <span style={{ fontSize: 12, color: p.text, lineHeight: 1.5 }}>
+            Last logged: {lastDose.name}{lastDose.doseMl ? ` ${lastDose.doseMl}ml` : ''} · {timeAgo(lastDose.loggedAt)}
+          </span>
+        </div>
       )}
 
       <span style={labelStyle}>Dose (ml)</span>
