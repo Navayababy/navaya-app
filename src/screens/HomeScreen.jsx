@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, addSession, updateSession, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
-import { insertFeedSession, updateFeedSession } from '../lib/db.js'
+import { syncWrite } from '../lib/sync.js'
 import { fmt, timeAgo, fmtSince } from '../utils/time.js'
 import { normalizeFeedSession } from '../lib/normalize.js'
 import { newId } from '../lib/id.js'
@@ -96,7 +96,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
 
     pendingRemoteRef.current = null
     if (authUser && profile?.household_id) {
-      pendingRemoteRef.current = insertFeedSession({
+      pendingRemoteRef.current = syncWrite('feed.insert', {
         id:           session.id,
         householdId:  profile.household_id,
         babyId:       null,
@@ -106,17 +106,14 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
         durationSecs: session.durationSecs,
         side:         session.side,
         moodScore:    null,
-      }).then(({ data, error }) => {
-        if (error || !data) {
-          console.error('Failed to share feed:', error)
-          return null
-        }
+      }).then(({ ok }) => {
+        if (!ok) return ok // queued for retry — the flash would be a lie
         onSessionSaved?.()
         // Only claim the partner can see the feed once the write has succeeded
         flashTimersRef.current.forEach(clearTimeout)
         setPartnerFlash(true)
         flashTimersRef.current = [setTimeout(() => setPartnerFlash(false), 3100)]
-        return data
+        return ok
       })
     }
 
@@ -131,16 +128,18 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
     setSessions(sortByTime(updateSession(pendingSession.id, { mood })).slice(0, 3))
     const remote = pendingRemoteRef.current
     if (remote) {
-      // Same UUID in both stores — wait for the insert to land, then patch it
-      remote.then(row => {
-        if (!row) return
-        updateFeedSession(pendingSession.id, {
+      // Same UUID in both stores — wait for the insert attempt to settle, then
+      // patch the mood. If the insert was queued, the outbox keeps this update
+      // behind it, so ordering is preserved either way.
+      remote.then(() => {
+        syncWrite('feed.update', {
+          id:           pendingSession.id,
           side:         pendingSession.side,
           startedAt:    pendingSession.startedAt,
           endedAt:      pendingSession.endedAt,
           durationSecs: pendingSession.durationSecs,
           moodScore:    mood,
-        }).then(() => onSessionSaved?.())
+        }).then(({ ok }) => { if (ok) onSessionSaved?.() })
       })
     }
     setPending(null)

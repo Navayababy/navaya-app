@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
 import { getNappies, addNappy, deleteNappy } from '../lib/storage.js'
-import { insertNappyLog, deleteNappyLog } from '../lib/db.js'
+import { syncWrite } from '../lib/sync.js'
 import { dateStr, timeStr } from '../utils/time.js'
 import { POO_COLORS } from '../lib/constants.js'
 import { newId } from '../lib/id.js'
@@ -93,11 +93,8 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
     const nappy = { id: newId(), type, pooColor: needsColor ? pooColor : null, loggedAt }
     setNappies(addNappy(nappy))
     if (authUser && profile?.household_id) {
-      insertNappyLog({ id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type, pooColor: nappy.pooColor, loggedAt })
-        .then(({ error }) => {
-          if (error) console.error('Failed to share nappy log:', error)
-          else onNappySaved?.()
-        })
+      syncWrite('nappy.insert', { id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type, pooColor: nappy.pooColor, loggedAt })
+        .then(({ ok }) => { if (ok) onNappySaved?.() })
     }
     setType(null)
     setEditingTime(false)
@@ -109,7 +106,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
 
   const handleDelete = (id) => {
     setNappies(deleteNappy(id))
-    if (sharedMode) deleteNappyLog(id).then(() => onNappySaved?.())
+    if (sharedMode) syncWrite('nappy.delete', { id }).then(({ ok }) => { if (ok) onNappySaved?.() })
     setConfirmDel(null)
   }
 

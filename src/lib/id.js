@@ -2,6 +2,11 @@
 // The same UUID is written to localStorage and to Supabase, so edits and
 // deletes target the same row in both stores instead of drifting apart.
 
+export function isUuid(value) {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
 export function newId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
