@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSleeps, addSleep, deleteSleep } from '../lib/storage.js'
+import { syncWrite } from '../lib/sync.js'
+import { normalizeSleep } from '../lib/normalize.js'
+import { sleepSecsOnDay } from '../lib/stats.js'
 import { fmtMins, timeAgo, timeStr, dateStr, buildISO, dayShort } from '../utils/time.js'
 import { newId } from '../lib/id.js'
 
@@ -17,13 +20,10 @@ function fmtRange(sleep) {
   return `${timeStr(sleep.startedAt)} – ${timeStr(sleep.endedAt)}`
 }
 
-function todayMidnight() {
-  const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime()
-}
-
-export default function SleepScreen({ night, timer }) {
+export default function SleepScreen({ night, timer, authUser, profile, sharedSleeps, onSleepSaved }) {
   const p = palette(night)
   const { sleepActive, sleepElapsed, startSleep, stopSleep } = timer
+  const sharedMode = !!(profile?.household_id && sharedSleeps)
 
   const [sleeps,     setSleeps]     = useState(() => getSleeps())
   const [addingPast, setAddingPast] = useState(false)
@@ -31,6 +31,14 @@ export default function SleepScreen({ night, timer }) {
   const [startTime,  setStartTime]  = useState('13:00')
   const [endTime,    setEndTime]    = useState('14:00')
   const [confirmDel, setConfirmDel] = useState(null)
+
+  // Keep the list in sync with shared sleeps when in shared mode.
+  // Skipped while the user is composing a manual entry.
+  useEffect(() => {
+    if (!sharedSleeps) return
+    if (addingPast) return
+    setSleeps(sharedSleeps.map(normalizeSleep))
+  }, [sharedSleeps, addingPast])
 
   // Re-render every 30s so the relative times stay current
   const [, setClockTick] = useState(0)
@@ -45,16 +53,27 @@ export default function SleepScreen({ night, timer }) {
     , null)
   , [sleeps])
 
-  const todaySecs = useMemo(() => {
-    const start = todayMidnight()
-    return sleeps
-      .filter(s => new Date(s.endedAt).getTime() >= start)
-      .reduce((a, s) => a + (s.durationSecs || 0), 0)
-  }, [sleeps])
+  // Clamped to today's boundary: an overnight 22:00–06:00 sleep contributes
+  // only the after-midnight portion to today's total.
+  const todaySecs = useMemo(() => sleepSecsOnDay(sleeps), [sleeps])
+
+  const shareSleep = (sleep) => {
+    if (!authUser || !profile?.household_id) return
+    syncWrite('sleep.insert', {
+      id:           sleep.id,
+      householdId:  profile.household_id,
+      loggedBy:     authUser.id,
+      startedAt:    sleep.startedAt,
+      endedAt:      sleep.endedAt,
+      durationSecs: sleep.durationSecs,
+    }).then(({ ok }) => { if (ok) onSleepSaved?.() })
+  }
 
   const handleStop = () => {
     const sleepData = stopSleep()
-    setSleeps(addSleep({ id: newId(), ...sleepData }))
+    const sleep = { id: newId(), ...sleepData }
+    setSleeps(addSleep(sleep))
+    shareSleep(sleep)
   }
 
   const handleAddPast = () => {
@@ -67,13 +86,16 @@ export default function SleepScreen({ night, timer }) {
       endedAt = d.toISOString()
     }
     const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
-    setSleeps(addSleep({ id: newId(), startedAt, endedAt, durationSecs }))
+    const sleep = { id: newId(), startedAt, endedAt, durationSecs }
+    setSleeps(addSleep(sleep))
+    shareSleep(sleep)
     setAddingPast(false)
     setLogDate(dateStr())
   }
 
   const handleDelete = (id) => {
     setSleeps(deleteSleep(id))
+    if (sharedMode) syncWrite('sleep.delete', { id }).then(({ ok }) => { if (ok) onSleepSaved?.() })
     setConfirmDel(null)
   }
 
@@ -182,7 +204,9 @@ export default function SleepScreen({ night, timer }) {
         {sleeps.length === 0 ? (
           <span style={{ fontSize: 13, color: p.sub }}>No sleeps logged yet. Tap the button above when baby drifts off.</span>
         ) : (
-          sleeps.slice(0, 14).map((s, i) => (
+          sleeps.slice(0, 14).map((s, i) => {
+            const canDelete = !sharedMode || !s.loggedBy || s.loggedBy === authUser?.id
+            return (
             <div key={s.id} style={{
               display: 'flex', alignItems: 'center', padding: '10px 0',
               borderBottom: i < Math.min(sleeps.length, 14) - 1 ? `1px solid ${p.border}` : 'none',
@@ -195,18 +219,20 @@ export default function SleepScreen({ night, timer }) {
                 <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{fmtRange(s)}</span>
               </div>
               <div style={{ textAlign: 'right', marginRight: 12 }}>
-                <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{dayShort(s.endedAt)}</span>
+                {/* Labelled by start day, matching the Logbook's grouping */}
+                <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{dayShort(s.startedAt)}</span>
               </div>
-              {confirmDel === s.id ? (
+              {canDelete && (confirmDel === s.id ? (
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button onClick={() => setConfirmDel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
                   <button onClick={() => handleDelete(s.id)} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
                 </div>
               ) : (
                 <button onClick={() => setConfirmDel(s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
-              )}
+              ))}
             </div>
-          ))
+            )
+          })
         )}
       </div>
 

@@ -8,6 +8,8 @@ vi.mock('./db.js', () => ({
   deleteNappyLog: vi.fn(),
   insertMedicineLog: vi.fn(),
   deleteMedicineLog: vi.fn(),
+  insertSleepLog: vi.fn(),
+  deleteSleepLog: vi.fn(),
 }))
 vi.mock('./supabase.js', () => ({
   isSupabaseConfigured: true,

@@ -17,6 +17,23 @@ export function averageFeedMood(feeds) {
   return { ...feedMoodMeta(average), count: rated.length }
 }
 
+// Seconds of an interval that fall within the calendar day containing `day`.
+// Used to clamp overnight sleeps to day boundaries so daily totals only count
+// the portion that actually occurred on that day.
+export function secsOverlappingDay(startedAt, endedAt, day = new Date()) {
+  const dayStart = new Date(day)
+  dayStart.setHours(0, 0, 0, 0)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setDate(dayEnd.getDate() + 1)
+  const start = Math.max(new Date(startedAt).getTime(), dayStart.getTime())
+  const end   = Math.min(new Date(endedAt).getTime(), dayEnd.getTime())
+  return Math.max(0, Math.round((end - start) / 1000))
+}
+
+export function sleepSecsOnDay(sleeps, day = new Date()) {
+  return sleeps.reduce((a, s) => a + secsOverlappingDay(s.startedAt, s.endedAt, day), 0)
+}
+
 // Last-7-days insight rows and totals for the weekly insights panel.
 export function computeWeeklyInsights(feeds, nappies, medicines) {
   const days = []

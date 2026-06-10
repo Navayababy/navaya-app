@@ -126,6 +126,30 @@ export async function deleteNappyLog(id) {
   return { error }
 }
 
+// ── Sleep logs ────────────────────────────────────────────────────────────────
+
+export async function insertSleepLog({ id, householdId, loggedBy, startedAt, endedAt, durationSecs }) {
+  const { error } = await supabase
+    .from('sleep_logs')
+    .insert({ ...(id ? { id } : {}), household_id: householdId, logged_by: loggedBy, started_at: startedAt, ended_at: endedAt, duration_secs: durationSecs ?? null })
+  return { error }
+}
+
+export async function getRecentSleepLogs(householdId, limit = 200) {
+  const { data, error } = await supabase
+    .from('sleep_logs')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('started_at', { ascending: false })
+    .limit(limit)
+  return { data: data || [], error }
+}
+
+export async function deleteSleepLog(id) {
+  const { error } = await supabase.from('sleep_logs').delete().eq('id', id)
+  return { error }
+}
+
 // ── Medicine logs ─────────────────────────────────────────────────────────────
 
 export async function insertMedicineLog({ id, householdId, loggedBy, name, medicineId, doseMl, form, notes, loggedAt }) {
@@ -162,35 +186,10 @@ export async function userHasDataInHousehold(householdId, userId) {
   return !!(data?.length)
 }
 
-export async function deduplicateHouseholdData(householdId) {
-  const dedupTable = async (table, keyFn) => {
-    const { data } = await supabase
-      .from(table)
-      .select('id, logged_by, ' + (table === 'feed_sessions' ? 'started_at, side' : 'logged_at, ' + (table === 'nappy_logs' ? 'type' : 'name')))
-      .eq('household_id', householdId)
-      .order('id', { ascending: true })
-      .limit(2000)
-    if (!data?.length) return
-    const seen = new Set()
-    const toDelete = []
-    for (const row of data) {
-      const key = keyFn(row)
-      if (seen.has(key)) toDelete.push(row.id)
-      else seen.add(key)
-    }
-    for (let i = 0; i < toDelete.length; i += 50) {
-      await supabase.from(table).delete().in('id', toDelete.slice(i, i + 50))
-    }
-  }
-
-  await dedupTable('feed_sessions', r => `${r.logged_by}|${r.started_at}|${r.side}`)
-  await dedupTable('nappy_logs',    r => `${r.logged_by}|${r.logged_at}|${r.type}`)
-  await dedupTable('medicine_logs', r => `${r.logged_by}|${r.logged_at}|${r.name}`)
-}
-
 // Rows that carry a client UUID are upserted (ignore duplicates), making a
 // re-run of the migration idempotent. Legacy rows without a UUID id fall back
-// to plain inserts, where the daily dedup pass still covers them.
+// to plain inserts; the migration flag is only set on full success, so they
+// are uploaded at most once.
 async function insertMigratedRows(table, rows) {
   const BATCH = 50
   const withId    = rows.filter(r => r.id)
@@ -227,6 +226,16 @@ export async function migrateLocalNappies(householdId, userId, localNappies) {
     type: n.type, poo_color: n.pooColor || null, logged_at: n.loggedAt,
   }))
   await insertMigratedRows('nappy_logs', rows)
+}
+
+export async function migrateLocalSleeps(householdId, userId, localSleeps) {
+  if (!localSleeps?.length) return
+  const rows = localSleeps.map(s => ({
+    id: isUuid(s.id) ? s.id : null,
+    household_id: householdId, logged_by: userId,
+    started_at: s.startedAt, ended_at: s.endedAt, duration_secs: s.durationSecs ?? null,
+  }))
+  await insertMigratedRows('sleep_logs', rows)
 }
 
 export async function migrateLocalMedicines(householdId, userId, localMedicines) {
@@ -301,7 +310,7 @@ export async function deleteFeedSession(id) {
 // feeds/nappies/medicines to { onInsert, onUpdate, onDelete }. Tables that are
 // not yet in the supabase_realtime publication simply never emit events, so
 // this degrades gracefully to the existing refresh-after-write behaviour.
-const REALTIME_TABLES = { feeds: 'feed_sessions', nappies: 'nappy_logs', medicines: 'medicine_logs' }
+const REALTIME_TABLES = { feeds: 'feed_sessions', nappies: 'nappy_logs', medicines: 'medicine_logs', sleeps: 'sleep_logs' }
 
 export function subscribeToHousehold(householdId, handlersByTable) {
   const filter = `household_id=eq.${householdId}`

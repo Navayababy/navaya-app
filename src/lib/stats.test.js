@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { feedMoodMeta, averageFeedMood, computeWeeklyInsights } from './stats.js'
+import { feedMoodMeta, averageFeedMood, computeWeeklyInsights, secsOverlappingDay, sleepSecsOnDay } from './stats.js'
 
 // Fixed "now": Tuesday 9 June 2026, 14:30 local time
 const NOW = new Date(2026, 5, 9, 14, 30, 0)
@@ -52,6 +52,35 @@ describe('averageFeedMood', () => {
     expect(avg.score).toBe(3)
     expect(avg.count).toBe(2)
     expect(avg.label).toBe('Good')
+  })
+})
+
+describe('secsOverlappingDay / sleepSecsOnDay', () => {
+  const iso = (daysAgo, hour, minute = 0) => at(daysAgo, hour, minute)
+
+  it('counts a same-day interval in full', () => {
+    expect(secsOverlappingDay(iso(0, 13), iso(0, 14))).toBe(3600)
+  })
+
+  it('clamps an overnight sleep to the portion inside each day', () => {
+    const start = iso(1, 22) // yesterday 22:00
+    const end   = iso(0, 6)  // today 06:00
+    expect(secsOverlappingDay(start, end, NOW)).toBe(6 * 3600)
+    const yesterday = new Date(NOW); yesterday.setDate(yesterday.getDate() - 1)
+    expect(secsOverlappingDay(start, end, yesterday)).toBe(2 * 3600)
+  })
+
+  it('returns zero for intervals outside the day', () => {
+    expect(secsOverlappingDay(iso(2, 13), iso(2, 14), NOW)).toBe(0)
+  })
+
+  it('sums clamped portions across sleeps', () => {
+    const sleeps = [
+      { startedAt: iso(1, 22), endedAt: iso(0, 6) },  // 6h today
+      { startedAt: iso(0, 13), endedAt: iso(0, 14) }, // 1h today
+      { startedAt: iso(2, 9),  endedAt: iso(2, 10) }, // not today
+    ]
+    expect(sleepSecsOnDay(sleeps, NOW)).toBe(7 * 3600)
   })
 })
 

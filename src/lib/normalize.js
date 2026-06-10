@@ -27,6 +27,17 @@ export function normalizeNappy(n) {
   }
 }
 
+export function normalizeSleep(s) {
+  if ('startedAt' in s) return s
+  return {
+    id:           s.id,
+    startedAt:    s.started_at,
+    endedAt:      s.ended_at,
+    durationSecs: s.duration_secs,
+    loggedBy:     s.logged_by,
+  }
+}
+
 export function normalizeMedicine(m) {
   if ('loggedAt' in m) return m
   return {

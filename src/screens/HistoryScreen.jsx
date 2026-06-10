@@ -3,9 +3,9 @@ import { brand, palette } from '../theme.js'
 import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, deleteSleep } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, timeStr, todayDateStr } from '../utils/time.js'
-import { normalizeFeedSession, normalizeNappy, normalizeMedicine } from '../lib/normalize.js'
+import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep } from '../lib/normalize.js'
 import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL } from '../lib/constants.js'
-import { averageFeedMood, computeWeeklyInsights } from '../lib/stats.js'
+import { averageFeedMood, computeWeeklyInsights, sleepSecsOnDay } from '../lib/stats.js'
 import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
@@ -34,18 +34,18 @@ function PartnerAttributionIndicator({ entry, sharedMode, authUser }) {
 
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-export default function HistoryScreen({ night, authUser, profile, sharedSessions, sharedNappies, sharedMedicines, onRefreshSessions, onRefreshNappies, onRefreshMedicines }) {
+export default function HistoryScreen({ night, authUser, profile, sharedSessions, sharedNappies, sharedMedicines, sharedSleeps, onRefreshSessions, onRefreshNappies, onRefreshMedicines, onRefreshSleeps }) {
   const p = palette(night)
   const sharedMode = !!(profile?.household_id && sharedSessions)
 
   const [sessions,    setSessions]    = useState(() => getSessions())
   const [nappies,     setNappies]     = useState(() => getNappies())
   const [medicines,   setMedicines]   = useState(() => getMedicines())
-  // Sleeps are tracked locally on each device (no shared table yet)
   const [sleeps,      setSleeps]      = useState(() => getSleeps())
 
   const nappyList    = sharedMode && sharedNappies   ? sharedNappies.map(normalizeNappy)     : nappies
   const medicineList = sharedMode && sharedMedicines ? sharedMedicines.map(normalizeMedicine) : medicines
+  const sleepList    = sharedMode && sharedSleeps    ? sharedSleeps.map(normalizeSleep)       : sleeps
   const [openDay,     setOpenDay]     = useState(null)
   const [editSession, setEditSession] = useState(null)
   const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'medicine'
@@ -61,15 +61,15 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     const f = feeds.map(s      => ({ ...s, _type: 'feed',     _time: s.startedAt }))
     const n = nappyList.map(n  => ({ ...n, _type: 'nappy',    _time: n.loggedAt  }))
     const m = medicineList.map(m => ({ ...m, _type: 'medicine', _time: m.loggedAt }))
-    const sl = sleeps.map(s    => ({ ...s, _type: 'sleep',    _time: s.startedAt }))
+    const sl = sleepList.map(s => ({ ...s, _type: 'sleep',    _time: s.startedAt }))
     return [...f, ...n, ...m, ...sl].sort((a, b) => new Date(b._time) - new Date(a._time))
-  }, [feeds, nappyList, medicineList, sleeps])
+  }, [feeds, nappyList, medicineList, sleepList])
 
   const grouped = useMemo(() => {
     const map = {}
     allEntries.forEach(entry => {
       const key = new Date(entry._time).toDateString()
-      if (!map[key]) map[key] = { label: dayLabel(entry._time), entries: [] }
+      if (!map[key]) map[key] = { label: dayLabel(entry._time), date: new Date(entry._time), entries: [] }
       map[key].entries.push(entry)
     })
     return Object.values(map)
@@ -179,6 +179,16 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
   const handleAddSleep = (sleep) => {
     setSleeps(addSleep(sleep))
+    if (sharedMode && authUser && profile?.household_id) {
+      syncWrite('sleep.insert', {
+        id:           sleep.id,
+        householdId:  profile.household_id,
+        loggedBy:     authUser.id,
+        startedAt:    sleep.startedAt,
+        endedAt:      sleep.endedAt,
+        durationSecs: sleep.durationSecs,
+      }).then(({ ok }) => { if (ok) onRefreshSleeps?.() })
+    }
     setAddMode(null)
   }
 
@@ -208,17 +218,24 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     }
     if (type === 'sleep') {
       setSleeps(deleteSleep(id))
+      if (sharedMode) {
+        const { ok } = await syncWrite('sleep.delete', { id })
+        if (ok) onRefreshSleeps?.()
+      }
     }
     setConfirmDel(null)
   }
 
   // ── Day summary line ──────────────────────────────────────────────────────
-  function daySummary(entries) {
+  function daySummary(entries, day) {
     const feeds    = entries.filter(e => e._type === 'feed').length
     const nappies  = entries.filter(e => e._type === 'nappy').length
     const meds     = entries.filter(e => e._type === 'medicine').length
     const feedDur  = entries.filter(e => e._type === 'feed').reduce((a, e) => a + (e.durationSecs || 0), 0)
-    const sleepDur = entries.filter(e => e._type === 'sleep').reduce((a, e) => a + (e.durationSecs || 0), 0)
+    // Sleep is clamped to this calendar day across ALL sleeps, so an overnight
+    // sleep contributes its pre-midnight portion here and the rest to the next
+    // day — totals stay accurate even though the row sits under the start day.
+    const sleepDur = sleepSecsOnDay(sleepList, day)
     const mood     = averageFeedMood(entries.filter(e => e._type === 'feed'))
     const parts    = []
     if (feeds   > 0) parts.push(`${feeds} feed${feeds !== 1 ? 's' : ''}`)
@@ -367,7 +384,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                 style={{ width: '100%', padding: '14px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: p.text }}>{group.label}</span>
-                  <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 3 }}>{daySummary(group.entries)}</span>
+                  <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 3 }}>{daySummary(group.entries, group.date)}</span>
                 </div>
                 <span style={{ color: p.sub, fontSize: 14, display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }}>›</span>
               </button>
@@ -436,11 +453,14 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                       )
                     }
 
-                    // ── Sleep row (local-only) ────────────────────────────
+                    // ── Sleep row ─────────────────────────────────────────
                     if (entry._type === 'sleep') {
                       const isDel = confirmDel?.id === entry.id
+                      const creatorId = getEntryCreatorId(entry)
+                      const canDelete = !sharedMode || !creatorId || creatorId === authUser?.id
                       return (
                         <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
+                          <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
                             😴
@@ -449,14 +469,14 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                             <span style={{ display: 'block', fontSize: 12, color: p.text }}>Sleep · {fmtMins(entry.durationSecs || 0)}</span>
                             <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{timeStr(entry.startedAt)} – {timeStr(entry.endedAt)}</span>
                           </div>
-                          {isDel ? (
+                          {canDelete && (isDel ? (
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                               <button onClick={() => setConfirmDel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
                               <button onClick={() => handleDelete({ id: entry.id, type: 'sleep' })} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
                             </div>
                           ) : (
                             <button onClick={() => setConfirmDel({ id: entry.id, type: 'sleep' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
-                          )}
+                          ))}
                         </div>
                       )
                     }
