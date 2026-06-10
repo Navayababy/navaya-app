@@ -12,8 +12,9 @@ const SUGGESTIONS = [
 
 export default function ChatScreen({ night, messages, setMessages }) {
   const p = palette(night)
-  const [input,    setInput]    = useState('')
-  const [loading,  setLoading]  = useState(false)
+  const [input,     setInput]     = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
 
@@ -50,15 +51,36 @@ export default function ChatScreen({ night, messages, setMessages }) {
       })
 
       clearTimeout(timeoutId)
-      const data = await res.json()
 
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
         setMessages(h => [...h, { id: `${Date.now()}-error`, role: 'assistant', content: data.error || 'Something went wrong. Please try again.', error: true }])
         setLoading(false)
         return
       }
 
-      setMessages(h => [...h, { id: `${Date.now()}-assistant`, role: 'assistant', content: data.reply }])
+      // The reply streams as plain text — grow the bubble as words arrive
+      const id = `${Date.now()}-assistant`
+      setMessages(h => [...h, { id, role: 'assistant', content: '' }])
+      setStreaming(true)
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let received = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const text = decoder.decode(value, { stream: true })
+        if (!text) continue
+        received += text
+        setMessages(h => h.map(m => m.id === id ? { ...m, content: m.content + text } : m))
+      }
+
+      if (!received.trim()) {
+        setMessages(h => h.map(m => m.id === id
+          ? { ...m, content: 'Something went wrong. Please try again.', error: true }
+          : m))
+      }
 
     } catch (err) {
       clearTimeout(timeoutId)
@@ -68,6 +90,7 @@ export default function ChatScreen({ night, messages, setMessages }) {
       setMessages(h => [...h, { id: `${Date.now()}-error`, role: 'assistant', content: msg, error: true }])
     }
 
+    setStreaming(false)
     setLoading(false)
   }
 
@@ -129,8 +152,8 @@ export default function ChatScreen({ night, messages, setMessages }) {
           </div>
         ))}
 
-        {/* Loading dots */}
-        {loading && (
+        {/* Loading dots — only while waiting for the first words */}
+        {loading && !streaming && (
           <div className="fade-up" style={{ marginBottom: 10 }}>
             <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: '14px 14px 14px 4px', padding: '13px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 9, color: brand.sand }}>✦</span>

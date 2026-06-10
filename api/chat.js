@@ -80,6 +80,8 @@ export default async function handler(req, res) {
   const sanitized = messages.map(m => ({ role: m.role, content: m.content }))
 
   const controller = new AbortController()
+  // Guards the connection + first byte; cleared once Anthropic responds,
+  // after which the stream itself paces the response.
   const timeoutId = setTimeout(() => controller.abort(), 15000)
 
   try {
@@ -91,8 +93,13 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+        stream: true,
+        // Chat configuration per the Sonnet 4.6 migration guide: thinking off
+        // and low effort keep latency and cost at Sonnet 4 levels.
+        thinking: { type: 'disabled' },
+        output_config: { effort: 'low' },
         system: SYSTEM,
         messages: sanitized,
       }),
@@ -100,18 +107,45 @@ export default async function handler(req, res) {
     })
 
     clearTimeout(timeoutId)
-    const data = await response.json()
 
     if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
       console.error('Anthropic API error:', { status: response.status, message: data.error?.message })
       return res.status(response.status).json({ error: data.error?.message || 'API error' })
     }
 
-    const reply = data.content?.find(b => b.type === 'text')?.text || ''
-    return res.status(200).json({ reply })
+    // Relay the SSE stream as plain text chunks so the first words reach the
+    // user immediately instead of after the full completion.
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    })
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+    for await (const chunk of response.body) {
+      buffer += decoder.decode(chunk, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop()
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        let event
+        try { event = JSON.parse(line.slice(6)) } catch { continue }
+        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+          res.write(event.delta.text)
+        }
+      }
+    }
+    return res.end()
 
   } catch (error) {
     clearTimeout(timeoutId)
+    // If the stream broke after headers were sent, all we can do is end it —
+    // the client treats whatever arrived as the (partial) reply.
+    if (res.headersSent) {
+      console.error('Chat stream error:', error)
+      return res.end()
+    }
     if (error.name === 'AbortError') {
       return res.status(504).json({ error: 'Request timed out. Please try again.' })
     }
@@ -119,3 +153,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Something went wrong. Please try again.' })
   }
 }
+
+// Vercel Node runtime: opt in to response streaming
+export const config = { supportsResponseStreaming: true }
