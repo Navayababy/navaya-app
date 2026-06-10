@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { getNightMode, setNightMode } from './lib/storage.js'
 import { useViewportHeight } from './hooks/useViewportHeight.js'
 import { useFeedTimer } from './hooks/useFeedTimer.js'
+import { useSleepTimer } from './hooks/useSleepTimer.js'
 import { useHousehold } from './hooks/useHousehold.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
 import NappyScreen   from './screens/NappyScreen.jsx'
+import SleepScreen   from './screens/SleepScreen.jsx'
 import ChatScreen    from './screens/ChatScreen.jsx'
 import PrepareScreen from './screens/PrepareScreen.jsx'
 import SettingsScreen from './screens/SettingsScreen.jsx'
@@ -20,6 +22,7 @@ export default function App() {
 
   const viewportHeight = useViewportHeight()
   const timerProps = useFeedTimer()
+  const sleepTimerProps = useSleepTimer()
   const {
     authUser, profile, householdMembers, householdMembersError,
     sharedSessions, sharedNappies, sharedMedicines,
@@ -48,12 +51,13 @@ export default function App() {
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} timer={timerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onSessionSaved={refreshSharedSessions} />}
         {screen === 'nappy'   && <NappyScreen   night={night} authUser={authUser} profile={profile} sharedNappies={sharedNappies} onNappySaved={refreshSharedNappies} />}
+        {screen === 'sleep'   && <SleepScreen   night={night} timer={sleepTimerProps} />}
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} />}
         {screen === 'chat'    && <ChatScreen    night={night} messages={chatMessages} setMessages={setChatMessages} />}
         {screen === 'prepare' && <PrepareScreen night={night} />}
         {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
       </div>
-      <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={timerProps.feedActive} />
+      <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={timerProps.feedActive} sleepActive={sleepTimerProps.sleepActive} />
     </div>
   )
 }

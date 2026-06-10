@@ -3,12 +3,13 @@ import { palette } from '../theme.js'
 const tabs = [
   { id: 'home',    icon: '◉', label: 'Feed'    },
   { id: 'nappy',   icon: '◈', label: 'Nappy'   },
+  { id: 'sleep',   icon: '☾', label: 'Sleep'   },
   { id: 'history', icon: '≡', label: 'Logbook' },
   { id: 'chat',    icon: '✦', label: 'Sage'    },
   { id: 'prepare', icon: '◎', label: 'Prepare' },
 ]
 
-export default function NavBar({ screen, setScreen, night, feedActive }) {
+export default function NavBar({ screen, setScreen, night, feedActive, sleepActive }) {
   const p = palette(night)
 
   return (
@@ -22,7 +23,8 @@ export default function NavBar({ screen, setScreen, night, feedActive }) {
     }}>
       {tabs.map(tab => {
         const active  = screen === tab.id
-        const showDot = tab.id === 'home' && feedActive && !active
+        const showDot = (tab.id === 'home' && feedActive && !active)
+          || (tab.id === 'sleep' && sleepActive && !active)
         return (
           <button
             key={tab.id}
