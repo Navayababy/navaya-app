@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { getNightMode, setNightMode, getActiveTimer, setActiveTimer, clearActiveTimer, getSessions, getNappies, getMedicines } from './lib/storage.js'
-import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, migrateLocalNappies, migrateLocalMedicines, userHasDataInHousehold, deduplicateHouseholdData } from './lib/db.js'
-import { flushOutbox } from './lib/sync.js'
-import { supabase, isSupabaseConfigured } from './lib/supabase.js'
+import { useState } from 'react'
+import { getNightMode, setNightMode } from './lib/storage.js'
+import { useViewportHeight } from './hooks/useViewportHeight.js'
+import { useFeedTimer } from './hooks/useFeedTimer.js'
+import { useHousehold } from './hooks/useHousehold.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
 import NappyScreen   from './screens/NappyScreen.jsx'
@@ -11,259 +11,27 @@ import PrepareScreen from './screens/PrepareScreen.jsx'
 import SettingsScreen from './screens/SettingsScreen.jsx'
 import NavBar        from './components/NavBar.jsx'
 
-function getViewportHeight() {
-  if (typeof window === 'undefined') return null
-  return Math.round(window.visualViewport?.height || window.innerHeight)
-}
-
 export default function App() {
   const [screen, setScreen] = useState('home')
   const [night, setNight]   = useState(() => getNightMode())
   // Chat history lives here so the conversation survives tab changes
   // (screens are conditionally rendered, so ChatScreen unmounts on navigation).
   const [chatMessages, setChatMessages] = useState([])
-  const [viewportHeight, setViewportHeight] = useState(() => getViewportHeight())
-  const initialTimer = useRef(getActiveTimer())
 
-  // ── Auth & shared session state ────────────────────────────────────────────
-  const [authUser,        setAuthUser]        = useState(null)
-  const [profile,         setProfile]         = useState(null)
-  const [householdMembers, setHouseholdMembers] = useState(null)
-  const [householdMembersError, setHouseholdMembersError] = useState(null)
-  const [sharedSessions,  setSharedSessions]  = useState(null)
-  const [sharedNappies,   setSharedNappies]   = useState(null)
-  const [sharedMedicines, setSharedMedicines] = useState(null)
-  const realtimeUnsub = useRef(null)
-
-  // ── Feed timer state lives here so it survives tab changes ────────────────
-  const [feedActive,    setFeedActive]    = useState(() => initialTimer.current !== null)
-  const [feedSide,      setFeedSide]      = useState(() => initialTimer.current?.side || 'L')
-  const [feedStartedAt, setFeedStartedAt] = useState(() => initialTimer.current?.startedAt || null)
-  const [elapsed,       setElapsed]       = useState(() => {
-    const saved = initialTimer.current
-    if (!saved) return 0
-    return Math.floor((Date.now() - saved.startedAt) / 1000)
-  })
-  const timerRef = useRef(null)
-  const feedStartedAtRef = useRef(feedStartedAt)
-  feedStartedAtRef.current = feedStartedAt
-
-  useLayoutEffect(() => {
-    let rafId = null
-
-    const syncViewportHeight = () => {
-      if (rafId !== null) window.cancelAnimationFrame(rafId)
-      rafId = window.requestAnimationFrame(() => {
-        setViewportHeight(getViewportHeight())
-      })
-    }
-
-    syncViewportHeight()
-
-    window.addEventListener('resize', syncViewportHeight)
-    window.addEventListener('orientationchange', syncViewportHeight)
-    window.addEventListener('pageshow', syncViewportHeight)
-    document.addEventListener('visibilitychange', syncViewportHeight)
-    window.visualViewport?.addEventListener('resize', syncViewportHeight)
-    window.visualViewport?.addEventListener('scroll', syncViewportHeight)
-
-    return () => {
-      if (rafId !== null) window.cancelAnimationFrame(rafId)
-      window.removeEventListener('resize', syncViewportHeight)
-      window.removeEventListener('orientationchange', syncViewportHeight)
-      window.removeEventListener('pageshow', syncViewportHeight)
-      document.removeEventListener('visibilitychange', syncViewportHeight)
-      window.visualViewport?.removeEventListener('resize', syncViewportHeight)
-      window.visualViewport?.removeEventListener('scroll', syncViewportHeight)
-    }
-  }, [])
-
-  // ── Auth init (only when Supabase is configured) ───────────────────────────
-  useEffect(() => {
-    if (!isSupabaseConfigured) return
-
-    getSession().then(session => {
-      if (session?.user) {
-        setAuthUser(session.user)
-        loadProfile(session.user.id)
-      }
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const user = session?.user || null
-      setAuthUser(user)
-      if (user) {
-        loadProfile(user.id)
-      } else {
-        setProfile(null)
-        setHouseholdMembers(null)
-        setHouseholdMembersError(null)
-        setSharedSessions(null)
-        setSharedNappies(null)
-        setSharedMedicines(null)
-        if (realtimeUnsub.current) { realtimeUnsub.current(); realtimeUnsub.current = null }
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadProfile = async (userId) => {
-    const { data } = await getProfile(userId)
-    if (!data) return
-    setProfile(data)
-    if (data.household_id) {
-      setHouseholdMembers(null)
-      setHouseholdMembersError(null)
-      loadHouseholdMembers()
-      // One-time migration: upload local data only if this user has no records in Supabase yet.
-      // Flag is only set on full success so a failed migration can be retried on next login.
-      const migrationKey = `navaya_migrated_${data.household_id}`
-      if (!localStorage.getItem(migrationKey)) {
-        const alreadySynced = await userHasDataInHousehold(data.household_id, userId)
-        if (!alreadySynced) {
-          try {
-            await migrateLocalSessions(data.household_id, userId, getSessions())
-            await migrateLocalNappies(data.household_id, userId, getNappies())
-            await migrateLocalMedicines(data.household_id, userId, getMedicines())
-            localStorage.setItem(migrationKey, '1')
-          } catch (err) {
-            console.error('Migration failed, will retry next login:', err)
-          }
-        } else {
-          localStorage.setItem(migrationKey, '1')
-        }
-      }
-      // Deduplicate at most once per 24 hours to avoid O(n) queries on every login.
-      const dedupKey = `navaya_dedup_${data.household_id}`
-      const lastDedup = parseInt(localStorage.getItem(dedupKey) || '0', 10)
-      if (Date.now() - lastDedup > 24 * 60 * 60 * 1000) {
-        await deduplicateHouseholdData(data.household_id)
-        localStorage.setItem(dedupKey, String(Date.now()))
-      }
-      // Deliver any writes queued while offline before refreshing the lists
-      await flushOutbox()
-      loadSharedSessions(data.household_id)
-      loadSharedNappies(data.household_id)
-      loadSharedMedicines(data.household_id)
-      if (realtimeUnsub.current) realtimeUnsub.current()
-      const listHandlers = (setList) => ({
-        onInsert: (row) => setList(prev => prev ? [row, ...prev.filter(x => x.id !== row.id)] : [row]),
-        onUpdate: (row) => setList(prev => prev ? prev.map(x => x.id === row.id ? row : x) : [row]),
-        onDelete: (row) => setList(prev => prev ? prev.filter(x => x.id !== row.id) : []),
-      })
-      realtimeUnsub.current = subscribeToHousehold(data.household_id, {
-        feeds:     listHandlers(setSharedSessions),
-        nappies:   listHandlers(setSharedNappies),
-        medicines: listHandlers(setSharedMedicines),
-      })
-    } else {
-      setHouseholdMembers([])
-      setHouseholdMembersError(null)
-    }
-  }
-
-  const loadHouseholdMembers = useCallback(async () => {
-    const { data, error } = await getHouseholdMembers()
-    if (error) {
-      setHouseholdMembers([])
-      setHouseholdMembersError(error.message || 'Unable to load household members')
-      return []
-    }
-    setHouseholdMembers(data || [])
-    setHouseholdMembersError(null)
-    return data || []
-  }, [])
-
-  const loadSharedSessions = async (householdId) => {
-    const { data } = await getRecentSessions(householdId, 200)
-    if (data) setSharedSessions(data)
-  }
-
-  const loadSharedNappies = async (householdId) => {
-    const { data } = await getRecentNappyLogs(householdId, 200)
-    if (data) setSharedNappies(data)
-  }
-
-  const loadSharedMedicines = async (householdId) => {
-    const { data } = await getRecentMedicineLogs(householdId, 200)
-    if (data) setSharedMedicines(data)
-  }
-
-  const refreshProfile = () => {
-    if (authUser) loadProfile(authUser.id)
-  }
-
-  const refreshSharedSessions  = () => { if (profile?.household_id) loadSharedSessions(profile.household_id) }
-  const refreshSharedNappies   = () => { if (profile?.household_id) loadSharedNappies(profile.household_id) }
-  const refreshSharedMedicines = () => { if (profile?.household_id) loadSharedMedicines(profile.household_id) }
-
-  const resyncAll = async () => {
-    if (!profile?.household_id) return
-    await flushOutbox()
-    await deduplicateHouseholdData(profile.household_id)
-    await Promise.all([
-      loadSharedSessions(profile.household_id),
-      loadSharedNappies(profile.household_id),
-      loadSharedMedicines(profile.household_id),
-    ])
-  }
-
-  // Drain queued offline writes when connectivity returns, and once a minute
-  // as a safety net (no-op when the outbox is empty).
-  useEffect(() => {
-    if (!isSupabaseConfigured) return
-    const onOnline = () => flushOutbox()
-    window.addEventListener('online', onOnline)
-    const drainTimer = setInterval(() => flushOutbox(), 60000)
-    return () => {
-      window.removeEventListener('online', onOnline)
-      clearInterval(drainTimer)
-    }
-  }, [])
-
-  // ── Feed timer ─────────────────────────────────────────────────────────────
-  // feedStartedAt is read via ref inside the interval to avoid restarting on every tick.
-  useEffect(() => {
-    if (feedActive) {
-      timerRef.current = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - feedStartedAtRef.current) / 1000))
-      }, 1000)
-    } else {
-      clearInterval(timerRef.current)
-    }
-    return () => clearInterval(timerRef.current)
-  }, [feedActive])
-
-  const startFeed = (side) => {
-    const now = Date.now()
-    setFeedSide(side)
-    setFeedStartedAt(now)
-    setElapsed(0)
-    setFeedActive(true)
-    setActiveTimer(side, now)
-  }
-
-  const stopFeed = () => {
-    clearInterval(timerRef.current)
-    setFeedActive(false)
-    clearActiveTimer()
-    // Duration is derived from the timestamps, not the ticking elapsed state,
-    // which can lag behind when the tab has been backgrounded.
-    const endedAt = Date.now()
-    return {
-      side:         feedSide,
-      startedAt:    new Date(feedStartedAt).toISOString(),
-      endedAt:      new Date(endedAt).toISOString(),
-      durationSecs: Math.max(0, Math.round((endedAt - feedStartedAt) / 1000)),
-    }
-  }
+  const viewportHeight = useViewportHeight()
+  const timerProps = useFeedTimer()
+  const {
+    authUser, profile, householdMembers, householdMembersError,
+    sharedSessions, sharedNappies, sharedMedicines,
+    loadHouseholdMembers, refreshProfile,
+    refreshSharedSessions, refreshSharedNappies, refreshSharedMedicines,
+    resyncAll,
+  } = useHousehold()
 
   const toggleNight = () => {
     setNight(n => { setNightMode(!n); return !n })
   }
 
-  const timerProps = { feedActive, feedSide, elapsed, startFeed, stopFeed }
   const bg = night ? '#1A1410' : '#F5F0EB'
   const appHeight = viewportHeight ? `${viewportHeight}px` : '100dvh'
 
@@ -285,7 +53,7 @@ export default function App() {
         {screen === 'prepare' && <PrepareScreen night={night} />}
         {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
       </div>
-      <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={feedActive} />
+      <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={timerProps.feedActive} />
     </div>
   )
 }
