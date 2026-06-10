@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, getNappies, getMedicines, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine } from '../lib/storage.js'
+import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, deleteSleep } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, timeStr, todayDateStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine } from '../lib/normalize.js'
@@ -10,6 +10,7 @@ import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
 import AddMedicineModal from '../components/modals/AddMedicineModal.jsx'
+import AddSleepModal from '../components/modals/AddSleepModal.jsx'
 
 
 function getEntryCreatorId(entry) {
@@ -40,6 +41,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const [sessions,    setSessions]    = useState(() => getSessions())
   const [nappies,     setNappies]     = useState(() => getNappies())
   const [medicines,   setMedicines]   = useState(() => getMedicines())
+  // Sleeps are tracked locally on each device (no shared table yet)
+  const [sleeps,      setSleeps]      = useState(() => getSleeps())
 
   const nappyList    = sharedMode && sharedNappies   ? sharedNappies.map(normalizeNappy)     : nappies
   const medicineList = sharedMode && sharedMedicines ? sharedMedicines.map(normalizeMedicine) : medicines
@@ -58,8 +61,9 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     const f = feeds.map(s      => ({ ...s, _type: 'feed',     _time: s.startedAt }))
     const n = nappyList.map(n  => ({ ...n, _type: 'nappy',    _time: n.loggedAt  }))
     const m = medicineList.map(m => ({ ...m, _type: 'medicine', _time: m.loggedAt }))
-    return [...f, ...n, ...m].sort((a, b) => new Date(b._time) - new Date(a._time))
-  }, [feeds, nappyList, medicineList])
+    const sl = sleeps.map(s    => ({ ...s, _type: 'sleep',    _time: s.startedAt }))
+    return [...f, ...n, ...m, ...sl].sort((a, b) => new Date(b._time) - new Date(a._time))
+  }, [feeds, nappyList, medicineList, sleeps])
 
   const grouped = useMemo(() => {
     const map = {}
@@ -173,6 +177,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     setAddMode(null)
   }
 
+  const handleAddSleep = (sleep) => {
+    setSleeps(addSleep(sleep))
+    setAddMode(null)
+  }
+
   const handleAddMedicine = (medicine) => {
     setMedicines(addMedicine(medicine))
     if (sharedMode && authUser && profile?.household_id) {
@@ -197,20 +206,25 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
         if (ok) onRefreshMedicines?.()
       }
     }
+    if (type === 'sleep') {
+      setSleeps(deleteSleep(id))
+    }
     setConfirmDel(null)
   }
 
   // ── Day summary line ──────────────────────────────────────────────────────
   function daySummary(entries) {
-    const feeds   = entries.filter(e => e._type === 'feed').length
-    const nappies = entries.filter(e => e._type === 'nappy').length
-    const meds    = entries.filter(e => e._type === 'medicine').length
-    const feedDur = entries.filter(e => e._type === 'feed').reduce((a, e) => a + (e.durationSecs || 0), 0)
-    const mood    = averageFeedMood(entries.filter(e => e._type === 'feed'))
-    const parts   = []
+    const feeds    = entries.filter(e => e._type === 'feed').length
+    const nappies  = entries.filter(e => e._type === 'nappy').length
+    const meds     = entries.filter(e => e._type === 'medicine').length
+    const feedDur  = entries.filter(e => e._type === 'feed').reduce((a, e) => a + (e.durationSecs || 0), 0)
+    const sleepDur = entries.filter(e => e._type === 'sleep').reduce((a, e) => a + (e.durationSecs || 0), 0)
+    const mood     = averageFeedMood(entries.filter(e => e._type === 'feed'))
+    const parts    = []
     if (feeds   > 0) parts.push(`${feeds} feed${feeds !== 1 ? 's' : ''}`)
     if (nappies > 0) parts.push(`${nappies} napp${nappies !== 1 ? 'ies' : 'y'}`)
     if (meds > 0) parts.push(`${meds} med${meds !== 1 ? 's' : ''}`)
+    if (sleepDur > 0) parts.push(`${fmtMins(sleepDur)} sleep`)
     if (feedDur > 0) parts.push(fmtMins(feedDur))
     if (mood) parts.push(`${mood.emoji} ${mood.label} avg`)
     return parts.join(' · ')
@@ -422,6 +436,31 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                       )
                     }
 
+                    // ── Sleep row (local-only) ────────────────────────────
+                    if (entry._type === 'sleep') {
+                      const isDel = confirmDel?.id === entry.id
+                      return (
+                        <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
+                          <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
+                            😴
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ display: 'block', fontSize: 12, color: p.text }}>Sleep · {fmtMins(entry.durationSecs || 0)}</span>
+                            <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{timeStr(entry.startedAt)} – {timeStr(entry.endedAt)}</span>
+                          </div>
+                          {isDel ? (
+                            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                              <button onClick={() => setConfirmDel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
+                              <button onClick={() => handleDelete({ id: entry.id, type: 'sleep' })} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => setConfirmDel({ id: entry.id, type: 'sleep' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
+                          )}
+                        </div>
+                      )
+                    }
+
                     if (entry._type === 'medicine') {
                       const isDel = confirmDel?.id === entry.id
                       return (
@@ -475,6 +514,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
               {[
                 { mode: 'feed',  icon: '🍼', label: 'Feed'  },
                 { mode: 'nappy', icon: '💧', label: 'Nappy' },
+                { mode: 'sleep', icon: '😴', label: 'Sleep' },
                 { mode: 'medicine', icon: '💊', label: 'Medicine' },
               ].map(({ mode, icon, label }) => (
                 <button key={mode} onClick={() => setAddMode(mode)}
@@ -491,7 +531,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       {/* ── Add modals ── */}
       {addMode === 'feed'  && <AddFeedModal  night={night} onSave={handleAddFeed}  onClose={() => setAddMode(null)} />}
       {addMode === 'nappy' && <AddNappyModal night={night} onSave={handleAddNappy} onClose={() => setAddMode(null)} />}
-      {addMode === 'medicine' && <AddMedicineModal night={night} onSave={handleAddMedicine} onClose={() => setAddMode(null)} />}
+      {addMode === 'sleep' && <AddSleepModal night={night} onSave={handleAddSleep} onClose={() => setAddMode(null)} />}
+      {addMode === 'medicine' && <AddMedicineModal night={night} recentMedicines={medicineList} onSave={handleAddMedicine} onClose={() => setAddMode(null)} />}
     </div>
   )
 }

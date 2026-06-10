@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { fmt, fmtMins, fmtSince, timeAgo, dayLabel, timeStr, dateStr, buildISO, todayDateStr, dayKey } from './time.js'
+import { fmt, fmtMins, fmtSince, timeAgo, dayLabel, dayShort, fmtDayTime, timeStr, dateStr, buildISO, todayDateStr, dayKey } from './time.js'
 
 // Fixed "now": Tuesday 9 June 2026, 14:30 local time
 const NOW = new Date(2026, 5, 9, 14, 30, 0)
@@ -42,6 +42,11 @@ describe('fmtSince', () => {
     expect(fmtSince(minutesAgo(2))).toBe('2m')
     expect(fmtSince(minutesAgo(61))).toBe('1h 1m')
   })
+
+  it('rolls over to days past 24 hours', () => {
+    expect(fmtSince(minutesAgo(60 * 26))).toBe('1 day')
+    expect(fmtSince(minutesAgo(60 * 24 * 14 + 30))).toBe('14 days')
+  })
 })
 
 describe('timeAgo', () => {
@@ -54,6 +59,11 @@ describe('timeAgo', () => {
     expect(timeAgo(minutesAgo(5))).toBe('5m ago')
     expect(timeAgo(minutesAgo(125))).toBe('2h 5m ago')
   })
+
+  it('rolls over to days past 24 hours', () => {
+    expect(timeAgo(minutesAgo(60 * 26))).toBe('1 day ago')
+    expect(timeAgo(minutesAgo(60 * 24 * 14 + 30))).toBe('14 days ago')
+  })
 })
 
 describe('dayLabel', () => {
@@ -65,6 +75,20 @@ describe('dayLabel', () => {
   it('uses weekday + day + short month otherwise', () => {
     // 1 June 2026 was a Monday
     expect(dayLabel(new Date(2026, 5, 1, 9, 0).toISOString())).toBe('Monday 1 Jun')
+  })
+})
+
+describe('dayShort / fmtDayTime', () => {
+  it('labels days briefly', () => {
+    expect(dayShort(NOW.toISOString())).toBe('Today')
+    expect(dayShort(new Date(2026, 5, 8, 9, 0).toISOString())).toBe('Yesterday')
+    expect(dayShort(new Date(2026, 5, 1, 9, 0).toISOString())).toBe('1 Jun')
+  })
+
+  it('shows bare time today, day-prefixed time otherwise', () => {
+    expect(fmtDayTime(new Date(2026, 5, 9, 8, 5).toISOString())).toBe('08:05')
+    expect(fmtDayTime(new Date(2026, 5, 8, 22, 40).toISOString())).toBe('Yesterday 22:40')
+    expect(fmtDayTime(new Date(2026, 5, 1, 14, 30).toISOString())).toBe('1 Jun · 14:30')
   })
 })
 

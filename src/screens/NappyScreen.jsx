@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
 import { getNappies, addNappy, deleteNappy } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
-import { dateStr, timeStr } from '../utils/time.js'
+import { dateStr, timeStr, fmtDayTime } from '../utils/time.js'
 import { POO_COLORS } from '../lib/constants.js'
 import { newId } from '../lib/id.js'
 
@@ -10,31 +10,13 @@ function timeSinceShort(iso) {
   if (!iso) return '—'
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
   if (diff < 60) return '< 1m'
+  // Compact stat — roll over to days past 24h ("14d" rather than "350h")
+  const days = Math.floor(diff / 86400)
+  if (days >= 1) return `${days}d`
   const h = Math.floor(diff / 3600)
   const m = Math.floor((diff % 3600) / 60)
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 }
-
-function timeSinceLabel(iso) {
-  if (!iso) return ''
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (diff < 60) return 'just now'
-  const h = Math.floor(diff / 3600)
-  const m = Math.floor((diff % 3600) / 60)
-  return h > 0 ? `${h}h ${m}m ago` : `${m}m ago`
-}
-
-function fmtDateTime(iso) {
-  const d = new Date(iso)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(today.getDate() - 1)
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  if (d.toDateString() === today.toDateString()) return time
-  if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' · ' + time
-}
-
 
 function todayMidnight() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime()
@@ -264,10 +246,9 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
                   )}
                 </div>
 
-                {/* Time */}
+                {/* Time — absolute; "last change" above carries the how-long-ago */}
                 <div style={{ textAlign: 'right', marginRight: 12 }}>
-                  <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{timeSinceLabel(n.loggedAt)}</span>
-                  <span style={{ display: 'block', fontSize: 10, color: p.sub, opacity: 0.55 }}>{fmtDateTime(n.loggedAt)}</span>
+                  <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{fmtDayTime(n.loggedAt)}</span>
                 </div>
 
                 {/* Delete */}

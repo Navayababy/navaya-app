@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, addSession, updateSession, getBabyName, setBabyName, getUserName, setUserName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
-import { fmt, timeAgo, fmtSince } from '../utils/time.js'
+import { fmt, fmtSince, fmtDayTime } from '../utils/time.js'
 import { normalizeFeedSession } from '../lib/normalize.js'
 import { newId } from '../lib/id.js'
 
@@ -382,7 +382,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
               </div>
               <div style={{ flex: 1 }}>
                 <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500 }}>{s.side === 'L' ? 'Left' : 'Right'} side</span>
-                <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{timeAgo(s.endedAt)}</span>
+                <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{fmtDayTime(s.endedAt)}</span>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ display: 'block', fontSize: 12, color: p.sub }}>{fmt(s.durationSecs)}</span>
