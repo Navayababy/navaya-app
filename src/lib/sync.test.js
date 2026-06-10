@@ -21,6 +21,7 @@ import { getOutbox, outboxSize, enqueue } from './outbox.js'
 const ok = () => Promise.resolve({ error: null })
 const networkFail = () => Promise.resolve({ error: { message: 'fetch failed' } })
 const duplicateKey = () => Promise.resolve({ error: { code: '23505', message: 'duplicate key' } })
+const rowNotFound = () => Promise.resolve({ error: { code: 'PGRST116', message: 'no rows returned' } })
 
 beforeEach(() => {
   localStorage.clear()
@@ -78,7 +79,7 @@ describe('flushOutbox', () => {
     expect(calls).toEqual([['insert', 'a'], ['update', 'a']])
   })
 
-  it('stops at the first transient failure and increments attempts', async () => {
+  it('stops at the first failure so later writes cannot run ahead', async () => {
     insertFeedSession.mockImplementation(networkFail)
     deleteFeedSession.mockImplementation(ok)
     enqueue('feed.insert', { id: 'a' })
@@ -87,6 +88,28 @@ describe('flushOutbox', () => {
     const result = await flushOutbox()
     expect(result).toMatchObject({ flushed: 0, pending: 2 })
     expect(deleteFeedSession).not.toHaveBeenCalled()
+  })
+
+  it('never drops connectivity failures, however often they retry', async () => {
+    insertFeedSession.mockImplementation(networkFail)
+    enqueue('feed.insert', { id: 'a' })
+
+    // A device offline for a long stretch sees many scheduled drains
+    for (let i = 0; i < 30; i++) await flushOutbox()
+    expect(outboxSize()).toBe(1)
+    expect(getOutbox()[0].attempts).toBe(0)
+
+    // Connectivity returns — the write is still there and now delivers
+    insertFeedSession.mockImplementation(ok)
+    const result = await flushOutbox()
+    expect(result).toMatchObject({ flushed: 1, pending: 0 })
+  })
+
+  it('counts attempts only for coded server errors', async () => {
+    updateFeedSession.mockImplementation(rowNotFound)
+    enqueue('feed.update', { id: 'a', moodScore: 4 })
+
+    await flushOutbox()
     expect(getOutbox()[0].attempts).toBe(1)
   })
 
@@ -101,9 +124,9 @@ describe('flushOutbox', () => {
     expect(deleteFeedSession).toHaveBeenCalled()
   })
 
-  it('gives up on an item after the maximum retry attempts', async () => {
-    insertFeedSession.mockImplementation(networkFail)
-    enqueue('feed.insert', { id: 'a' })
+  it('gives up on a coded server error after the maximum retry attempts', async () => {
+    updateFeedSession.mockImplementation(rowNotFound)
+    enqueue('feed.update', { id: 'a', moodScore: 4 })
 
     for (let i = 0; i < 7; i++) await flushOutbox()
     expect(outboxSize()).toBe(1)

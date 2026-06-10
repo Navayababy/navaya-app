@@ -32,6 +32,15 @@ function isPermanent(error) {
   return code.startsWith('23') || code.startsWith('22')
 }
 
+// Connectivity failures (offline, DNS, timeouts) surface without a
+// Postgres/PostgREST error code. They must never count toward the retry cap —
+// the device may simply be offline for hours, which is the exact situation
+// the outbox exists for. Only coded server errors (e.g. row-not-found racing
+// an unflushed insert) are capped, since those can otherwise loop forever.
+function countsTowardCap(error) {
+  return Boolean(String(error?.code || '').trim())
+}
+
 async function attempt(type, payload) {
   const handler = HANDLERS[type]
   if (!handler) return { error: { message: `Unknown sync type: ${type}`, code: '22000' } }
@@ -56,6 +65,11 @@ export function flushOutbox() {
 async function drain() {
   let flushed = 0
   if (!isSupabaseConfigured) return { flushed, pending: getOutbox().length }
+  // No point attempting while the browser knows it is offline; the 'online'
+  // event triggers the next flush.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return { flushed, pending: getOutbox().length }
+  }
 
   // Head-of-line: stop at the first transient failure so later writes can
   // never run ahead of an earlier one they may depend on.
@@ -71,14 +85,16 @@ async function drain() {
       continue
     }
 
-    if (isPermanent(error) || (head.attempts || 0) + 1 >= MAX_ATTEMPTS) {
+    if (isPermanent(error) || (countsTowardCap(error) && (head.attempts || 0) + 1 >= MAX_ATTEMPTS)) {
       console.error('Dropping unsyncable change:', head.type, error)
       saveOutbox(getOutbox().slice(1))
       continue
     }
 
-    const current = getOutbox()
-    saveOutbox([{ ...current[0], attempts: (current[0].attempts || 0) + 1 }, ...current.slice(1)])
+    if (countsTowardCap(error)) {
+      const current = getOutbox()
+      saveOutbox([{ ...current[0], attempts: (current[0].attempts || 0) + 1 }, ...current.slice(1)])
+    }
     break
   }
 
