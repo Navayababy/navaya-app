@@ -186,35 +186,10 @@ export async function userHasDataInHousehold(householdId, userId) {
   return !!(data?.length)
 }
 
-export async function deduplicateHouseholdData(householdId) {
-  const dedupTable = async (table, keyFn) => {
-    const { data } = await supabase
-      .from(table)
-      .select('id, logged_by, ' + (table === 'feed_sessions' ? 'started_at, side' : 'logged_at, ' + (table === 'nappy_logs' ? 'type' : 'name')))
-      .eq('household_id', householdId)
-      .order('id', { ascending: true })
-      .limit(2000)
-    if (!data?.length) return
-    const seen = new Set()
-    const toDelete = []
-    for (const row of data) {
-      const key = keyFn(row)
-      if (seen.has(key)) toDelete.push(row.id)
-      else seen.add(key)
-    }
-    for (let i = 0; i < toDelete.length; i += 50) {
-      await supabase.from(table).delete().in('id', toDelete.slice(i, i + 50))
-    }
-  }
-
-  await dedupTable('feed_sessions', r => `${r.logged_by}|${r.started_at}|${r.side}`)
-  await dedupTable('nappy_logs',    r => `${r.logged_by}|${r.logged_at}|${r.type}`)
-  await dedupTable('medicine_logs', r => `${r.logged_by}|${r.logged_at}|${r.name}`)
-}
-
 // Rows that carry a client UUID are upserted (ignore duplicates), making a
 // re-run of the migration idempotent. Legacy rows without a UUID id fall back
-// to plain inserts, where the daily dedup pass still covers them.
+// to plain inserts; the migration flag is only set on full success, so they
+// are uploaded at most once.
 async function insertMigratedRows(table, rows) {
   const BATCH = 50
   const withId    = rows.filter(r => r.id)

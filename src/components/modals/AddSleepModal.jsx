@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { brand, palette } from '../../theme.js'
-import { timeStr, todayDateStr, buildISO } from '../../utils/time.js'
+import { timeStr, dateStr, buildISO } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
@@ -9,13 +9,15 @@ export default function AddSleepModal({ night, onSave, onClose }) {
   const p = palette(night)
   const { input: inputStyle, label: labelStyle } = makeModalStyles(p)
 
-  const now          = new Date()
-  const defaultEnd   = timeStr(now)
-  const defaultStart = timeStr(new Date(now.getTime() - 60 * 60 * 1000))
+  // The date field is the sleep's START date. Seed it from the default start
+  // time (an hour ago), so opening the modal just after midnight defaults to
+  // yesterday rather than creating a future entry.
+  const now              = new Date()
+  const defaultStartDate = new Date(now.getTime() - 60 * 60 * 1000)
 
-  const [date,      setDate]      = useState(todayDateStr())
-  const [startTime, setStartTime] = useState(defaultStart)
-  const [endTime,   setEndTime]   = useState(defaultEnd)
+  const [date,      setDate]      = useState(dateStr(defaultStartDate))
+  const [startTime, setStartTime] = useState(timeStr(defaultStartDate))
+  const [endTime,   setEndTime]   = useState(timeStr(now))
 
   const handleSave = () => {
     const startedAt = buildISO(date, startTime)

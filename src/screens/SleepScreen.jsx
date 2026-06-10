@@ -3,6 +3,7 @@ import { brand, palette } from '../theme.js'
 import { getSleeps, addSleep, deleteSleep } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
+import { sleepSecsOnDay } from '../lib/stats.js'
 import { fmtMins, timeAgo, timeStr, dateStr, buildISO, dayShort } from '../utils/time.js'
 import { newId } from '../lib/id.js'
 
@@ -17,10 +18,6 @@ function fmtClock(secs) {
 
 function fmtRange(sleep) {
   return `${timeStr(sleep.startedAt)} – ${timeStr(sleep.endedAt)}`
-}
-
-function todayMidnight() {
-  const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime()
 }
 
 export default function SleepScreen({ night, timer, authUser, profile, sharedSleeps, onSleepSaved }) {
@@ -56,12 +53,9 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     , null)
   , [sleeps])
 
-  const todaySecs = useMemo(() => {
-    const start = todayMidnight()
-    return sleeps
-      .filter(s => new Date(s.endedAt).getTime() >= start)
-      .reduce((a, s) => a + (s.durationSecs || 0), 0)
-  }, [sleeps])
+  // Clamped to today's boundary: an overnight 22:00–06:00 sleep contributes
+  // only the after-midnight portion to today's total.
+  const todaySecs = useMemo(() => sleepSecsOnDay(sleeps), [sleeps])
 
   const shareSleep = (sleep) => {
     if (!authUser || !profile?.household_id) return
@@ -225,7 +219,8 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
                 <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{fmtRange(s)}</span>
               </div>
               <div style={{ textAlign: 'right', marginRight: 12 }}>
-                <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{dayShort(s.endedAt)}</span>
+                {/* Labelled by start day, matching the Logbook's grouping */}
+                <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{dayShort(s.startedAt)}</span>
               </div>
               {canDelete && (confirmDel === s.id ? (
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>

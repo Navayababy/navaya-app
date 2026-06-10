@@ -5,7 +5,7 @@ import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, timeStr, todayDateStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep } from '../lib/normalize.js'
 import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL } from '../lib/constants.js'
-import { averageFeedMood, computeWeeklyInsights } from '../lib/stats.js'
+import { averageFeedMood, computeWeeklyInsights, sleepSecsOnDay } from '../lib/stats.js'
 import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
@@ -69,7 +69,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     const map = {}
     allEntries.forEach(entry => {
       const key = new Date(entry._time).toDateString()
-      if (!map[key]) map[key] = { label: dayLabel(entry._time), entries: [] }
+      if (!map[key]) map[key] = { label: dayLabel(entry._time), date: new Date(entry._time), entries: [] }
       map[key].entries.push(entry)
     })
     return Object.values(map)
@@ -227,12 +227,15 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   }
 
   // ── Day summary line ──────────────────────────────────────────────────────
-  function daySummary(entries) {
+  function daySummary(entries, day) {
     const feeds    = entries.filter(e => e._type === 'feed').length
     const nappies  = entries.filter(e => e._type === 'nappy').length
     const meds     = entries.filter(e => e._type === 'medicine').length
     const feedDur  = entries.filter(e => e._type === 'feed').reduce((a, e) => a + (e.durationSecs || 0), 0)
-    const sleepDur = entries.filter(e => e._type === 'sleep').reduce((a, e) => a + (e.durationSecs || 0), 0)
+    // Sleep is clamped to this calendar day across ALL sleeps, so an overnight
+    // sleep contributes its pre-midnight portion here and the rest to the next
+    // day — totals stay accurate even though the row sits under the start day.
+    const sleepDur = sleepSecsOnDay(sleepList, day)
     const mood     = averageFeedMood(entries.filter(e => e._type === 'feed'))
     const parts    = []
     if (feeds   > 0) parts.push(`${feeds} feed${feeds !== 1 ? 's' : ''}`)
@@ -381,7 +384,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                 style={{ width: '100%', padding: '14px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: p.text }}>{group.label}</span>
-                  <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 3 }}>{daySummary(group.entries)}</span>
+                  <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 3 }}>{daySummary(group.entries, group.date)}</span>
                 </div>
                 <span style={{ color: p.sub, fontSize: 14, display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }}>›</span>
               </button>

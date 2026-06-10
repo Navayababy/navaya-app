@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSessions, getNappies, getMedicines, getSleeps } from '../lib/storage.js'
-import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, getRecentSleepLogs, migrateLocalNappies, migrateLocalMedicines, migrateLocalSleeps, userHasDataInHousehold, deduplicateHouseholdData } from '../lib/db.js'
+import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, getRecentSleepLogs, migrateLocalNappies, migrateLocalMedicines, migrateLocalSleeps, userHasDataInHousehold } from '../lib/db.js'
 import { flushOutbox } from '../lib/sync.js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js'
 
@@ -86,13 +86,6 @@ export function useHousehold() {
           console.error('Sleep migration failed, will retry next login:', err)
         }
       }
-      // Deduplicate at most once per 24 hours to avoid O(n) queries on every login.
-      const dedupKey = `navaya_dedup_${data.household_id}`
-      const lastDedup = parseInt(localStorage.getItem(dedupKey) || '0', 10)
-      if (Date.now() - lastDedup > 24 * 60 * 60 * 1000) {
-        await deduplicateHouseholdData(data.household_id)
-        localStorage.setItem(dedupKey, String(Date.now()))
-      }
       // Deliver any writes queued while offline before refreshing the lists
       await flushOutbox()
       loadSharedSessions(data.household_id)
@@ -161,7 +154,6 @@ export function useHousehold() {
   const resyncAll = async () => {
     if (!profile?.household_id) return
     await flushOutbox()
-    await deduplicateHouseholdData(profile.household_id)
     await Promise.all([
       loadSharedSessions(profile.household_id),
       loadSharedNappies(profile.household_id),
