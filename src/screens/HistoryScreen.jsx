@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, deleteSleep } from '../lib/storage.js'
+import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, deleteSleep } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, timeStr, todayDateStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine } from '../lib/normalize.js'
@@ -10,6 +10,7 @@ import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
 import AddMedicineModal from '../components/modals/AddMedicineModal.jsx'
+import AddSleepModal from '../components/modals/AddSleepModal.jsx'
 
 
 function getEntryCreatorId(entry) {
@@ -173,6 +174,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       syncWrite('nappy.insert', { id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type: nappy.type, pooColor: nappy.pooColor, loggedAt: nappy.loggedAt })
         .then(({ ok }) => { if (ok) onRefreshNappies?.() })
     }
+    setAddMode(null)
+  }
+
+  const handleAddSleep = (sleep) => {
+    setSleeps(addSleep(sleep))
     setAddMode(null)
   }
 
@@ -508,6 +514,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
               {[
                 { mode: 'feed',  icon: '🍼', label: 'Feed'  },
                 { mode: 'nappy', icon: '💧', label: 'Nappy' },
+                { mode: 'sleep', icon: '😴', label: 'Sleep' },
                 { mode: 'medicine', icon: '💊', label: 'Medicine' },
               ].map(({ mode, icon, label }) => (
                 <button key={mode} onClick={() => setAddMode(mode)}
@@ -524,6 +531,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       {/* ── Add modals ── */}
       {addMode === 'feed'  && <AddFeedModal  night={night} onSave={handleAddFeed}  onClose={() => setAddMode(null)} />}
       {addMode === 'nappy' && <AddNappyModal night={night} onSave={handleAddNappy} onClose={() => setAddMode(null)} />}
+      {addMode === 'sleep' && <AddSleepModal night={night} onSave={handleAddSleep} onClose={() => setAddMode(null)} />}
       {addMode === 'medicine' && <AddMedicineModal night={night} recentMedicines={medicineList} onSave={handleAddMedicine} onClose={() => setAddMode(null)} />}
     </div>
   )
