@@ -42,6 +42,11 @@ describe('fmtSince', () => {
     expect(fmtSince(minutesAgo(2))).toBe('2m')
     expect(fmtSince(minutesAgo(61))).toBe('1h 1m')
   })
+
+  it('rolls over to days past 24 hours', () => {
+    expect(fmtSince(minutesAgo(60 * 26))).toBe('1 day')
+    expect(fmtSince(minutesAgo(60 * 24 * 14 + 30))).toBe('14 days')
+  })
 })
 
 describe('timeAgo', () => {
@@ -53,6 +58,11 @@ describe('timeAgo', () => {
     expect(timeAgo(minutesAgo(0.5))).toBe('just now')
     expect(timeAgo(minutesAgo(5))).toBe('5m ago')
     expect(timeAgo(minutesAgo(125))).toBe('2h 5m ago')
+  })
+
+  it('rolls over to days past 24 hours', () => {
+    expect(timeAgo(minutesAgo(60 * 26))).toBe('1 day ago')
+    expect(timeAgo(minutesAgo(60 * 24 * 14 + 30))).toBe('14 days ago')
   })
 })
 

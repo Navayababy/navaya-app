@@ -18,6 +18,9 @@ export function fmtSince(isoString) {
   if (!isoString) return null
   const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000)
   if (diff < 60) return 'just now'
+  // Beyond a day, hour counts stop being readable ("350h") — switch to days
+  const days = Math.floor(diff / 86400)
+  if (days >= 1) return days === 1 ? '1 day' : `${days} days`
   const h = Math.floor(diff / 3600)
   const m = Math.floor((diff % 3600) / 60)
   if (h > 0) return `${h}h ${m}m`
@@ -29,6 +32,9 @@ export function timeAgo(isoString) {
   const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000)
   if (diff < 60)   return 'just now'
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  // Beyond a day, hour counts stop being readable ("350h ago") — switch to days
+  const days = Math.floor(diff / 86400)
+  if (days >= 1) return days === 1 ? '1 day ago' : `${days} days ago`
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m ago`
 }
 

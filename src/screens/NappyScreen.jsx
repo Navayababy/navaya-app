@@ -10,6 +10,9 @@ function timeSinceShort(iso) {
   if (!iso) return '—'
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
   if (diff < 60) return '< 1m'
+  // Compact stat — roll over to days past 24h ("14d" rather than "350h")
+  const days = Math.floor(diff / 86400)
+  if (days >= 1) return `${days}d`
   const h = Math.floor(diff / 3600)
   const m = Math.floor((diff % 3600) / 60)
   return h > 0 ? `${h}h ${m}m` : `${m}m`
