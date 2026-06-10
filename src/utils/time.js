@@ -42,6 +42,27 @@ export function dayLabel(isoString) {
   return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })
 }
 
+// Short day label for list rows: 'Today' | 'Yesterday' | '8 Jun'
+export function dayShort(isoString) {
+  const d = new Date(isoString)
+  const today     = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(today.getDate() - 1)
+  if (d.toDateString() === today.toDateString())     return 'Today'
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+// Absolute timestamp for list rows: '14:32' today, 'Yesterday 14:32',
+// or '8 Jun · 14:32' for older entries.
+export function fmtDayTime(isoString) {
+  const time = timeStr(isoString)
+  const day  = dayShort(isoString)
+  if (day === 'Today') return time
+  if (day === 'Yesterday') return `Yesterday ${time}`
+  return `${day} · ${time}`
+}
+
 // Accepts ISO string, Date object, or nothing (defaults to current time).
 export function timeStr(isoOrDate = new Date()) {
   const d = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate)

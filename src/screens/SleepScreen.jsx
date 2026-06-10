@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSleeps, addSleep, deleteSleep } from '../lib/storage.js'
-import { fmtMins, timeAgo, timeStr, dateStr, buildISO } from '../utils/time.js'
+import { fmtMins, timeAgo, timeStr, dateStr, buildISO, dayShort } from '../utils/time.js'
 import { newId } from '../lib/id.js'
 
 // h:mm:ss for long-running sleeps, mm:ss under an hour
@@ -195,7 +195,7 @@ export default function SleepScreen({ night, timer }) {
                 <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{fmtRange(s)}</span>
               </div>
               <div style={{ textAlign: 'right', marginRight: 12 }}>
-                <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{timeAgo(s.endedAt)}</span>
+                <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{dayShort(s.endedAt)}</span>
               </div>
               {confirmDel === s.id ? (
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
