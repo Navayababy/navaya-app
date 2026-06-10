@@ -192,10 +192,10 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
       ) : !authUser ? (
         <Card p={p}>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 12 }}>
-            Sign in to share feeds
+            Sign in to start sharing
           </span>
           <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.5, marginBottom: 14 }}>
-            Create a free account so both parents can log feeds and see a shared history together.
+            Create a free account so both parents can log feeds, nappies and sleeps in a shared logbook.
           </span>
 
           {/* Tab toggle */}
@@ -439,7 +439,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
 
           <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${p.border}` }}>
             <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.5, marginBottom: 10 }}>
-              Pull the latest feeds, nappies and medicines from the shared logbook.
+              Pull the latest feeds, nappies, sleeps and medicines from the shared logbook.
             </span>
             {pendingSync > 0 && (
               <span style={{ display: 'block', fontSize: 11, color: brand.accent, lineHeight: 1.5, marginBottom: 10 }}>

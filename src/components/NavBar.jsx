@@ -1,12 +1,13 @@
 import { palette } from '../theme.js'
 
+// Prepare is reached from the Home screen card rather than the nav bar —
+// it's a before-you-go-out task, not a many-times-a-day one like these five.
 const tabs = [
   { id: 'home',    icon: '◉', label: 'Feed'    },
   { id: 'nappy',   icon: '◈', label: 'Nappy'   },
   { id: 'sleep',   icon: '☾', label: 'Sleep'   },
   { id: 'history', icon: '≡', label: 'Logbook' },
   { id: 'chat',    icon: '✦', label: 'Sage'    },
-  { id: 'prepare', icon: '◎', label: 'Prepare' },
 ]
 
 export default function NavBar({ screen, setScreen, night, feedActive, sleepActive }) {
@@ -49,7 +50,7 @@ export default function NavBar({ screen, setScreen, night, feedActive, sleepActi
             <span style={{ fontSize: 9, fontWeight: active ? 600 : 400, color: active ? p.navActive : p.sub, letterSpacing: '.02em', fontFamily: "'DM Sans', sans-serif", lineHeight: 1 }}>
               {tab.label}
             </span>
-            {/* Live indicator dot — shows when a feed is active on another screen */}
+            {/* Live indicator dot — shows when a feed or sleep is running on another screen */}
             {showDot && (
               <span style={{ position: 'absolute', top: 2, right: 'calc(50% - 14px)', width: 6, height: 6, borderRadius: '50%', background: '#D4956A' }} />
             )}

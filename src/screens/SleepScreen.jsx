@@ -4,7 +4,7 @@ import { getSleeps, addSleep, deleteSleep } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
 import { sleepSecsOnDay } from '../lib/stats.js'
-import { fmtMins, timeAgo, timeStr, dateStr, buildISO, dayShort } from '../utils/time.js'
+import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO, dayShort } from '../utils/time.js'
 import { newId } from '../lib/id.js'
 
 // h:mm:ss for long-running sleeps, mm:ss under an hour
@@ -56,6 +56,11 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   // Clamped to today's boundary: an overnight 22:00–06:00 sleep contributes
   // only the after-midnight portion to today's total.
   const todaySecs = useMemo(() => sleepSecsOnDay(sleeps), [sleeps])
+
+  // "2h 14m since last sleep" — mirrors the feed card's since-last-feed line
+  const timeSinceLast = lastSleep?.endedAt && !sleepActive
+    ? fmtSince(lastSleep.endedAt)
+    : null
 
   const shareSleep = (sleep) => {
     if (!authUser || !profile?.household_id) return
@@ -135,6 +140,9 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
           <span style={{ fontSize: 11, color: p.sub, letterSpacing: '.04em' }}>
             {sleepActive ? 'Sleeping' : 'Ready to start'}
           </span>
+          {!sleepActive && timeSinceLast !== null && (
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: p.sub }}>woke {timeSinceLast}{timeSinceLast !== 'just now' ? ' ago' : ''}</span>
+          )}
         </div>
 
         <div style={{ textAlign: 'center', padding: '18px 0 14px' }}>
@@ -149,7 +157,9 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
             </>
           ) : (
             <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 30, fontWeight: 300, color: p.sub, lineHeight: 1 }}>
-              {lastSleep ? `Last sleep ${fmtMins(lastSleep.durationSecs || 0)}` : 'Track naps and night sleep'}
+              {timeSinceLast !== null
+                ? timeSinceLast === 'just now' ? 'just woke up' : `${timeSinceLast} since last sleep`
+                : 'Track naps and night sleep'}
             </span>
           )}
         </div>

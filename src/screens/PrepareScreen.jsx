@@ -1,19 +1,11 @@
 import { useState } from 'react'
 import { brand, palette } from '../theme.js'
 import { getChecked, setChecked as saveChecked, getCustomItems, setCustomItems as saveCustomItems, getHiddenDefaults, saveHiddenDefaults } from '../lib/storage.js'
-
-const DEFAULT_ITEMS = [
-  { id: 'cover',  emoji: '🌿', label: 'Navaya cover packed'            },
-  { id: 'seat',   emoji: '🪑', label: 'Comfortable seat identified'    },
-  { id: 'water',  emoji: '💧', label: 'Water bottle filled'            },
-  { id: 'phone',  emoji: '🔋', label: 'Phone charged'                  },
-  { id: 'pads',   emoji: '✨', label: 'Breast pads in bag'             },
-  { id: 'muslin', emoji: '🤍', label: 'Muslin cloth packed'            },
-]
+import { PREPARE_DEFAULT_ITEMS as DEFAULT_ITEMS } from '../lib/constants.js'
 
 const PROTECTED_ID = 'cover'
 
-export default function PrepareScreen({ night }) {
+export default function PrepareScreen({ night, setScreen }) {
   const p = palette(night)
 
   const [checked,        setChecked]        = useState(() => getChecked())
@@ -74,6 +66,10 @@ export default function PrepareScreen({ night }) {
 
       {/* Header */}
       <div style={{ padding: '20px 16px 12px' }}>
+        <button onClick={() => setScreen?.('home')}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 8px', fontSize: 12, color: p.sub, letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: 4 }}>
+          ‹ Home
+        </button>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Feed with confidence</span>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Prepare to go out</span>
         <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 4, lineHeight: 1.5 }}>Run through this before you leave. Everything ticked means you're ready.</span>

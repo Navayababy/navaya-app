@@ -35,7 +35,7 @@ export function sleepSecsOnDay(sleeps, day = new Date()) {
 }
 
 // Last-7-days insight rows and totals for the weekly insights panel.
-export function computeWeeklyInsights(feeds, nappies, medicines) {
+export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
   const days = []
   for (let i = 6; i >= 0; i--) {
     const d = new Date()
@@ -44,7 +44,7 @@ export function computeWeeklyInsights(feeds, nappies, medicines) {
     days.push(d)
   }
 
-  const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, feedMins: 0, meds: 0, dirty: 0, moodTotal: 0, moodCount: 0 }]))
+  const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, feedMins: 0, meds: 0, wet: 0, dirty: 0, sleepSecs: 0, moodTotal: 0, moodCount: 0 }]))
   feeds.forEach(s => {
     const k = dayKey(s.startedAt)
     if (!byDay[k]) return
@@ -63,7 +63,13 @@ export function computeWeeklyInsights(feeds, nappies, medicines) {
   nappies.forEach(n => {
     const k = dayKey(n.loggedAt)
     if (!byDay[k]) return
+    if (n.type === 'wet' || n.type === 'both') byDay[k].wet += 1
     if (n.type === 'poo' || n.type === 'both') byDay[k].dirty += 1
+  })
+  // Sleep is clamped to each calendar day, so an overnight sleep contributes
+  // its pre-midnight portion to one row and the rest to the next.
+  days.forEach(d => {
+    byDay[dateStr(d.toISOString())].sleepSecs = sleepSecsOnDay(sleeps, d)
   })
 
   const rows = days.map(d => {
@@ -79,7 +85,14 @@ export function computeWeeklyInsights(feeds, nappies, medicines) {
 
   const totalFeeds = rows.reduce((a, r) => a + r.feeds, 0)
   const totalMeds  = rows.reduce((a, r) => a + r.meds, 0)
+  const totalWet   = rows.reduce((a, r) => a + r.wet, 0)
   const totalDirty = rows.reduce((a, r) => a + r.dirty, 0)
+  // Averaged over days that have sleep logged, so a half-tracked week
+  // doesn't drag the figure down to something misleading.
+  const sleepDays = rows.filter(r => r.sleepSecs > 0)
+  const avgSleepSecsPerDay = sleepDays.length
+    ? Math.round(sleepDays.reduce((a, r) => a + r.sleepSecs, 0) / sleepDays.length)
+    : null
   const ratedFeeds = rows.reduce((a, r) => a + r.moodCount, 0)
   const avgFeedMins = totalFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalFeeds) : 0
   const avgMood = ratedFeeds ? feedMoodMeta(rows.reduce((a, r) => a + r.moodTotal, 0) / ratedFeeds) : null
@@ -93,5 +106,5 @@ export function computeWeeklyInsights(feeds, nappies, medicines) {
     ? Math.round(sortedFeeds.slice(1).reduce((acc, ts, idx) => acc + (ts - sortedFeeds[idx]), 0) / (sortedFeeds.length - 1) / 60000)
     : null
 
-  return { rows, totalFeeds, totalMeds, totalDirty, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
+  return { rows, totalFeeds, totalMeds, totalWet, totalDirty, avgSleepSecsPerDay, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
 }

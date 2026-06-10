@@ -109,12 +109,15 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     nappyList.filter(n => new Date(n.loggedAt) >= todayStart && (n.type === 'poo' || n.type === 'both')).length
   , [nappyList, todayStart])
 
+  const sleepTodaySecs = useMemo(() => sleepSecsOnDay(sleepList), [sleepList])
+
+  // Same last-7-days window as the insights panel, so the summary strip and
+  // the insights never disagree about what "this week" means.
   const weekFeeds = useMemo(() => {
-    const now    = new Date()
-    const monday = new Date(now)
-    monday.setHours(0, 0, 0, 0)
-    monday.setDate(now.getDate() - (now.getDay() + 6) % 7)
-    return feeds.filter(s => new Date(s.startedAt) >= monday)
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    start.setDate(start.getDate() - 6)
+    return feeds.filter(s => new Date(s.startedAt) >= start)
   }, [feeds])
 
   const weekAvgDuration = useMemo(() => {
@@ -135,8 +138,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   }
 
   const insights = useMemo(
-    () => computeWeeklyInsights(feeds, nappyList, medicineList),
-    [feeds, nappyList, medicineList]
+    () => computeWeeklyInsights(feeds, nappyList, medicineList, sleepList),
+    [feeds, nappyList, medicineList, sleepList]
   )
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -290,15 +293,16 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       </div>
 
       {/* ── Today stats ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, padding: '0 14px 8px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, padding: '0 14px 8px' }}>
         {[
-          { val: feedsToday.length.toString(), lbl: 'feeds today',  sub: feedTimeTodaySecs > 0 ? fmtMins(feedTimeTodaySecs) : null },
-          { val: wetToday.toString(),          lbl: 'wet today',    sub: null },
-          { val: dirtyToday.toString(),        lbl: 'dirty today',  sub: null },
+          { val: feedsToday.length.toString(),                 lbl: 'feeds',  sub: feedTimeTodaySecs > 0 ? fmtMins(feedTimeTodaySecs) : null },
+          { val: wetToday.toString(),                          lbl: 'wees',   sub: null },
+          { val: dirtyToday.toString(),                        lbl: 'poos',   sub: null },
+          { val: sleepTodaySecs > 0 ? fmtMins(sleepTodaySecs) : '—', lbl: 'sleep',  sub: null },
         ].map(({ val, lbl, sub }) => (
           <div key={lbl} style={{ background: p.card, borderRadius: 13, padding: '12px 10px', border: `1px solid ${p.border}`, textAlign: 'left' }}>
-            <span style={{ display: 'block', fontSize: 10, color: p.sub, lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '.08em' }}>{lbl}</span>
-            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 24, lineHeight: 1, color: p.heading, marginTop: 6 }}>{val}</span>
+            <span style={{ display: 'block', fontSize: 10, color: p.sub, lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '.08em' }}>{lbl} today</span>
+            <span style={{ display: 'flex', alignItems: 'flex-end', minHeight: 24, fontFamily: "'Cormorant Garamond', serif", fontSize: val.length > 3 ? 17 : 24, lineHeight: 1, color: p.heading, marginTop: 6 }}>{val}</span>
             {sub && <span style={{ display: 'block', fontSize: 10, color: p.sub, opacity: 0.85, marginTop: 6 }}>{sub}</span>}
           </div>
         ))}
@@ -318,7 +322,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                 Last 7 days
               </span>
               <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 23, lineHeight: 1, color: p.heading }}>
-                Feeding rhythm
+                Your week
               </span>
             </div>
             <div style={{ width: 84, height: 84, borderRadius: '50%', background: night ? '#30271F' : '#F3E9DD', border: `1px solid ${p.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', flexShrink: 0 }}>
@@ -359,9 +363,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {[
               { label: 'Avg feed', value: `${insights.avgFeedMins}m` },
+              { label: 'Avg gap between feeds', value: fmtGap(insights.avgGapMins) },
+              { label: 'Avg sleep per day', value: insights.avgSleepSecsPerDay ? fmtMins(insights.avgSleepSecsPerDay) : '—' },
               { label: 'Medicine', value: insights.totalMeds },
-              { label: 'Dirty nappies', value: insights.totalDirty },
-              { label: 'Avg gap', value: fmtGap(insights.avgGapMins) },
+              { label: 'Wees', value: insights.totalWet },
+              { label: 'Poos', value: insights.totalDirty },
             ].map(item => (
               <div key={item.label} style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 14, padding: '11px 12px' }}>
                 <span style={{ display: 'block', fontSize: 10, color: p.sub }}>{item.label}</span>
@@ -376,9 +382,10 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       {!showInsights && weekFeeds.length > 0 && (
         <div style={{ margin: '0 14px 14px', background: p.card, borderRadius: 10, border: `1px solid ${p.border}`, padding: '10px 12px' }}>
           <span style={{ fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
-            {'This week · '}
+            {'Last 7 days · '}
             <span style={{ color: p.text, fontWeight: 500 }}>{weekFeeds.length} feed{weekFeeds.length !== 1 ? 's' : ''}</span>
             {weekAvgDuration > 0 && <>{' · avg '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(weekAvgDuration)}</span>{' each'}</>}
+            {insights.avgSleepSecsPerDay && <>{' · sleep '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(insights.avgSleepSecsPerDay)}</span>{'/day'}</>}
             {weekMood && <>{' · feel: '}<span style={{ color: p.text, fontWeight: 500 }}>{weekMood.emoji} {weekMood.label}</span></>}
             {(leftCount + rightCount) > 0 && <>{' · L/R: '}<span style={{ color: p.text, fontWeight: 500 }}>{leftCount}/{rightCount}</span></>}
           </span>
@@ -388,7 +395,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       {/* ── Day groups ── */}
       {!showInsights && (grouped.length === 0 ? (
         <div style={{ padding: '20px 14px' }}>
-          <span style={{ fontSize: 13, color: p.sub }}>No entries yet. Your history will appear here.</span>
+          <span style={{ fontSize: 13, color: p.sub }}>No entries yet. Your logbook will appear here.</span>
         </div>
       ) : (
         grouped.map(group => {

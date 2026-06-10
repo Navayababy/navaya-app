@@ -96,12 +96,12 @@ describe('computeWeeklyInsights', () => {
     expect(insights.peakFeeds).toBe(1) // floor of 1 so bar heights never divide by zero
   })
 
-  it('buckets feeds, medicines and dirty nappies by local day', () => {
+  it('buckets feeds, medicines and nappies by local day', () => {
     const feeds = [feed(0, 9, { mood: 4 }), feed(0, 12), feed(1, 10, { mood: 2 })]
     const nappies = [
       { id: 'n1', type: 'poo', loggedAt: at(0, 8) },
-      { id: 'n2', type: 'both', loggedAt: at(1, 8) },
-      { id: 'n3', type: 'wet', loggedAt: at(1, 9) }, // wet does not count as dirty
+      { id: 'n2', type: 'both', loggedAt: at(1, 8) }, // counts as wet AND dirty
+      { id: 'n3', type: 'wet', loggedAt: at(1, 9) },  // wet does not count as dirty
     ]
     const meds = [{ id: 'm1', name: 'Paracetamol', loggedAt: at(0, 7) }]
 
@@ -111,13 +111,34 @@ describe('computeWeeklyInsights', () => {
 
     expect(today.feeds).toBe(2)
     expect(today.dirty).toBe(1)
+    expect(today.wet).toBe(0)
     expect(today.meds).toBe(1)
     expect(yesterday.feeds).toBe(1)
     expect(yesterday.dirty).toBe(1)
+    expect(yesterday.wet).toBe(2)
     expect(insights.totalFeeds).toBe(3)
+    expect(insights.totalWet).toBe(2)
     expect(insights.totalDirty).toBe(2)
     expect(insights.totalMeds).toBe(1)
     expect(insights.peakFeeds).toBe(2)
+  })
+
+  it('clamps sleep to day rows and averages over days with sleep logged', () => {
+    const sleeps = [
+      { startedAt: at(1, 22), endedAt: at(0, 6) }, // 2h yesterday + 6h today
+      { startedAt: at(0, 13), endedAt: at(0, 14) }, // 1h today
+    ]
+    const insights = computeWeeklyInsights([], [], [], sleeps)
+    expect(insights.rows[6].sleepSecs).toBe(7 * 3600)
+    expect(insights.rows[5].sleepSecs).toBe(2 * 3600)
+    expect(insights.rows[4].sleepSecs).toBe(0)
+    // Only the 2 days with logged sleep count towards the average
+    expect(insights.avgSleepSecsPerDay).toBe(Math.round((9 * 3600) / 2))
+  })
+
+  it('returns a null sleep average when no sleep is logged', () => {
+    const insights = computeWeeklyInsights([], [], [])
+    expect(insights.avgSleepSecsPerDay).toBeNull()
   })
 
   it('ignores entries outside the 7-day window', () => {
