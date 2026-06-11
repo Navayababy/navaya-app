@@ -273,15 +273,17 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     // day — totals stay accurate even though the row sits under the start day.
     const sleepDur = sleepSecsOnDay(sleepList, day)
     const mood     = averageFeedMood(entries.filter(e => e._type === 'feed'))
+    // Ordered feeding → sleep → nappies → medicine → mood, each part
+    // self-explanatory so the chips read cleanly on their own
     const parts    = []
     if (feeds   > 0) parts.push(`${feeds} feed${feeds !== 1 ? 's' : ''}`)
+    if (feedDur > 0) parts.push(`${fmtMins(feedDur)} breast`)
+    if (bottleMl > 0) parts.push(`${bottleMl}ml bottle`)
+    if (sleepDur > 0) parts.push(`${fmtMins(sleepDur)} sleep`)
     if (nappies > 0) parts.push(`${nappies} napp${nappies !== 1 ? 'ies' : 'y'}`)
     if (meds > 0) parts.push(`${meds} med${meds !== 1 ? 's' : ''}`)
-    if (sleepDur > 0) parts.push(`${fmtMins(sleepDur)} sleep`)
-    if (feedDur > 0) parts.push(fmtMins(feedDur))
-    if (bottleMl > 0) parts.push(`${bottleMl}ml bottle`)
-    if (mood) parts.push(`${mood.emoji} ${mood.label} avg`)
-    return parts.join(' · ')
+    if (mood) parts.push(`${mood.emoji} ${mood.label}`)
+    return parts
   }
 
   return (
@@ -314,7 +316,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       {/* ── Today stats ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, padding: '0 14px 8px' }}>
         {[
-          { val: feedsToday.length.toString(),                 lbl: 'feeds',  sub: [feedTimeTodaySecs > 0 ? fmtMins(feedTimeTodaySecs) : null, bottleMlToday > 0 ? `${bottleMlToday}ml` : null].filter(Boolean).join(' · ') || null },
+          { val: feedsToday.length.toString(),                 lbl: 'feeds',  sub: [feedTimeTodaySecs > 0 ? `${fmtMins(feedTimeTodaySecs)} breast` : null, bottleMlToday > 0 ? `${bottleMlToday}ml bottle` : null].filter(Boolean).join(' · ') || null },
           { val: wetToday.toString(),                          lbl: 'wees',   sub: null },
           { val: dirtyToday.toString(),                        lbl: 'poos',   sub: null },
           { val: sleepTodaySecs > 0 ? fmtMins(sleepTodaySecs) : '—', lbl: 'sleep',  sub: null },
@@ -381,11 +383,12 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {[
-              { label: 'Avg breast feed', value: `${insights.avgFeedMins}m` },
+              // Fixed 2×4 grid, paired by theme: breast feeding, bottle
+              // feeding, sleep & medicine, nappies
+              { label: 'Avg breast feed', value: insights.totalBreastFeeds ? `${insights.avgFeedMins}m` : '—' },
               { label: 'Avg gap between feeds', value: fmtGap(insights.avgGapMins) },
-              // Only shown for mixed-feeding weeks — no empty tile for
-              // exclusively breastfeeding users
-              ...(insights.totalBottleMl > 0 ? [{ label: 'Bottle milk', value: `${insights.totalBottleMl}ml` }] : []),
+              { label: 'Bottle feeds', value: insights.totalBottleFeeds || '—' },
+              { label: 'Bottle milk', value: insights.totalBottleMl > 0 ? `${insights.totalBottleMl}ml` : '—' },
               { label: 'Avg sleep per day', value: insights.avgSleepSecsPerDay ? fmtMins(insights.avgSleepSecsPerDay) : '—' },
               { label: 'Medicine', value: insights.totalMeds },
               { label: 'Wees', value: insights.totalWet },
@@ -402,16 +405,30 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
       {/* ── This week summary ── */}
       {!showInsights && weekFeeds.length > 0 && (
-        <div style={{ margin: '0 14px 14px', background: p.card, borderRadius: 10, border: `1px solid ${p.border}`, padding: '10px 12px' }}>
-          <span style={{ fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
-            {'Last 7 days · '}
-            <span style={{ color: p.text, fontWeight: 500 }}>{weekFeeds.length} feed{weekFeeds.length !== 1 ? 's' : ''}</span>
-            {weekAvgDuration > 0 && <>{' · avg '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(weekAvgDuration)}</span>{' breast'}</>}
-            {weekBottleMl > 0 && <>{' · '}<span style={{ color: p.text, fontWeight: 500 }}>{weekBottleMl}ml</span>{' bottle'}</>}
-            {insights.avgSleepSecsPerDay && <>{' · sleep '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(insights.avgSleepSecsPerDay)}</span>{'/day'}</>}
-            {weekMood && <>{' · feel: '}<span style={{ color: p.text, fontWeight: 500 }}>{weekMood.emoji} {weekMood.label}</span></>}
-            {(leftCount + rightCount) > 0 && <>{' · L/R: '}<span style={{ color: p.text, fontWeight: 500 }}>{leftCount}/{rightCount}</span></>}
+        <div style={{ margin: '0 14px 14px', background: p.card, borderRadius: 12, border: `1px solid ${p.border}`, padding: '11px 14px 12px' }}>
+          <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+            Last 7 days
           </span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
+            {[
+              { label: 'Feeds',      value: weekFeeds.length },
+              { label: 'Breast avg', value: weekAvgDuration > 0 ? fmtMins(weekAvgDuration) : '—' },
+              { label: 'Bottle',     value: weekBottleMl > 0 ? `${weekBottleMl}ml` : '—' },
+              { label: 'Sleep/day',  value: insights.avgSleepSecsPerDay ? fmtMins(insights.avgSleepSecsPerDay) : '—' },
+            ].map(item => (
+              <div key={item.label}>
+                <span style={{ display: 'block', fontSize: 9.5, color: p.sub, lineHeight: 1.3 }}>{item.label}</span>
+                <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 600, marginTop: 2 }}>{item.value}</span>
+              </div>
+            ))}
+          </div>
+          {(weekMood || (leftCount + rightCount) > 0) && (
+            <div style={{ marginTop: 9, paddingTop: 8, borderTop: `1px solid ${p.border}`, fontSize: 11, color: p.sub }}>
+              {weekMood && <>Feeds felt <span style={{ color: p.text, fontWeight: 500 }}>{weekMood.emoji} {weekMood.label.toLowerCase()}</span></>}
+              {weekMood && (leftCount + rightCount) > 0 && ' · '}
+              {(leftCount + rightCount) > 0 && <>Left/Right <span style={{ color: p.text, fontWeight: 500 }}>{leftCount}/{rightCount}</span></>}
+            </div>
+          )}
         </div>
       )}
 
@@ -429,7 +446,13 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                 style={{ width: '100%', padding: '14px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: p.text }}>{group.label}</span>
-                  <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 3 }}>{daySummary(group.entries, group.date)}</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                    {daySummary(group.entries, group.date).map(part => (
+                      <span key={part} style={{ fontSize: 10, color: p.sub, background: p.bg, border: `1px solid ${p.border}`, borderRadius: 999, padding: '2px 8px', lineHeight: 1.4, whiteSpace: 'nowrap' }}>
+                        {part}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <span style={{ color: p.sub, fontSize: 14, display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }}>›</span>
               </button>
