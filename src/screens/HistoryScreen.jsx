@@ -3,8 +3,8 @@ import { brand, palette } from '../theme.js'
 import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, deleteSleep } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, dayShort, timeStr, todayDateStr } from '../utils/time.js'
-import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep } from '../lib/normalize.js'
-import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL } from '../lib/constants.js'
+import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep, isBottleFeed } from '../lib/normalize.js'
+import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL, bottleLabel } from '../lib/constants.js'
 import { averageFeedMood, computeWeeklyInsights, sleepSecsOnDay } from '../lib/stats.js'
 import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
@@ -97,8 +97,13 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     feeds.filter(s => new Date(s.startedAt) >= todayStart)
   , [feeds, todayStart])
 
+  // Breast minutes and bottle ml are different units — kept separate
   const feedTimeTodaySecs = useMemo(() =>
-    feedsToday.reduce((a, s) => a + (s.durationSecs || 0), 0)
+    feedsToday.filter(s => !isBottleFeed(s)).reduce((a, s) => a + (s.durationSecs || 0), 0)
+  , [feedsToday])
+
+  const bottleMlToday = useMemo(() =>
+    feedsToday.filter(isBottleFeed).reduce((a, s) => a + (s.amountMl || 0), 0)
   , [feedsToday])
 
   const wetToday = useMemo(() =>
@@ -120,10 +125,16 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     return feeds.filter(s => new Date(s.startedAt) >= start)
   }, [feeds])
 
+  // Average duration covers breast feeds only — bottle feeds are measured in ml
   const weekAvgDuration = useMemo(() => {
-    if (!weekFeeds.length) return 0
-    return Math.round(weekFeeds.reduce((a, s) => a + (s.durationSecs || 0), 0) / weekFeeds.length)
+    const breast = weekFeeds.filter(s => !isBottleFeed(s))
+    if (!breast.length) return 0
+    return Math.round(breast.reduce((a, s) => a + (s.durationSecs || 0), 0) / breast.length)
   }, [weekFeeds])
+
+  const weekBottleMl = useMemo(() =>
+    weekFeeds.filter(isBottleFeed).reduce((a, s) => a + (s.amountMl || 0), 0)
+  , [weekFeeds])
 
   const leftCount  = weekFeeds.filter(s => s.side === 'L').length
   const rightCount = weekFeeds.filter(s => s.side === 'R').length
@@ -153,6 +164,9 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
         endedAt:     changes.endedAt,
         durationSecs: changes.durationSecs,
         moodScore:   changes.mood ?? null,
+        feedType:    changes.feedType,
+        amountMl:    changes.amountMl ?? null,
+        milkType:    changes.milkType ?? null,
       })
       if (ok) onRefreshSessions?.()
     }
@@ -181,6 +195,9 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
         durationSecs: session.durationSecs,
         side:         session.side,
         moodScore:    session.mood ?? null,
+        feedType:     session.feedType || 'breast',
+        amountMl:     session.amountMl ?? null,
+        milkType:     session.milkType ?? null,
       }).then(({ ok }) => { if (ok) onRefreshSessions?.() })
     }
     setAddMode(null)
@@ -249,7 +266,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     const feeds    = entries.filter(e => e._type === 'feed').length
     const nappies  = entries.filter(e => e._type === 'nappy').length
     const meds     = entries.filter(e => e._type === 'medicine').length
-    const feedDur  = entries.filter(e => e._type === 'feed').reduce((a, e) => a + (e.durationSecs || 0), 0)
+    const feedDur  = entries.filter(e => e._type === 'feed' && !isBottleFeed(e)).reduce((a, e) => a + (e.durationSecs || 0), 0)
+    const bottleMl = entries.filter(e => e._type === 'feed' && isBottleFeed(e)).reduce((a, e) => a + (e.amountMl || 0), 0)
     // Sleep is clamped to this calendar day across ALL sleeps, so an overnight
     // sleep contributes its pre-midnight portion here and the rest to the next
     // day — totals stay accurate even though the row sits under the start day.
@@ -261,6 +279,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     if (meds > 0) parts.push(`${meds} med${meds !== 1 ? 's' : ''}`)
     if (sleepDur > 0) parts.push(`${fmtMins(sleepDur)} sleep`)
     if (feedDur > 0) parts.push(fmtMins(feedDur))
+    if (bottleMl > 0) parts.push(`${bottleMl}ml bottle`)
     if (mood) parts.push(`${mood.emoji} ${mood.label} avg`)
     return parts.join(' · ')
   }
@@ -295,7 +314,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       {/* ── Today stats ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, padding: '0 14px 8px' }}>
         {[
-          { val: feedsToday.length.toString(),                 lbl: 'feeds',  sub: feedTimeTodaySecs > 0 ? fmtMins(feedTimeTodaySecs) : null },
+          { val: feedsToday.length.toString(),                 lbl: 'feeds',  sub: [feedTimeTodaySecs > 0 ? fmtMins(feedTimeTodaySecs) : null, bottleMlToday > 0 ? `${bottleMlToday}ml` : null].filter(Boolean).join(' · ') || null },
           { val: wetToday.toString(),                          lbl: 'wees',   sub: null },
           { val: dirtyToday.toString(),                        lbl: 'poos',   sub: null },
           { val: sleepTodaySecs > 0 ? fmtMins(sleepTodaySecs) : '—', lbl: 'sleep',  sub: null },
@@ -362,8 +381,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {[
-              { label: 'Avg feed', value: `${insights.avgFeedMins}m` },
+              { label: 'Avg breast feed', value: `${insights.avgFeedMins}m` },
               { label: 'Avg gap between feeds', value: fmtGap(insights.avgGapMins) },
+              // Only shown for mixed-feeding weeks — no empty tile for
+              // exclusively breastfeeding users
+              ...(insights.totalBottleMl > 0 ? [{ label: 'Bottle milk', value: `${insights.totalBottleMl}ml` }] : []),
               { label: 'Avg sleep per day', value: insights.avgSleepSecsPerDay ? fmtMins(insights.avgSleepSecsPerDay) : '—' },
               { label: 'Medicine', value: insights.totalMeds },
               { label: 'Wees', value: insights.totalWet },
@@ -384,7 +406,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
           <span style={{ fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
             {'Last 7 days · '}
             <span style={{ color: p.text, fontWeight: 500 }}>{weekFeeds.length} feed{weekFeeds.length !== 1 ? 's' : ''}</span>
-            {weekAvgDuration > 0 && <>{' · avg '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(weekAvgDuration)}</span>{' each'}</>}
+            {weekAvgDuration > 0 && <>{' · avg '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(weekAvgDuration)}</span>{' breast'}</>}
+            {weekBottleMl > 0 && <>{' · '}<span style={{ color: p.text, fontWeight: 500 }}>{weekBottleMl}ml</span>{' bottle'}</>}
             {insights.avgSleepSecsPerDay && <>{' · sleep '}<span style={{ color: p.text, fontWeight: 500 }}>{fmtMins(insights.avgSleepSecsPerDay)}</span>{'/day'}</>}
             {weekMood && <>{' · feel: '}<span style={{ color: p.text, fontWeight: 500 }}>{weekMood.emoji} {weekMood.label}</span></>}
             {(leftCount + rightCount) > 0 && <>{' · L/R: '}<span style={{ color: p.text, fontWeight: 500 }}>{leftCount}/{rightCount}</span></>}
@@ -428,10 +451,14 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
-                            <span style={{ fontSize: 10, fontWeight: 600, color: p.sub }}>{entry.side}</span>
+                            {isBottleFeed(entry)
+                              ? <span style={{ fontSize: 12 }}>🍼</span>
+                              : <span style={{ fontSize: 10, fontWeight: 600, color: p.sub }}>{entry.side}</span>}
                           </div>
                           <div style={{ flex: 1 }}>
-                            <span style={{ display: 'block', fontSize: 12, color: p.text }}>{entry.side === 'L' ? 'Left' : 'Right'} breast</span>
+                            <span style={{ display: 'block', fontSize: 12, color: p.text }}>
+                              {isBottleFeed(entry) ? bottleLabel(entry) : `${entry.side === 'L' ? 'Left' : 'Right'} breast`}
+                            </span>
                             {entry.mood && <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{MOOD_EMOJI[entry.mood - 1]} {MOOD_LABEL[entry.mood - 1]}</span>}
                           </div>
                           <div style={{ textAlign: 'right' }}>

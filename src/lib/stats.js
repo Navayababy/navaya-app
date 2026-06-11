@@ -3,6 +3,7 @@
 
 import { dateStr, dayKey } from '../utils/time.js'
 import { MOOD_EMOJI, MOOD_LABEL } from './constants.js'
+import { isBottleFeed } from './normalize.js'
 
 export function feedMoodMeta(score) {
   if (!score) return null
@@ -44,12 +45,18 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     days.push(d)
   }
 
-  const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, feedMins: 0, meds: 0, wet: 0, dirty: 0, sleepSecs: 0, moodTotal: 0, moodCount: 0 }]))
+  const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, breastFeeds: 0, feedMins: 0, bottleMl: 0, meds: 0, wet: 0, dirty: 0, sleepSecs: 0, moodTotal: 0, moodCount: 0 }]))
   feeds.forEach(s => {
     const k = dayKey(s.startedAt)
     if (!byDay[k]) return
     byDay[k].feeds += 1
-    byDay[k].feedMins += Math.round((s.durationSecs || 0) / 60)
+    // Duration averages stay breast-only; bottle feeds contribute ml instead
+    if (isBottleFeed(s)) {
+      byDay[k].bottleMl += s.amountMl || 0
+    } else {
+      byDay[k].breastFeeds += 1
+      byDay[k].feedMins += Math.round((s.durationSecs || 0) / 60)
+    }
     if (Number(s.mood) > 0) {
       byDay[k].moodTotal += Number(s.mood)
       byDay[k].moodCount += 1
@@ -83,7 +90,9 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     }
   })
 
-  const totalFeeds = rows.reduce((a, r) => a + r.feeds, 0)
+  const totalFeeds       = rows.reduce((a, r) => a + r.feeds, 0)
+  const totalBreastFeeds = rows.reduce((a, r) => a + r.breastFeeds, 0)
+  const totalBottleMl    = rows.reduce((a, r) => a + r.bottleMl, 0)
   const totalMeds  = rows.reduce((a, r) => a + r.meds, 0)
   const totalWet   = rows.reduce((a, r) => a + r.wet, 0)
   const totalDirty = rows.reduce((a, r) => a + r.dirty, 0)
@@ -94,7 +103,7 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     ? Math.round(sleepDays.reduce((a, r) => a + r.sleepSecs, 0) / sleepDays.length)
     : null
   const ratedFeeds = rows.reduce((a, r) => a + r.moodCount, 0)
-  const avgFeedMins = totalFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalFeeds) : 0
+  const avgFeedMins = totalBreastFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalBreastFeeds) : 0
   const avgMood = ratedFeeds ? feedMoodMeta(rows.reduce((a, r) => a + r.moodTotal, 0) / ratedFeeds) : null
   const peakFeeds = Math.max(1, ...rows.map(r => r.feeds))
   const nowTs = Date.now()
@@ -106,5 +115,5 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     ? Math.round(sortedFeeds.slice(1).reduce((acc, ts, idx) => acc + (ts - sortedFeeds[idx]), 0) / (sortedFeeds.length - 1) / 60000)
     : null
 
-  return { rows, totalFeeds, totalMeds, totalWet, totalDirty, avgSleepSecsPerDay, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
+  return { rows, totalFeeds, totalBreastFeeds, totalBottleMl, totalMeds, totalWet, totalDirty, avgSleepSecsPerDay, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
 }

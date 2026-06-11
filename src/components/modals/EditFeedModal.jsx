@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { brand, palette } from '../../theme.js'
 import { dateStr, timeStr, buildISO } from '../../utils/time.js'
-import { MOOD_EMOJI, MOOD_LABEL } from '../../lib/constants.js'
+import { MOOD_EMOJI, MOOD_LABEL, MILK_TYPE_LABEL } from '../../lib/constants.js'
+import { feedTypeOf } from '../../lib/normalize.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
 
@@ -9,13 +10,24 @@ export default function EditFeedModal({ session, night, onSave, onDelete, onClos
   const p = palette(night)
   const { input: inputStyle, label: labelStyle } = makeModalStyles(p)
 
+  const [feedType,   setFeedType]   = useState(feedTypeOf(session))
   const [startDate,  setStartDate]  = useState(dateStr(session.startedAt))
   const [startTime,  setStartTime]  = useState(timeStr(session.startedAt))
   const [endDate,    setEndDate]    = useState(session.endedAt ? dateStr(session.endedAt) : dateStr(session.startedAt))
   const [endTime,    setEndTime]    = useState(session.endedAt ? timeStr(session.endedAt) : '')
-  const [side,       setSide]       = useState(session.side)
+  const [side,       setSide]       = useState(session.side || 'L')
+  const [amount,     setAmount]     = useState(session.amountMl ? String(session.amountMl) : '')
+  const [milkType,   setMilkType]   = useState(session.milkType || 'expressed')
   const [mood,       setMood]       = useState(session.mood ? Number(session.mood) : null)
   const [confirmDel, setConfirmDel] = useState(false)
+
+  const toggleBtn = (active) => ({
+    flex: 1, padding: '12px', borderRadius: 11,
+    border: `1.5px solid ${active ? brand.sand : p.border}`,
+    background: active ? brand.bark : 'transparent',
+    cursor: 'pointer', color: active ? brand.sand : p.sub,
+    fontSize: 13, fontWeight: 500,
+  })
 
   const handleSave = () => {
     const newStartedAt = buildISO(startDate, startTime)
@@ -23,19 +35,60 @@ export default function EditFeedModal({ session, night, onSave, onDelete, onClos
     const durationSecs = newEndedAt
       ? Math.max(0, Math.round((new Date(newEndedAt) - new Date(newStartedAt)) / 1000))
       : session.durationSecs
-    onSave(session.id, { side, startedAt: newStartedAt, endedAt: newEndedAt, durationSecs, mood })
+    const parsed = Math.round(Number(amount))
+    // Switching type clears the other type's fields so a converted entry never
+    // carries a stale side or amount.
+    onSave(session.id, {
+      feedType,
+      side:     feedType === 'bottle' ? null : side,
+      startedAt: newStartedAt, endedAt: newEndedAt, durationSecs,
+      amountMl: feedType === 'bottle' && parsed >= 1 ? Math.min(500, parsed) : null,
+      milkType: feedType === 'bottle' ? milkType : null,
+      mood,
+    })
   }
 
   return (
     <ModalShell title="Edit feed" night={night} onClose={onClose}>
-      <span style={labelStyle}>Side</span>
+      <span style={labelStyle}>Type</span>
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-        {['L', 'R'].map(s => (
-          <button key={s} onClick={() => setSide(s)} style={{ flex: 1, padding: '12px', borderRadius: 11, border: `1.5px solid ${side === s ? brand.sand : p.border}`, background: side === s ? brand.bark : 'transparent', cursor: 'pointer', color: side === s ? brand.sand : p.sub, fontSize: 13, fontWeight: 500 }}>
-            {s === 'L' ? 'Left' : 'Right'}
+        {[['breast', 'Breast'], ['bottle', '🍼 Bottle']].map(([id, label]) => (
+          <button key={id} onClick={() => setFeedType(id)} style={toggleBtn(feedType === id)}>
+            {label}
           </button>
         ))}
       </div>
+
+      {feedType === 'breast' ? (
+        <>
+          <span style={labelStyle}>Side</span>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+            {['L', 'R'].map(s => (
+              <button key={s} onClick={() => setSide(s)} style={toggleBtn(side === s)}>
+                {s === 'L' ? 'Left' : 'Right'}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <span style={labelStyle}>Amount (ml)</span>
+          <input
+            type="number" inputMode="numeric" min="1" max="500"
+            value={amount} onChange={e => setAmount(e.target.value)}
+            placeholder="e.g. 120"
+            style={{ ...inputStyle, marginBottom: 14 }}
+          />
+          <span style={labelStyle}>Milk</span>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+            {Object.entries(MILK_TYPE_LABEL).map(([id, label]) => (
+              <button key={id} onClick={() => setMilkType(id)} style={toggleBtn(milkType === id)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <span style={labelStyle}>Start</span>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>

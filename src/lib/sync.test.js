@@ -81,6 +81,25 @@ describe('flushOutbox', () => {
     expect(calls).toEqual([['insert', 'a'], ['update', 'a']])
   })
 
+  it('passes bottle-feed fields through the outbox untouched', async () => {
+    updateFeedSession.mockImplementation(ok)
+    const payload = { id: 'b', feedType: 'bottle', side: null, amountMl: 120, milkType: 'formula', moodScore: null }
+    enqueue('feed.update', payload)
+
+    await flushOutbox()
+    expect(updateFeedSession).toHaveBeenCalledWith('b', expect.objectContaining(payload))
+  })
+
+  it('still flushes legacy payloads queued before bottle feeds existed', async () => {
+    updateFeedSession.mockImplementation(ok)
+    enqueue('feed.update', { id: 'a', side: 'L', moodScore: 3 })
+
+    const result = await flushOutbox()
+    expect(result).toMatchObject({ flushed: 1, pending: 0 })
+    const args = updateFeedSession.mock.calls[0][1]
+    expect('feedType' in args).toBe(false)
+  })
+
   it('stops at the first failure so later writes cannot run ahead', async () => {
     insertFeedSession.mockImplementation(networkFail)
     deleteFeedSession.mockImplementation(ok)
