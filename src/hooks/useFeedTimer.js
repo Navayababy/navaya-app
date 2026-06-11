@@ -8,6 +8,8 @@ export function useFeedTimer() {
 
   const [feedActive,    setFeedActive]    = useState(() => initialTimer.current !== null)
   const [feedSide,      setFeedSide]      = useState(() => initialTimer.current?.side || 'L')
+  // Timers persisted before bottle feeds existed have no feedType — breast.
+  const [feedType,      setFeedType]      = useState(() => initialTimer.current?.feedType || 'breast')
   const [feedStartedAt, setFeedStartedAt] = useState(() => initialTimer.current?.startedAt || null)
   const [elapsed,       setElapsed]       = useState(() => {
     const saved = initialTimer.current
@@ -30,13 +32,15 @@ export function useFeedTimer() {
     return () => clearInterval(timerRef.current)
   }, [feedActive])
 
-  const startFeed = (side) => {
+  // Bottle feeds start with startFeed(null, 'bottle') — no side.
+  const startFeed = (side, type = 'breast') => {
     const now = Date.now()
     setFeedSide(side)
+    setFeedType(type)
     setFeedStartedAt(now)
     setElapsed(0)
     setFeedActive(true)
-    setActiveTimer(side, now)
+    setActiveTimer(side, now, type)
   }
 
   const stopFeed = () => {
@@ -47,12 +51,13 @@ export function useFeedTimer() {
     // which can lag behind when the tab has been backgrounded.
     const endedAt = Date.now()
     return {
-      side:         feedSide,
+      feedType,
+      side:         feedType === 'bottle' ? null : feedSide,
       startedAt:    new Date(feedStartedAt).toISOString(),
       endedAt:      new Date(endedAt).toISOString(),
       durationSecs: Math.max(0, Math.round((endedAt - feedStartedAt) / 1000)),
     }
   }
 
-  return { feedActive, feedSide, elapsed, startFeed, stopFeed }
+  return { feedActive, feedSide, feedType, elapsed, startFeed, stopFeed }
 }

@@ -141,6 +141,33 @@ describe('computeWeeklyInsights', () => {
     expect(insights.avgSleepSecsPerDay).toBeNull()
   })
 
+  it('splits a mixed-feeding week into breast durations and bottle ml', () => {
+    const feeds = [
+      feed(0, 9, { durationSecs: 600 }),                                          // 10m breast
+      feed(0, 12, { feedType: 'bottle', side: null, amountMl: 120, milkType: 'formula' }),
+      feed(1, 9, { durationSecs: 1200 }),                                         // 20m breast
+      feed(1, 12, { feedType: 'bottle', side: null, amountMl: null, milkType: 'expressed' }), // amount skipped
+    ]
+    const insights = computeWeeklyInsights(feeds, [], [])
+    expect(insights.totalFeeds).toBe(4)            // bar chart counts every feed
+    expect(insights.totalBreastFeeds).toBe(2)
+    expect(insights.totalBottleMl).toBe(120)       // skipped amount contributes 0
+    expect(insights.avgFeedMins).toBe(15)          // bottle durations excluded
+    expect(insights.rows[6].bottleMl).toBe(120)
+    expect(insights.rows[6].feeds).toBe(2)
+  })
+
+  it('handles an all-bottle week without NaN', () => {
+    const feeds = [
+      feed(0, 9,  { feedType: 'bottle', side: null, amountMl: 90, milkType: 'expressed' }),
+      feed(0, 13, { feedType: 'bottle', side: null, amountMl: 150, milkType: 'formula' }),
+    ]
+    const insights = computeWeeklyInsights(feeds, [], [])
+    expect(insights.avgFeedMins).toBe(0)
+    expect(insights.totalBottleMl).toBe(240)
+    expect(insights.avgGapMins).toBe(240)          // gaps span bottle feeds too
+  })
+
   it('ignores entries outside the 7-day window', () => {
     const insights = computeWeeklyInsights([feed(8, 9)], [], [])
     expect(insights.totalFeeds).toBe(0)

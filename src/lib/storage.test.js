@@ -156,13 +156,40 @@ describe('active timer', () => {
   it('defaults to null, persists side and start, and clears', () => {
     expect(getActiveTimer()).toBeNull()
     setActiveTimer('L', 1700000000000)
-    expect(getActiveTimer()).toEqual({ side: 'L', startedAt: 1700000000000 })
+    expect(getActiveTimer()).toEqual({ side: 'L', startedAt: 1700000000000, feedType: 'breast' })
     clearActiveTimer()
     expect(getActiveTimer()).toBeNull()
+  })
+
+  it('persists a bottle timer with no side', () => {
+    setActiveTimer(null, 1700000000000, 'bottle')
+    expect(getActiveTimer()).toEqual({ side: null, startedAt: 1700000000000, feedType: 'bottle' })
+  })
+
+  it('still reads a timer persisted before bottle feeds existed', () => {
+    localStorage.setItem('navaya_active_timer', JSON.stringify({ side: 'R', startedAt: 1700000000000 }))
+    expect(getActiveTimer()).toEqual({ side: 'R', startedAt: 1700000000000 })
   })
 
   it('returns null on corrupt JSON', () => {
     localStorage.setItem('navaya_active_timer', '{bad')
     expect(getActiveTimer()).toBeNull()
+  })
+})
+
+describe('bottle feed sessions', () => {
+  it('round-trips bottle fields', () => {
+    addSession(session('b1', { feedType: 'bottle', side: null, amountMl: 120, milkType: 'formula' }))
+    const [s] = getSessions()
+    expect(s).toMatchObject({ feedType: 'bottle', side: null, amountMl: 120, milkType: 'formula' })
+  })
+
+  it('patches amount and milk type without touching other fields', () => {
+    addSession(session('b1', { feedType: 'bottle', side: null, amountMl: null, milkType: null }))
+    const [s] = updateSession('b1', { amountMl: 90, milkType: 'expressed' })
+    expect(s.amountMl).toBe(90)
+    expect(s.milkType).toBe('expressed')
+    expect(s.durationSecs).toBe(900)
+    expect(s.feedType).toBe('bottle')
   })
 })

@@ -4,7 +4,8 @@ import { getSessions, addSession, updateSession, getBabyName, setBabyName, getUs
 import { PREPARE_DEFAULT_ITEMS } from '../lib/constants.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtSince, fmtDayTime } from '../utils/time.js'
-import { normalizeFeedSession } from '../lib/normalize.js'
+import { normalizeFeedSession, isBottleFeed, feedTypeOf } from '../lib/normalize.js'
+import { bottleLabel } from '../lib/constants.js'
 import { newId } from '../lib/id.js'
 
 const QUOTES = [
@@ -47,15 +48,17 @@ function greeting() {
 
 export default function HomeScreen({ night, onNightToggle, setScreen, timer, authUser, profile, sharedSessions, onSessionSaved }) {
   const p = palette(night)
-  const { feedActive, feedSide, elapsed, startFeed, stopFeed } = timer
+  const { feedActive, feedSide, feedType, elapsed, startFeed, stopFeed } = timer
 
-  const [sessions,       setSessions]      = useState(() => sortByTime(getSessions()).slice(0, 3))
+  // Full sorted list (sliced to 3 at render): the side suggestion needs the
+  // most recent BREAST feed, which may sit behind a run of bottle feeds.
+  const [sessions,       setSessions]      = useState(() => sortByTime(getSessions()))
 
   // Keep "Recent feeds" in sync with shared sessions when in shared mode.
   // Runs for an empty array too, so the list clears when the household has no entries.
   useEffect(() => {
     if (!sharedSessions) return
-    setSessions(sortByTime(sharedSessions.slice(0, 3).map(normalizeFeedSession)).slice(0, 3))
+    setSessions(sortByTime(sharedSessions.map(normalizeFeedSession)))
   }, [sharedSessions])
 
   // Re-render every 30s so "Xh Ym since last feed" stays current while the screen is open
@@ -65,6 +68,9 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
     return () => clearInterval(tick)
   }, [])
   const [showMood,       setShowMood]      = useState(false)
+  const [showAmount,     setShowAmount]    = useState(false)
+  const [amountInput,    setAmountInput]   = useState('')
+  const [milkInput,      setMilkInput]     = useState('expressed')
   const [pendingSession, setPending]       = useState(null)
   const [partnerFlash,   setPartnerFlash]  = useState(false)
   const [editingName,    setEditingName]   = useState(false)
@@ -79,7 +85,9 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
   const flashTimersRef = useRef([])
 
   const lastSession = sessions[0] || null
-  const lastSide    = lastSession?.side || 'R'
+  // Suggest the opposite of the last breast feed — bottle feeds don't count
+  const lastBreast  = sessions.find(s => !isBottleFeed(s)) || null
+  const lastSide    = lastBreast?.side || 'R'
   const suggested   = lastSide === 'L' ? 'R' : 'L'
 
   const timeSinceLast = lastSession?.endedAt && !feedActive
@@ -92,8 +100,8 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
 
   const handleStop = () => {
     const sessionData = stopFeed()
-    const session = { id: newId(), ...sessionData, mood: null }
-    setSessions(sortByTime(addSession(session)).slice(0, 3))
+    const session = { id: newId(), ...sessionData, amountMl: null, milkType: null, mood: null }
+    setSessions(sortByTime(addSession(session)))
 
     pendingRemoteRef.current = null
     if (authUser && profile?.household_id) {
@@ -107,6 +115,9 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
         durationSecs: session.durationSecs,
         side:         session.side,
         moodScore:    null,
+        feedType:     session.feedType,
+        amountMl:     null,
+        milkType:     null,
       }).then(({ ok }) => {
         if (!ok) return ok // queued for retry — the flash would be a lie
         onSessionSaved?.()
@@ -119,19 +130,28 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
     }
 
     setPending(session)
-    setShowMood(true)
+    // Bottle: the feed is already saved — the amount sheet (then mood) only
+    // patches it afterwards, so closing the app can never lose the feed.
+    if (session.feedType === 'bottle') {
+      setAmountInput('')
+      setMilkInput('expressed')
+      setShowAmount(true)
+    } else {
+      setShowMood(true)
+    }
   }
 
   useEffect(() => () => flashTimersRef.current.forEach(clearTimeout), [])
 
   const saveMood = (mood) => {
     if (!pendingSession) return
-    setSessions(sortByTime(updateSession(pendingSession.id, { mood })).slice(0, 3))
+    setSessions(sortByTime(updateSession(pendingSession.id, { mood })))
     const remote = pendingRemoteRef.current
     if (remote) {
       // Same UUID in both stores — wait for the insert attempt to settle, then
       // patch the mood. If the insert was queued, the outbox keeps this update
-      // behind it, so ordering is preserved either way.
+      // behind it, so ordering is preserved either way. The bottle fields ride
+      // along so this patch never strips an amount saved a moment earlier.
       remote.then(() => {
         syncWrite('feed.update', {
           id:           pendingSession.id,
@@ -140,6 +160,9 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
           endedAt:      pendingSession.endedAt,
           durationSecs: pendingSession.durationSecs,
           moodScore:    mood,
+          feedType:     feedTypeOf(pendingSession),
+          amountMl:     pendingSession.amountMl ?? null,
+          milkType:     pendingSession.milkType ?? null,
         }).then(({ ok }) => { if (ok) onSessionSaved?.() })
       })
     }
@@ -151,6 +174,40 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
     // Feed is already saved with no mood — just dismiss the check-in
     setPending(null)
     setShowMood(false)
+  }
+
+  const saveAmount = () => {
+    if (!pendingSession) return
+    const parsed = Math.round(Number(amountInput))
+    const amountMl = parsed >= 1 ? Math.min(500, parsed) : null
+    const changes = { amountMl, milkType: milkInput }
+    setSessions(sortByTime(updateSession(pendingSession.id, changes)))
+    setPending(prev => (prev ? { ...prev, ...changes } : prev))
+    const remote = pendingRemoteRef.current
+    if (remote) {
+      // Patches behind the insert exactly like the mood check-in does.
+      remote.then(() => {
+        syncWrite('feed.update', {
+          id:           pendingSession.id,
+          side:         null,
+          startedAt:    pendingSession.startedAt,
+          endedAt:      pendingSession.endedAt,
+          durationSecs: pendingSession.durationSecs,
+          moodScore:    pendingSession.mood ?? null,
+          feedType:     'bottle',
+          amountMl,
+          milkType:     milkInput,
+        }).then(({ ok }) => { if (ok) onSessionSaved?.() })
+      })
+    }
+    setShowAmount(false)
+    setShowMood(true)
+  }
+
+  const skipAmount = () => {
+    // Bottle feed is already saved without an amount — move on to the mood
+    setShowAmount(false)
+    setShowMood(true)
   }
 
   const saveName = () => {
@@ -292,7 +349,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: feedActive ? brand.accent : brand.sand, flexShrink: 0 }} />
           <span style={{ fontSize: 11, color: p.sub, letterSpacing: '.04em' }}>
             {feedActive
-              ? `Feeding · ${feedSide === 'L' ? 'Left' : 'Right'} side`
+              ? feedType === 'bottle' ? 'Feeding · Bottle' : `Feeding · ${feedSide === 'L' ? 'Left' : 'Right'} side`
               : `Next: ${suggested === 'L' ? 'Left' : 'Right'} side`}
           </span>
           {!feedActive && timeSinceLast !== null && (
@@ -333,6 +390,12 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
                 </button>
               )
             })}
+            <button onClick={() => startFeed(null, 'bottle')}
+              style={{ flex: 1, padding: '16px 0', borderRadius: 13, border: 'none', cursor: 'pointer', background: p.bg, transition: 'all .2s' }}>
+              <span style={{ display: 'block', fontSize: 10, fontWeight: 500, letterSpacing: '.06em', textTransform: 'uppercase', color: p.sub }}>
+                🍼 Bottle
+              </span>
+            </button>
           </div>
         ) : (
           <div style={{ padding: '0 14px 14px' }}>
@@ -349,6 +412,48 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
         <div className="fade-up" style={{ margin: '10px 14px 0', background: brand.green, borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: '#fff', fontSize: 13 }}>✓</span>
           <span style={{ fontSize: 12, color: '#fff', fontWeight: 500 }}>Your partner can see this feed</span>
+        </div>
+      )}
+
+      {/* ── Bottle amount check-in ── */}
+      {showAmount && (
+        <div className="fade-up" style={{ margin: '10px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '14px' }}>
+          <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500, marginBottom: 4 }}>How much did baby take?</span>
+          <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 12 }}>This gets saved to your logbook.</span>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {[60, 90, 120, 150].map(ml => (
+              <button key={ml} onClick={() => setAmountInput(String(ml))}
+                style={{ flex: 1, padding: '9px 0', borderRadius: 10, border: `1.5px solid ${amountInput === String(ml) ? brand.sand : p.border}`, background: amountInput === String(ml) ? brand.bark : 'transparent', cursor: 'pointer', fontSize: 12, color: amountInput === String(ml) ? brand.sand : p.sub, fontWeight: 500 }}>
+                {ml}ml
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <input
+              type="number" inputMode="numeric" min="1" max="500"
+              value={amountInput}
+              onChange={e => setAmountInput(e.target.value)}
+              placeholder="Amount"
+              style={{ flex: 1, background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11, padding: '10px 12px', fontSize: 14, color: p.text, fontFamily: "'DM Sans', sans-serif", outline: 'none' }}
+            />
+            <span style={{ fontSize: 12, color: p.sub }}>ml</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {[['expressed', 'Expressed'], ['formula', 'Formula']].map(([id, label]) => (
+              <button key={id} onClick={() => setMilkInput(id)}
+                style={{ flex: 1, padding: '10px 0', borderRadius: 11, border: `1.5px solid ${milkInput === id ? brand.sand : p.border}`, background: milkInput === id ? brand.bark : 'transparent', cursor: 'pointer', fontSize: 12, color: milkInput === id ? brand.sand : p.sub, fontWeight: 500 }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <button onClick={saveAmount}
+            style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 13, color: brand.sand, fontWeight: 500 }}>
+            Save
+          </button>
+          <button onClick={skipAmount}
+            style={{ fontSize: 11, color: p.sub, background: 'none', border: 'none', cursor: 'pointer', marginTop: 10, letterSpacing: '.04em' }}>
+            skip
+          </button>
         </div>
       )}
 
@@ -383,15 +488,19 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
       <div style={{ padding: '14px 14px 0' }}>
         <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8 }}>Recent feeds</span>
         {sessions.length === 0 ? (
-          <span style={{ fontSize: 13, color: p.sub }}>No feeds logged yet. Tap Left or Right to begin.</span>
+          <span style={{ fontSize: 13, color: p.sub }}>No feeds logged yet. Tap Left, Right or Bottle to begin.</span>
         ) : (
-          sessions.map((s, i) => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: i < sessions.length - 1 ? `1px solid ${p.border}` : 'none' }}>
+          sessions.slice(0, 3).map((s, i) => (
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: i < Math.min(sessions.length, 3) - 1 ? `1px solid ${p.border}` : 'none' }}>
               <div style={{ width: 30, height: 30, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: p.sub }}>{s.side}</span>
+                {isBottleFeed(s)
+                  ? <span style={{ fontSize: 13 }}>🍼</span>
+                  : <span style={{ fontSize: 11, fontWeight: 600, color: p.sub }}>{s.side}</span>}
               </div>
               <div style={{ flex: 1 }}>
-                <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500 }}>{s.side === 'L' ? 'Left' : 'Right'} side</span>
+                <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500 }}>
+                  {isBottleFeed(s) ? bottleLabel(s) : `${s.side === 'L' ? 'Left' : 'Right'} side`}
+                </span>
                 <span style={{ display: 'block', fontSize: 11, color: p.sub }}>{fmtDayTime(s.endedAt)}</span>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -430,7 +539,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
           App guide
         </span>
         <span style={{ display: 'block', fontSize: 13, color: p.text, lineHeight: 1.45 }}>
-          Start a feed with Left or Right, then finish to save it to your Logbook. See the full walkthrough anytime.
+          Start a feed with Left, Right or Bottle, then finish to save it to your Logbook. See the full walkthrough anytime.
         </span>
         <a
           href={appGuideUrl}

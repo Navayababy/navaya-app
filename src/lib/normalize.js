@@ -1,14 +1,22 @@
 // Canonical normalization functions for Supabase snake_case → camelCase conversion.
 // Each function handles both already-normalized objects (early return) and raw Supabase rows.
 
+// Legacy feed records (local or remote) predate feed_type and are breast feeds.
+// Every read site goes through these helpers so the default lives in one place.
+export const feedTypeOf   = (s) => s?.feedType || s?.feed_type || 'breast'
+export const isBottleFeed = (s) => feedTypeOf(s) === 'bottle'
+
 export function normalizeFeedSession(s) {
   if ('startedAt' in s) return s
   return {
     id:           s.id,
+    feedType:     s.feed_type || 'breast',
     side:         s.side,
     startedAt:    s.started_at,
     endedAt:      s.ended_at,
     durationSecs: s.duration_secs,
+    amountMl:     s.amount_ml ?? null,
+    milkType:     s.milk_type ?? null,
     mood:         s.mood_score,
     loggedBy:     s.logged_by,
   }

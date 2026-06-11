@@ -244,8 +244,8 @@ export function getActiveTimer() {
   }
 }
 
-export function setActiveTimer(side, startedAt) {
-  localStorage.setItem(KEYS.activeTimer, JSON.stringify({ side, startedAt }));
+export function setActiveTimer(side, startedAt, feedType = 'breast') {
+  localStorage.setItem(KEYS.activeTimer, JSON.stringify({ side, startedAt, feedType }));
 }
 
 export function clearActiveTimer() {

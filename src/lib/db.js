@@ -212,8 +212,11 @@ export async function migrateLocalSessions(householdId, userId, localSessions) {
     started_at:    s.startedAt,
     ended_at:      s.endedAt,
     duration_secs: s.durationSecs,
-    side:          s.side,
+    side:          s.feedType === 'bottle' ? null : s.side,
     mood_score:    s.mood ?? null,
+    feed_type:     s.feedType || 'breast',
+    amount_ml:     s.amountMl ?? null,
+    milk_type:     s.milkType ?? null,
   }))
   await insertMigratedRows('feed_sessions', rows)
 }
@@ -251,7 +254,7 @@ export async function migrateLocalMedicines(householdId, userId, localMedicines)
 
 // ── Feed sessions ─────────────────────────────────────────────────────────────
 
-export async function insertFeedSession({ id, householdId, babyId, loggedBy, startedAt, endedAt, durationSecs, side, moodScore }) {
+export async function insertFeedSession({ id, householdId, babyId, loggedBy, startedAt, endedAt, durationSecs, side, moodScore, feedType, amountMl, milkType }) {
   const { data, error } = await supabase
     .from('feed_sessions')
     .insert({
@@ -264,6 +267,11 @@ export async function insertFeedSession({ id, householdId, babyId, loggedBy, sta
       duration_secs: durationSecs,
       side,
       mood_score:    moodScore || null,
+      // Default/empty values are omitted so breast feeds keep working even
+      // against a database that hasn't run the bottle-feeds migration yet.
+      ...(feedType && feedType !== 'breast' ? { feed_type: feedType } : {}),
+      ...(amountMl != null ? { amount_ml: amountMl } : {}),
+      ...(milkType ? { milk_type: milkType } : {}),
     })
     .select()
     .single()
@@ -280,7 +288,7 @@ export async function getRecentSessions(householdId, limit = 50) {
   return { data: data || [], error }
 }
 
-export async function updateFeedSession(id, { side, startedAt, endedAt, durationSecs, moodScore }) {
+export async function updateFeedSession(id, { side, startedAt, endedAt, durationSecs, moodScore, feedType, amountMl, milkType }) {
   const { data, error } = await supabase
     .from('feed_sessions')
     .update({
@@ -289,6 +297,11 @@ export async function updateFeedSession(id, { side, startedAt, endedAt, duration
       ended_at:      endedAt,
       duration_secs: durationSecs,
       mood_score:    moodScore ?? null,
+      // Only sent when the caller provides them, so update payloads queued in
+      // the outbox before this feature shipped can never null these out.
+      ...(feedType !== undefined ? { feed_type: feedType } : {}),
+      ...(amountMl !== undefined ? { amount_ml: amountMl } : {}),
+      ...(milkType !== undefined ? { milk_type: milkType } : {}),
     })
     .eq('id', id)
     .select()
