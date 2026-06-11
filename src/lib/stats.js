@@ -45,13 +45,14 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     days.push(d)
   }
 
-  const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, breastFeeds: 0, feedMins: 0, bottleMl: 0, meds: 0, wet: 0, dirty: 0, sleepSecs: 0, moodTotal: 0, moodCount: 0 }]))
+  const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, breastFeeds: 0, feedMins: 0, bottleFeeds: 0, bottleMl: 0, meds: 0, wet: 0, dirty: 0, sleepSecs: 0, moodTotal: 0, moodCount: 0 }]))
   feeds.forEach(s => {
     const k = dayKey(s.startedAt)
     if (!byDay[k]) return
     byDay[k].feeds += 1
     // Duration averages stay breast-only; bottle feeds contribute ml instead
     if (isBottleFeed(s)) {
+      byDay[k].bottleFeeds += 1
       byDay[k].bottleMl += s.amountMl || 0
     } else {
       byDay[k].breastFeeds += 1
@@ -92,6 +93,7 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
 
   const totalFeeds       = rows.reduce((a, r) => a + r.feeds, 0)
   const totalBreastFeeds = rows.reduce((a, r) => a + r.breastFeeds, 0)
+  const totalBottleFeeds = rows.reduce((a, r) => a + r.bottleFeeds, 0)
   const totalBottleMl    = rows.reduce((a, r) => a + r.bottleMl, 0)
   const totalMeds  = rows.reduce((a, r) => a + r.meds, 0)
   const totalWet   = rows.reduce((a, r) => a + r.wet, 0)
@@ -115,5 +117,5 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     ? Math.round(sortedFeeds.slice(1).reduce((acc, ts, idx) => acc + (ts - sortedFeeds[idx]), 0) / (sortedFeeds.length - 1) / 60000)
     : null
 
-  return { rows, totalFeeds, totalBreastFeeds, totalBottleMl, totalMeds, totalWet, totalDirty, avgSleepSecsPerDay, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
+  return { rows, totalFeeds, totalBreastFeeds, totalBottleFeeds, totalBottleMl, totalMeds, totalWet, totalDirty, avgSleepSecsPerDay, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
 }
