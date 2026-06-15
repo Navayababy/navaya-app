@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, deleteSleep } from '../lib/storage.js'
+import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, deleteSleep, getBabyName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, dayShort, timeStr, todayDateStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep, isBottleFeed } from '../lib/normalize.js'
@@ -37,6 +37,7 @@ function PartnerAttributionIndicator({ entry, sharedMode, authUser }) {
 export default function HistoryScreen({ night, authUser, profile, sharedSessions, sharedNappies, sharedMedicines, sharedSleeps, onRefreshSessions, onRefreshNappies, onRefreshMedicines, onRefreshSleeps }) {
   const p = palette(night)
   const sharedMode = !!(profile?.household_id && sharedSessions)
+  const babyName = getBabyName()
 
   const [sessions,    setSessions]    = useState(() => getSessions())
   const [nappies,     setNappies]     = useState(() => getNappies())
@@ -375,7 +376,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
             <div style={{ background: night ? '#2A231D' : '#F6EFE7', border: `1px solid ${p.border}`, borderRadius: 16, padding: '12px 13px', marginTop: 12, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ width: 44, height: 44, borderRadius: '50%', background: night ? '#342B24' : '#FFF7EC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 27, lineHeight: 1, flexShrink: 0 }}>{insights.avgMood.emoji}</span>
               <div style={{ minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 700 }}>Feeds felt {insights.avgMood.label.toLowerCase()} overall</span>
+                <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 700 }}>{babyName ? `${babyName}'s feeds` : 'Feeds'} felt {insights.avgMood.label.toLowerCase()} overall</span>
                 <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 2 }}>From {insights.ratedFeeds} rated feed{insights.ratedFeeds !== 1 ? 's' : ''} this week.</span>
               </div>
             </div>

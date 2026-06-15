@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSleeps, addSleep, deleteSleep } from '../lib/storage.js'
+import { getSleeps, addSleep, deleteSleep, babyDisplayName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
 import { sleepSecsOnDay } from '../lib/stats.js'
@@ -168,12 +168,12 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
           {sleepActive ? (
             <button onClick={handleStop}
               style={{ width: '100%', padding: '15px', borderRadius: 13, border: `1.5px solid ${p.heading}`, cursor: 'pointer', background: 'transparent', color: p.heading, fontSize: 13, fontWeight: 500 }}>
-              Baby&apos;s awake
+              {babyDisplayName()}&apos;s awake
             </button>
           ) : (
             <button onClick={startSleep}
               style={{ width: '100%', padding: '15px', borderRadius: 13, border: 'none', cursor: 'pointer', background: brand.bark, color: brand.sand, fontSize: 13, fontWeight: 500 }}>
-              ☾ &nbsp;Baby&apos;s asleep
+              ☾ &nbsp;{babyDisplayName()}&apos;s asleep
             </button>
           )}
         </div>
@@ -212,7 +212,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
         <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>Recent</span>
 
         {sleeps.length === 0 ? (
-          <span style={{ fontSize: 13, color: p.sub }}>No sleeps logged yet. Tap the button above when baby drifts off.</span>
+          <span style={{ fontSize: 13, color: p.sub }}>No sleeps logged yet. Tap the button above when {babyDisplayName(true)} drifts off.</span>
         ) : (
           sleeps.slice(0, 14).map((s, i) => {
             const canDelete = !sharedMode || !s.loggedBy || s.loggedBy === authUser?.id

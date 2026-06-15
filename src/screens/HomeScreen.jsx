@@ -418,7 +418,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, aut
       {/* ── Bottle amount check-in ── */}
       {showAmount && (
         <div className="fade-up" style={{ margin: '10px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '14px' }}>
-          <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500, marginBottom: 4 }}>How much did baby take?</span>
+          <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500, marginBottom: 4 }}>How much did {babyName || 'baby'} take?</span>
           <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 12 }}>This gets saved to your logbook.</span>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
             {[60, 90, 120, 150].map(ml => (
