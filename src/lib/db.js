@@ -59,6 +59,21 @@ export async function getHouseholdMembers() {
   return { data: data || [], error }
 }
 
+// ── Announcements ───────────────────────────────────────────────────────────
+
+// The single highest-priority live banner. RLS already hides inactive and
+// out-of-window rows, so the client just picks the top one. Returns null when
+// there is nothing to show.
+export async function getActiveAnnouncement() {
+  const { data, error } = await supabase
+    .from('announcements')
+    .select('*')
+    .order('priority', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(1)
+  return { data: data?.[0] || null, error }
+}
+
 // ── Household setup ───────────────────────────────────────────────────────────
 
 export async function createHousehold() {

@@ -16,6 +16,7 @@ const KEYS = {
   userName:       'navaya_user_name',
   activeTimer:    'navaya_active_timer',
   activeSleep:    'navaya_active_sleep',
+  dismissedAnnouncements: 'navaya_dismissed_announcements',
 };
 
 // ── Sessions ────────────────────────────────────────────────────────────────
@@ -239,6 +240,28 @@ export function setBabyName(name) {
 // for mid-sentence use ("when baby drifts off") vs sentence start ("Baby").
 export function babyDisplayName(lower = false) {
   return getBabyName() || (lower ? 'baby' : 'Baby');
+}
+
+// ── Announcements ────────────────────────────────────────────────────────────
+
+// Dismissal is tracked by announcement id, so a dismissed banner never returns
+// but a newly published one (new id) still shows.
+export function getDismissedAnnouncements() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.dismissedAnnouncements) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function dismissAnnouncement(id) {
+  const dismissed = getDismissedAnnouncements();
+  if (!dismissed.includes(id)) {
+    dismissed.push(id);
+    // Keep the list bounded — old ids can never resurface anyway.
+    localStorage.setItem(KEYS.dismissedAnnouncements, JSON.stringify(dismissed.slice(-50)));
+  }
+  return dismissed;
 }
 
 // ── Active timer ─────────────────────────────────────────────────────────────
