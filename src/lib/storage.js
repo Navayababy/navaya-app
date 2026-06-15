@@ -234,6 +234,13 @@ export function setBabyName(name) {
   localStorage.setItem(KEYS.babyName, name);
 }
 
+// Name to use in user-facing copy: the set name, or a neutral fallback so
+// sentences read naturally before a name has been entered. Pass lower: true
+// for mid-sentence use ("when baby drifts off") vs sentence start ("Baby").
+export function babyDisplayName(lower = false) {
+  return getBabyName() || (lower ? 'baby' : 'Baby');
+}
+
 // ── Active timer ─────────────────────────────────────────────────────────────
 
 export function getActiveTimer() {
