@@ -47,8 +47,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const nappyList    = sharedMode && sharedNappies   ? sharedNappies.map(normalizeNappy)     : nappies
   const medicineList = sharedMode && sharedMedicines ? sharedMedicines.map(normalizeMedicine) : medicines
   const sleepList    = sharedMode && sharedSleeps    ? sharedSleeps.map(normalizeSleep)       : sleeps
-  const [openDay,     setOpenDay]     = useState(null)
+  // Open today's group by default so a just-logged entry is one tap from edit.
+  const [openDay,     setOpenDay]     = useState(() => dayLabel(new Date()))
   const [editSession, setEditSession] = useState(null)
+  const [editNappy,   setEditNappy]   = useState(null)
+  const [editSleep,   setEditSleep]   = useState(null)
   const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'medicine'
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
   const [showInsights, setShowInsights] = useState(false)
@@ -235,6 +238,37 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
         .then(({ ok }) => { if (ok) onRefreshMedicines?.() })
     }
     setAddMode(null)
+  }
+
+  // There is no nappy.update / sleep.update sync handler, so an edit is a
+  // delete of the old entry followed by an insert of the corrected one — both
+  // already-tested paths. The corrected entry carries a fresh id.
+  const handleEditNappy = async (oldId, nappy) => {
+    deleteNappy(oldId)
+    setNappies(addNappy(nappy))
+    if (sharedMode) {
+      const { ok } = await syncWrite('nappy.delete', { id: oldId })
+      if (ok) onRefreshNappies?.()
+      if (authUser && profile?.household_id) {
+        syncWrite('nappy.insert', { id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type: nappy.type, pooColor: nappy.pooColor, loggedAt: nappy.loggedAt })
+          .then(({ ok }) => { if (ok) onRefreshNappies?.() })
+      }
+    }
+    setEditNappy(null)
+  }
+
+  const handleEditSleep = async (oldId, sleep) => {
+    deleteSleep(oldId)
+    setSleeps(addSleep(sleep))
+    if (sharedMode) {
+      const { ok } = await syncWrite('sleep.delete', { id: oldId })
+      if (ok) onRefreshSleeps?.()
+      if (authUser && profile?.household_id) {
+        syncWrite('sleep.insert', { id: sleep.id, householdId: profile.household_id, loggedBy: authUser.id, startedAt: sleep.startedAt, endedAt: sleep.endedAt, durationSecs: sleep.durationSecs })
+          .then(({ ok }) => { if (ok) onRefreshSleeps?.() })
+      }
+    }
+    setEditSleep(null)
   }
 
   const handleDelete = async ({ id, type }) => {
@@ -498,8 +532,12 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                       const nappyEmoji = entry.type === 'wet' ? '💧' : entry.type === 'poo' ? '💩' : '💧💩'
                       const nappyLabel = entry.type === 'wet' ? 'Wee' : entry.type === 'poo' ? 'Poo' : 'Wee & Poo'
                       const isDel      = confirmDel?.id === entry.id
+                      const creatorId  = getEntryCreatorId(entry)
+                      const canEdit    = !sharedMode || creatorId === authUser?.id
                       return (
-                        <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
+                        <div key={entry.id}
+                          style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle, cursor: canEdit && !isDel ? 'pointer' : 'default' }}
+                          onClick={() => canEdit && !isDel && setEditNappy(entry)}>
                           <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.loggedAt)}</span>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 13 }}>
@@ -516,11 +554,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           </div>
                           {isDel ? (
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                              <button onClick={() => setConfirmDel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
-                              <button onClick={() => handleDelete({ id: entry.id, type: 'nappy' })} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); setConfirmDel(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'nappy' }) }} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
                             </div>
                           ) : (
-                            <button onClick={() => setConfirmDel({ id: entry.id, type: 'nappy' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
+                            <button onClick={(e) => { e.stopPropagation(); setConfirmDel({ id: entry.id, type: 'nappy' }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
                           )}
                         </div>
                       )
@@ -547,9 +585,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                     if (entry._type === 'sleep') {
                       const isDel = confirmDel?.id === entry.id
                       const creatorId = getEntryCreatorId(entry)
-                      const canDelete = !sharedMode || !creatorId || creatorId === authUser?.id
+                      const canEdit   = !sharedMode || !creatorId || creatorId === authUser?.id
                       return (
-                        <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
+                        <div key={entry.id}
+                          style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle, cursor: canEdit && !isDel ? 'pointer' : 'default' }}
+                          onClick={() => canEdit && !isDel && setEditSleep(entry)}>
                           <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
@@ -559,13 +599,13 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                             <span style={{ display: 'block', fontSize: 12, color: p.text }}>Sleep · {fmtMins(entry.durationSecs || 0)}</span>
                             <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{timeStr(entry.startedAt)} – {timeStr(entry.endedAt)}</span>
                           </div>
-                          {canDelete && (isDel ? (
+                          {canEdit && (isDel ? (
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                              <button onClick={() => setConfirmDel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
-                              <button onClick={() => handleDelete({ id: entry.id, type: 'sleep' })} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); setConfirmDel(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'sleep' }) }} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
                             </div>
                           ) : (
-                            <button onClick={() => setConfirmDel({ id: entry.id, type: 'sleep' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
+                            <button onClick={(e) => { e.stopPropagation(); setConfirmDel({ id: entry.id, type: 'sleep' }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
                           ))}
                         </div>
                       )
@@ -610,6 +650,14 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       {/* ── Edit feed modal ── */}
       {editSession && (
         <EditFeedModal session={editSession} night={night} onSave={handleSaveEdit} onDelete={handleDeleteFeed} onClose={() => setEditSession(null)} />
+      )}
+
+      {/* ── Edit nappy / sleep (reuse the add modals, prefilled) ── */}
+      {editNappy && (
+        <AddNappyModal night={night} initial={editNappy} onSave={(nappy) => handleEditNappy(editNappy.id, nappy)} onClose={() => setEditNappy(null)} />
+      )}
+      {editSleep && (
+        <AddSleepModal night={night} initial={editSleep} onSave={(sleep) => handleEditSleep(editSleep.id, sleep)} onClose={() => setEditSleep(null)} />
       )}
 
       {/* ── Add type picker ── */}
