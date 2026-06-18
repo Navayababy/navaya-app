@@ -74,7 +74,7 @@ function nextFeedHint(sessions) {
 
 export default function HomeScreen({ night, onNightToggle, setScreen, timer, sleepTimer, authUser, profile, sharedSessions, sharedNappies, sharedSleeps, onSessionSaved, onNappySaved, onSleepSaved }) {
   const p = palette(night)
-  const { feedActive, feedSide, feedType, elapsed, startFeed, stopFeed } = timer
+  const { feedActive, feedSide, feedType, elapsed, startFeed, switchSide, stopFeed } = timer
   const { sleepActive, sleepElapsed, startSleep, stopSleep } = sleepTimer
 
   // Full sorted list (sliced at render): the side suggestion needs the most
@@ -565,6 +565,23 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, sle
           </div>
         ) : (
           <div style={{ padding: '0 14px 14px' }}>
+            {/* Mid-feed side switch — breast feeds only; keeps the clock running */}
+            {feedType !== 'bottle' && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                {['L', 'R'].map(side => {
+                  const isCurrent = side === feedSide
+                  return (
+                    <button key={side} onClick={() => switchSide(side)}
+                      style={{ flex: 1, minHeight: 48, borderRadius: 13, border: `1.5px solid ${isCurrent ? brand.sand : p.border}`, cursor: 'pointer', background: isCurrent ? brand.bark : 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, transition: 'all .2s' }}>
+                      <span style={{ fontSize: 12, fontWeight: 500, letterSpacing: '.06em', textTransform: 'uppercase', color: isCurrent ? brand.sand : p.sub }}>
+                        {side === 'L' ? 'Left' : 'Right'}
+                      </span>
+                      {isCurrent && <span style={{ fontSize: 8, color: brand.sand, letterSpacing: '.04em' }}>on this side</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
             <button onClick={handleStop}
               style={{ width: '100%', minHeight: 56, borderRadius: 14, border: `1.5px solid ${p.heading}`, cursor: 'pointer', background: 'transparent', color: p.heading, fontSize: 14, fontWeight: 500 }}>
               Finish feed
