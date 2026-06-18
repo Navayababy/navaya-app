@@ -10,13 +10,24 @@ const SUGGESTIONS = [
   "My milk supply feels low — what can I do?",
 ]
 
-export default function ChatScreen({ night, messages, setMessages }) {
+export default function ChatScreen({ night, messages, setMessages, seed = '', onSeedConsumed }) {
   const p = palette(night)
   const [input,     setInput]     = useState('')
   const [loading,   setLoading]   = useState(false)
   const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
+
+  // A seeded question from a Home nudge is prefilled (not auto-sent) so the
+  // parent decides whether to ask it. Consumed once on open.
+  useEffect(() => {
+    if (!seed) return
+    setInput(seed)
+    onSeedConsumed?.()
+    const el = textareaRef.current
+    if (el) { el.focus(); el.setSelectionRange(seed.length, seed.length) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })

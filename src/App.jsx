@@ -33,6 +33,9 @@ export default function App() {
   // Chat history lives here so the conversation survives tab changes
   // (screens are conditionally rendered, so ChatScreen unmounts on navigation).
   const [chatMessages, setChatMessages] = useState([])
+  // A question pre-seeded from a Home nudge — prefilled into Sage's input on
+  // open so the parent stays in control of whether to send it.
+  const [chatSeed, setChatSeed] = useState('')
   const [announcement, setAnnouncement] = useState(null)
 
   // Fetch the live broadcast banner once on load. RLS only returns active,
@@ -73,6 +76,9 @@ export default function App() {
     if (nightHint) { setNightHintSeen(); setNightHint(false) }
   }
 
+  // Open Sage, optionally pre-seeding a contextual question from a Home nudge.
+  const askSage = (prompt = '') => { setChatSeed(prompt); setScreen('chat') }
+
   const bg = night ? '#1A1410' : '#F5F0EB'
   const appHeight = viewportHeight ? `${viewportHeight}px` : '100dvh'
 
@@ -104,11 +110,11 @@ export default function App() {
         </div>
       )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} timer={timerProps} sleepTimer={sleepTimerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedSleeps={sharedSleeps} onSessionSaved={refreshSharedSessions} onNappySaved={refreshSharedNappies} onSleepSaved={refreshSharedSleeps} />}
+        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} onAskSage={askSage} timer={timerProps} sleepTimer={sleepTimerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedSleeps={sharedSleeps} onSessionSaved={refreshSharedSessions} onNappySaved={refreshSharedNappies} onSleepSaved={refreshSharedSleeps} />}
         {screen === 'nappy'   && <NappyScreen   night={night} authUser={authUser} profile={profile} sharedNappies={sharedNappies} onNappySaved={refreshSharedNappies} />}
         {screen === 'sleep'   && <SleepScreen   night={night} timer={sleepTimerProps} authUser={authUser} profile={profile} sharedSleeps={sharedSleeps} onSleepSaved={refreshSharedSleeps} />}
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} sharedSleeps={sharedSleeps} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} onRefreshSleeps={refreshSharedSleeps} />}
-        {screen === 'chat'    && <ChatScreen    night={night} messages={chatMessages} setMessages={setChatMessages} />}
+        {screen === 'chat'    && <ChatScreen    night={night} messages={chatMessages} setMessages={setChatMessages} seed={chatSeed} onSeedConsumed={() => setChatSeed('')} />}
         {screen === 'prepare' && <PrepareScreen night={night} setScreen={setScreen} />}
         {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
       </div>

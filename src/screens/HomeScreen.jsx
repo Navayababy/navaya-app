@@ -72,7 +72,7 @@ function nextFeedHint(sessions) {
   return `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}`
 }
 
-export default function HomeScreen({ night, onNightToggle, setScreen, timer, sleepTimer, authUser, profile, sharedSessions, sharedNappies, sharedSleeps, onSessionSaved, onNappySaved, onSleepSaved }) {
+export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage, timer, sleepTimer, authUser, profile, sharedSessions, sharedNappies, sharedSleeps, onSessionSaved, onNappySaved, onSleepSaved }) {
   const p = palette(night)
   const { feedActive, feedSide, feedType, elapsed, startFeed, switchSide, stopFeed } = timer
   const { sleepActive, sleepElapsed, startSleep, stopSleep } = sleepTimer
@@ -337,6 +337,17 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, sle
   const displayName = userName || 'there'
   const babyLabel   = babyName || 'baby'
 
+  // A gentle, context-aware question to pre-seed into Sage when something is
+  // worth asking about; otherwise Sage opens to its usual blank slate.
+  const sageSeed = (() => {
+    if (feedActive || sleepActive) return ''
+    if (lastSession?.endedAt) {
+      const hrs = (Date.now() - new Date(lastSession.endedAt).getTime()) / 3600000
+      if (hrs >= 4) return `It's been about ${Math.floor(hrs)} hours since ${babyLabel}'s last feed. Is that normal, or should I offer one?`
+    }
+    return ''
+  })()
+
   // Prepare checklist progress for the card below. Read once on mount — the
   // screen remounts on every tab change, so it stays fresh after editing.
   const [prepProgress] = useState(() => {
@@ -506,7 +517,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, sle
                   ? `Next feed likely around ${nextFeed}`
                   : `Next feed: ${suggested === 'L' ? 'Left' : 'Right'} side`}
           </span>
-          <button onClick={() => setScreen('chat')}
+          <button onClick={() => onAskSage(sageSeed)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: brand.sand, fontSize: 11, fontWeight: 500, letterSpacing: '.02em', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
             ✦ Ask Sage
           </button>
@@ -742,7 +753,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, timer, sle
       </button>
 
       {/* ── Sage entry point ── */}
-      <button onClick={() => setScreen('chat')}
+      <button onClick={() => onAskSage('')}
         style={{ display: 'block', width: 'calc(100% - 28px)', margin: '12px 14px 0', background: brand.bark, borderRadius: 14, border: 'none', padding: '14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ flex: 1, marginRight: 10 }}>
