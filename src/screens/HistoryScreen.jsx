@@ -365,8 +365,15 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       </div>
 
       <div style={{ padding: '0 14px 10px' }}>
-        <button onClick={() => setShowInsights(v => !v)} style={{ width: '100%', border: `1px solid ${p.border}`, borderRadius: 12, background: p.card, color: p.text, padding: '10px 12px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
-          {showInsights ? 'Back to logbook' : 'View weekly insights'}
+        <button onClick={() => setShowInsights(v => !v)} style={{ width: '100%', border: `1px solid ${p.border}`, borderRadius: 12, background: p.card, color: p.text, padding: '12px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, WebkitTapHighlightColor: 'transparent' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left' }}>
+            <span aria-hidden="true" style={{ color: brand.sand, fontSize: 14 }}>✦</span>
+            <span>
+              <span style={{ display: 'block', color: p.text, fontWeight: 500 }}>{showInsights ? 'Back to your logbook' : "This week's gentle patterns"}</span>
+              {!showInsights && <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 1 }}>A calm look at the last 7 days — no pressure.</span>}
+            </span>
+          </span>
+          <span style={{ color: p.sub, fontSize: 14, flexShrink: 0, transform: showInsights ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }}>›</span>
         </button>
       </div>
 
