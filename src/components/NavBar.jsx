@@ -47,7 +47,7 @@ export default function NavBar({ screen, setScreen, night, feedActive, sleepActi
             <span style={{ fontSize: 17, color: active ? p.navActive : p.sub, transition: 'color .2s', lineHeight: 1 }}>
               {tab.icon}
             </span>
-            <span style={{ fontSize: 9, fontWeight: active ? 600 : 400, color: active ? p.navActive : p.sub, letterSpacing: '.02em', fontFamily: "'DM Sans', sans-serif", lineHeight: 1 }}>
+            <span style={{ fontSize: 9, fontWeight: active ? 600 : 400, color: active ? p.navActive : p.sub, letterSpacing: '.02em', fontFamily: "'Jost', sans-serif", lineHeight: 1 }}>
               {tab.label}
             </span>
             {/* Live indicator dot — shows when a feed or sleep is running on another screen */}

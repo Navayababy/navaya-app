@@ -10,7 +10,7 @@ export function makeModalStyles(p) {
       padding: '11px 13px',
       fontSize: 16,
       color: p.text,
-      fontFamily: "'DM Sans', sans-serif",
+      fontFamily: "'Jost', sans-serif",
       outline: 'none',
       boxSizing: 'border-box',
     },

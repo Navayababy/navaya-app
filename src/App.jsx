@@ -72,7 +72,7 @@ export default function App() {
     }}>
       {announcement && <AnnouncementBanner night={night} announcement={announcement} onDismiss={dismissBanner} />}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} timer={timerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onSessionSaved={refreshSharedSessions} />}
+        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} timer={timerProps} sleepTimer={sleepTimerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedSleeps={sharedSleeps} onSessionSaved={refreshSharedSessions} onNappySaved={refreshSharedNappies} onSleepSaved={refreshSharedSleeps} />}
         {screen === 'nappy'   && <NappyScreen   night={night} authUser={authUser} profile={profile} sharedNappies={sharedNappies} onNappySaved={refreshSharedNappies} />}
         {screen === 'sleep'   && <SleepScreen   night={night} timer={sleepTimerProps} authUser={authUser} profile={profile} sharedSleeps={sharedSleeps} onSleepSaved={refreshSharedSleeps} />}
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} sharedSleeps={sharedSleeps} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} onRefreshSleeps={refreshSharedSleeps} />}

@@ -10,19 +10,19 @@ html, body, #root {
 }
 
 body {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Jost', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
 }
 
 button {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Jost', sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 
 input, textarea {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Jost', sans-serif;
 }
 
 /* Hide scrollbars but keep functionality */

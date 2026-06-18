@@ -42,7 +42,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
   const inputStyle = {
     width: '100%', background: p.bg, border: `1px solid ${p.border}`,
     borderRadius: 11, padding: '11px 13px', fontSize: 15, color: p.text,
-    fontFamily: "'DM Sans', sans-serif", outline: 'none', boxSizing: 'border-box',
+    fontFamily: "'Jost', sans-serif", outline: 'none', boxSizing: 'border-box',
   }
 
   const labelStyle = {
@@ -244,7 +244,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
             <button
               type="button"
               onClick={() => setShowPassword(v => !v)}
-              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: p.sub, fontSize: 12, padding: '4px 4px', fontFamily: "'DM Sans', sans-serif" }}
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: p.sub, fontSize: 12, padding: '4px 4px', fontFamily: "'Jost', sans-serif" }}
             >
               {showPassword ? 'Hide' : 'Show'}
             </button>
@@ -492,7 +492,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
             background: brand.bark,
             color: brand.sand,
             fontSize: 14,
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: "'Jost', sans-serif",
             fontWeight: 500,
             textAlign: 'center',
             textDecoration: 'none',

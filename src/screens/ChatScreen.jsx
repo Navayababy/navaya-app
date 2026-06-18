@@ -184,7 +184,7 @@ export default function ChatScreen({ night, messages, setMessages }) {
             padding:     '10px 13px',
             fontSize:    13,
             color:       p.text,
-            fontFamily:  "'DM Sans', sans-serif",
+            fontFamily:  "'Jost', sans-serif",
             resize:      'none',
             outline:     'none',
             lineHeight:  1.4,

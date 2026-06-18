@@ -107,7 +107,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   const inputStyle = {
     background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11,
     padding: '10px 12px', fontSize: 14, color: p.text,
-    fontFamily: "'DM Sans', sans-serif", outline: 'none',
+    fontFamily: "'Jost', sans-serif", outline: 'none',
   }
 
   return (

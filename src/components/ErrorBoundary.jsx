@@ -45,7 +45,7 @@ export default class ErrorBoundary extends Component {
             borderRadius: 13,
             padding: '13px 28px',
             fontSize: 14,
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: "'Jost', sans-serif",
             cursor: 'pointer',
           }}
         >

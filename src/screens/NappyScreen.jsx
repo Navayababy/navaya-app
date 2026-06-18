@@ -112,7 +112,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
   const inputStyle = {
     background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11,
     padding: '10px 12px', fontSize: 14, color: p.text,
-    fontFamily: "'DM Sans', sans-serif", outline: 'none',
+    fontFamily: "'Jost', sans-serif", outline: 'none',
   }
 
   return (
@@ -148,7 +148,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
           {['wet', 'poo', 'both'].map(t => (
             <button key={t} style={btnStyle(t)} onClick={() => setType(t)}>
               <span style={{ fontSize: t === 'both' ? 18 : 22, lineHeight: 1 }}>{TYPE_META[t].emoji}</span>
-              <span style={{ fontSize: 12, fontWeight: 500, fontFamily: "'DM Sans', sans-serif" }}>{TYPE_META[t].label}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, fontFamily: "'Jost', sans-serif" }}>{TYPE_META[t].label}</span>
             </button>
           ))}
         </div>
