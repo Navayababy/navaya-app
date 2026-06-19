@@ -3,9 +3,8 @@ import { brand, palette } from '../theme.js'
 import { getSessions, addSession, updateSession, getBabyName, setBabyName, getUserName, setUserName, getChecked, getCustomItems, getHiddenDefaults, getNappies, addNappy, getSleeps, addSleep } from '../lib/storage.js'
 import { PREPARE_DEFAULT_ITEMS } from '../lib/constants.js'
 import { syncWrite } from '../lib/sync.js'
-import { fmt, fmtSince, fmtMins, fmtDayTime } from '../utils/time.js'
+import { fmt, fmtSince } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeSleep, isBottleFeed, feedTypeOf } from '../lib/normalize.js'
-import { bottleLabel } from '../lib/constants.js'
 import { newId } from '../lib/id.js'
 
 const QUOTES = [
@@ -149,17 +148,6 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
   const sinceNappy = lastNappy ? fmtSince(lastNappy.loggedAt) : null
   const sinceSleep = lastSleep && !sleepActive ? fmtSince(lastSleep.endedAt) : null
   const nextFeed   = !feedActive ? nextFeedHint(sessions) : null
-
-  // Merged recent timeline — last five events across feeds, nappies and sleeps.
-  const timeline = useMemo(() => {
-    const feedItems  = sessions.map(s => ({ kind: 'feed',  id: s.id, at: s.endedAt || s.startedAt, data: s, loggedBy: s.loggedBy }))
-    const nappyItems = nappies.map(n => ({ kind: 'nappy', id: n.id, at: n.loggedAt,                data: n, loggedBy: n.loggedBy }))
-    const sleepItems = sleeps.map(s => ({ kind: 'sleep',  id: s.id, at: s.endedAt,                 data: s, loggedBy: s.loggedBy }))
-    return [...feedItems, ...nappyItems, ...sleepItems]
-      .filter(e => e.at)
-      .sort((a, b) => new Date(b.at) - new Date(a.at))
-      .slice(0, 3)
-  }, [sessions, nappies, sleeps])
 
   // The feed is saved the moment it stops — the mood check-in only patches it
   // afterwards, so navigating away or closing the app can never lose the feed.
@@ -367,36 +355,9 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
     </div>
   )
 
-  const TIMELINE_META = {
-    feed:  { icon: '◉', tint: brand.sand },
-    nappy: { icon: '◈', tint: brand.accent },
-    sleep: { icon: '☾', tint: brand.green },
-  }
-
-  const timelineRow = (e, isLast) => {
-    const meta = TIMELINE_META[e.kind]
-    let title = ''
-    if (e.kind === 'feed')  title = isBottleFeed(e.data) ? bottleLabel(e.data) : `${e.data.side === 'L' ? 'Left' : 'Right'} feed`
-    if (e.kind === 'nappy') title = e.data.type === 'wet' ? 'Wee' : e.data.type === 'poo' ? 'Poo' : 'Wee & poo'
-    if (e.kind === 'sleep') title = `Slept ${fmtMins(e.data.durationSecs || 0)}`
-    const byPartner = e.loggedBy && authUser && e.loggedBy !== authUser.id
-    return (
-      <div key={`${e.kind}-${e.id}`} style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: isLast ? 'none' : `1px solid ${p.border}` }}>
-        <div style={{ width: 30, height: 30, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 11, flexShrink: 0, color: meta.tint, fontSize: 14 }}>
-          {meta.icon}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500 }}>{title}</span>
-          <span style={{ display: 'block', fontSize: 11, color: p.sub }}>
-            {fmtDayTime(e.at)}{byPartner && <span style={{ color: brand.green }}> · shared</span>}
-          </span>
-        </div>
-        {e.kind === 'feed' && (
-          <span style={{ fontSize: 12, color: p.sub, flexShrink: 0 }}>{fmt(e.data.durationSecs)}</span>
-        )}
-      </div>
-    )
-  }
+  // Consistent styling for the navigation cluster cards (Logbook, Sage, Going out).
+  const navCardStyle = { display: 'flex', alignItems: 'center', gap: 12, width: 'calc(100% - 28px)', margin: '10px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '13px 14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }
+  const navIconStyle = { width: 34, height: 34, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15 }
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg }}>
@@ -482,8 +443,8 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
             {profile?.household_id ? '● Sharing' : '⊕ Account'}
           </button>
           <button onClick={onNightToggle} aria-label={night ? 'Switch to light mode' : 'Switch to night mode'}
-            style={{ background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '5px 12px', cursor: 'pointer', color: p.sub, fontSize: 11 }}>
-            {night ? '☀' : '☽'}
+            style={{ background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '5px 12px', cursor: 'pointer', color: p.sub, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span aria-hidden="true">{night ? '☀' : '☽'}</span>{night ? 'Day' : 'Night'}
           </button>
         </div>
       </div>
@@ -500,7 +461,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
           <div style={{ width: 1, alignSelf: 'stretch', background: p.border }} />
           {heroStat('Last nappy', sinceNappy === 'just now' ? 'just now' : sinceNappy || '—')}
           <div style={{ width: 1, alignSelf: 'stretch', background: p.border }} />
-          {heroStat('Sleep',
+          {heroStat('Last sleep',
             sleepActive ? fmtClock(sleepElapsed) : (sinceSleep === 'just now' ? 'just now' : sinceSleep || '—'),
             sleepActive ? brand.green : undefined)}
         </div>
@@ -556,7 +517,6 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
                   <span style={{ fontSize: 12, fontWeight: 500, letterSpacing: '.06em', textTransform: 'uppercase', color: isNext ? brand.sand : p.text }}>
                     {side === 'L' ? 'Left' : 'Right'}
                   </span>
-                  {isNext && <span style={{ fontSize: 9, color: brand.sand }}>suggested</span>}
                 </button>
               )
             })}
@@ -708,62 +668,43 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
         </div>
       )}
 
-      {/* ── Recent timeline preview ── */}
-      <div style={{ padding: '16px 14px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <span style={{ fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase' }}>Recent</span>
-          <button onClick={() => setScreen('history')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: brand.sand, fontWeight: 500 }}>
-            View all ›
-          </button>
+      {/* ── Navigation cluster: history, utility and companion ── */}
+      <button onClick={() => setScreen('history')} style={navCardStyle}>
+        <span style={{ ...navIconStyle, color: brand.sand }}>≡</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: p.text }}>Logbook</span>
+          <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 1 }}>Your full feed, nappy and sleep history</span>
         </div>
-        {timeline.length === 0 ? (
-          <span style={{ fontSize: 13, color: p.sub }}>Nothing logged yet. Start a feed, nappy or sleep above to begin.</span>
-        ) : (
-          timeline.map((e, i) => timelineRow(e, i === timeline.length - 1))
-        )}
-      </div>
-
-      {/* ── Prepare to go out ── */}
-      <button onClick={() => setScreen('prepare')}
-        style={{ display: 'block', width: 'calc(100% - 28px)', margin: '16px 14px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>
-              Going out?
-            </span>
-            <span style={{ display: 'block', fontSize: 13, color: p.text, lineHeight: 1.45 }}>
-              Run through the prepare checklist before you leave.
-            </span>
-            <span style={{ display: 'block', fontSize: 11, color: prepProgress.done === prepProgress.total && prepProgress.total > 0 ? brand.green : p.sub, marginTop: 6, fontWeight: 500 }}>
-              {prepProgress.done === prepProgress.total && prepProgress.total > 0
-                ? '✓ All packed'
-                : `${prepProgress.done}/${prepProgress.total} packed`}
-            </span>
-          </div>
-          <span style={{ color: p.sub, fontSize: 16, flexShrink: 0, marginLeft: 10 }}>›</span>
-        </div>
+        <span style={{ color: p.sub, fontSize: 16, flexShrink: 0 }}>›</span>
       </button>
 
-      {/* ── Sage entry point ── */}
-      <button onClick={() => onAskSage('')}
-        style={{ display: 'block', width: 'calc(100% - 28px)', margin: '12px 14px 0', background: brand.bark, borderRadius: 14, border: 'none', padding: '14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ flex: 1, marginRight: 10 }}>
-            <span style={{ display: 'block', fontSize: 10, color: brand.sand, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 5 }}>
-              ✦ Sage
-            </span>
-            <span style={{ display: 'block', fontSize: 13, color: brand.parchment, lineHeight: 1.45 }}>
-              A knowledgeable friend who's always awake. Ask anything about feeding, day or night.
-            </span>
-          </div>
-          <span style={{ color: brand.sand, fontSize: 16, flexShrink: 0 }}>›</span>
+      <button onClick={() => onAskSage('')} style={navCardStyle}>
+        <span style={{ ...navIconStyle, color: brand.sand }}>✦</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: p.text }}>Sage</span>
+          <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 1 }}>Ask anything about feeding, day or night</span>
         </div>
+        <span style={{ color: p.sub, fontSize: 16, flexShrink: 0 }}>›</span>
       </button>
 
-      {/* ── Editorial closing note ── */}
-      <div style={{ padding: '22px 26px 4px' }}>
-        <p style={{ fontSize: 13, color: p.sub, fontStyle: 'italic', lineHeight: 1.5, fontFamily: "'Cormorant Garamond', serif", margin: 0, textAlign: 'center', opacity: 0.85 }}>
+      <button onClick={() => setScreen('prepare')} style={navCardStyle}>
+        <span style={navIconStyle}>🎒</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: p.text }}>Going out</span>
+          <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 1 }}>Nappy-bag checklist before you leave</span>
+        </div>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: prepProgress.done === prepProgress.total && prepProgress.total > 0 ? brand.green : p.sub, fontWeight: 500 }}>
+            {prepProgress.done === prepProgress.total && prepProgress.total > 0 ? '✓ Packed' : `${prepProgress.done}/${prepProgress.total}`}
+          </span>
+          <span style={{ color: p.sub, fontSize: 16 }}>›</span>
+        </span>
+      </button>
+
+      {/* ── Editorial daily note ── */}
+      <div style={{ padding: '28px 26px 6px', textAlign: 'center' }}>
+        <span aria-hidden="true" style={{ display: 'block', fontSize: 13, color: brand.sand, marginBottom: 8 }}>✦</span>
+        <p style={{ fontSize: 15, color: p.sub, fontStyle: 'italic', lineHeight: 1.55, fontFamily: "'Cormorant Garamond', serif", margin: 0 }}>
           "{quote}"
         </p>
       </div>
