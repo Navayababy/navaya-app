@@ -3,7 +3,7 @@ import { brand, palette } from '../theme.js'
 // Owner-published broadcast banner. Content is rendered as plain text (never
 // HTML) plus one optional link, so a published message can carry no markup or
 // script. Styling follows the app's editorial card language: a soft tinted
-// badge, an eyebrow label, a Cormorant Garamond title and a DM Sans body.
+// badge, an eyebrow label, a Cormorant Garamond title and a Jost body.
 const TYPE_META = {
   info:    { eyebrow: 'Update',      icon: '🌿', accent: brand.sand },
   feature: { eyebrow: 'New',         icon: '✨', accent: brand.green },

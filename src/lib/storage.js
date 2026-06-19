@@ -12,6 +12,7 @@ const KEYS = {
   medicines:      'navaya_medicines',
   sleeps:         'navaya_sleeps',
   nightMode:      'navaya_night',
+  nightHintSeen:  'navaya_night_hint_seen',
   babyName:       'navaya_baby_name',
   userName:       'navaya_user_name',
   activeTimer:    'navaya_active_timer',
@@ -217,6 +218,20 @@ export function getNightMode() {
 
 export function setNightMode(val) {
   localStorage.setItem(KEYS.nightMode, String(val));
+}
+
+// Whether the user has ever made an explicit night-mode choice. When false,
+// the app can auto-apply night mode after dark without overriding a choice.
+export function hasNightPref() {
+  return localStorage.getItem(KEYS.nightMode) !== null;
+}
+
+export function getNightHintSeen() {
+  return localStorage.getItem(KEYS.nightHintSeen) === 'true';
+}
+
+export function setNightHintSeen() {
+  localStorage.setItem(KEYS.nightHintSeen, 'true');
 }
 
 export function getUserName() {

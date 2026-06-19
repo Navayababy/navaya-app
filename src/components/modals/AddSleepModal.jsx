@@ -5,9 +5,12 @@ import { newId } from '../../lib/id.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
 
-export default function AddSleepModal({ night, onSave, onClose }) {
+// `initial` switches the modal into edit mode: fields are pre-filled and the
+// title/button reflect editing. The caller decides how to persist the result.
+export default function AddSleepModal({ night, onSave, onClose, initial = null }) {
   const p = palette(night)
   const { input: inputStyle, label: labelStyle } = makeModalStyles(p)
+  const editing = !!initial
 
   // The date field is the sleep's START date. Seed it from the default start
   // time (an hour ago), so opening the modal just after midnight defaults to
@@ -15,9 +18,9 @@ export default function AddSleepModal({ night, onSave, onClose }) {
   const now              = new Date()
   const defaultStartDate = new Date(now.getTime() - 60 * 60 * 1000)
 
-  const [date,      setDate]      = useState(dateStr(defaultStartDate))
-  const [startTime, setStartTime] = useState(timeStr(defaultStartDate))
-  const [endTime,   setEndTime]   = useState(timeStr(now))
+  const [date,      setDate]      = useState(initial ? dateStr(initial.startedAt) : dateStr(defaultStartDate))
+  const [startTime, setStartTime] = useState(initial ? timeStr(initial.startedAt) : timeStr(defaultStartDate))
+  const [endTime,   setEndTime]   = useState(initial ? timeStr(initial.endedAt)   : timeStr(now))
 
   const handleSave = () => {
     const startedAt = buildISO(date, startTime)
@@ -33,7 +36,7 @@ export default function AddSleepModal({ night, onSave, onClose }) {
   }
 
   return (
-    <ModalShell title="Add sleep" night={night} onClose={onClose}>
+    <ModalShell title={editing ? 'Edit sleep' : 'Add sleep'} night={night} onClose={onClose}>
       <span style={labelStyle}>Date</span>
       <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, marginBottom: 14 }} />
 
@@ -48,7 +51,7 @@ export default function AddSleepModal({ night, onSave, onClose }) {
       </span>
 
       <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-        Add sleep
+        {editing ? 'Save changes' : 'Add sleep'}
       </button>
     </ModalShell>
   )

@@ -35,7 +35,7 @@ Navaya is a mobile-first React SPA (max-width 430px) for breastfeeding tracking.
 
 **AI chat** — `ChatScreen` POSTs conversation history to `/api/chat`, a Vercel serverless function that streams from the Anthropic API (claude-sonnet-4-6) keeping the API key server-side.
 
-**Theming** — `src/theme.js` exports `light`, `dark`, and `brand` colour palettes. Every component calls `palette(night)` to get the active colours. Night mode preference is persisted via `storage.js`. Typography uses Cormorant Garamond (headings/display) and DM Sans (body/UI), loaded from Google Fonts.
+**Theming** — `src/theme.js` exports `light`, `dark`, and `brand` colour palettes. Every component calls `palette(night)` to get the active colours. Night mode preference is persisted via `storage.js`. Typography uses Cormorant Garamond (headings/display) and Jost (body/UI), loaded from Google Fonts.
 
 **Language** — UK English throughout ("nappy", "wee/poo", "mum"). The history tab is called the **Logbook** in all user-facing copy.
 

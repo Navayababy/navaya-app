@@ -177,7 +177,7 @@ export default function PrepareScreen({ night, setScreen }) {
               padding:     '10px 13px',
               fontSize:    13,
               color:       p.text,
-              fontFamily:  "'DM Sans', sans-serif",
+              fontFamily:  "'Jost', sans-serif",
               outline:     'none',
             }}
           />

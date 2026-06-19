@@ -31,6 +31,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   const [startTime,  setStartTime]  = useState('13:00')
   const [endTime,    setEndTime]    = useState('14:00')
   const [confirmDel, setConfirmDel] = useState(null)
+  const [showAll,    setShowAll]    = useState(false)
 
   // Keep the list in sync with shared sleeps when in shared mode.
   // Skipped while the user is composing a manual entry.
@@ -107,7 +108,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   const inputStyle = {
     background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11,
     padding: '10px 12px', fontSize: 14, color: p.text,
-    fontFamily: "'DM Sans', sans-serif", outline: 'none',
+    fontFamily: "'Jost', sans-serif", outline: 'none',
   }
 
   return (
@@ -214,12 +215,12 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
         {sleeps.length === 0 ? (
           <span style={{ fontSize: 13, color: p.sub }}>No sleeps logged yet. Tap the button above when {babyDisplayName(true)} drifts off.</span>
         ) : (
-          sleeps.slice(0, 14).map((s, i) => {
+          (showAll ? sleeps : sleeps.slice(0, 5)).map((s, i, shown) => {
             const canDelete = !sharedMode || !s.loggedBy || s.loggedBy === authUser?.id
             return (
             <div key={s.id} style={{
               display: 'flex', alignItems: 'center', padding: '10px 0',
-              borderBottom: i < Math.min(sleeps.length, 14) - 1 ? `1px solid ${p.border}` : 'none',
+              borderBottom: i < shown.length - 1 ? `1px solid ${p.border}` : 'none',
             }}>
               <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.card, border: `1px solid ${p.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0, fontSize: 12 }}>
                 😴
@@ -243,6 +244,13 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
             </div>
             )
           })
+        )}
+
+        {sleeps.length > 5 && (
+          <button onClick={() => setShowAll(v => !v)}
+            style={{ width: '100%', marginTop: 10, padding: '10px', borderRadius: 11, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 12, color: p.sub, fontWeight: 500 }}>
+            {showAll ? 'Show fewer' : `Show all ${sleeps.length}`}
+          </button>
         )}
       </div>
 

@@ -43,6 +43,14 @@ export function useFeedTimer() {
     setActiveTimer(side, now, type)
   }
 
+  // Switch the recorded breast mid-feed without resetting the clock — the
+  // elapsed time and start timestamp are preserved, only the side changes.
+  const switchSide = (side) => {
+    if (feedType === 'bottle') return
+    setFeedSide(side)
+    setActiveTimer(side, feedStartedAtRef.current, feedType)
+  }
+
   const stopFeed = () => {
     clearInterval(timerRef.current)
     setFeedActive(false)
@@ -59,5 +67,5 @@ export function useFeedTimer() {
     }
   }
 
-  return { feedActive, feedSide, feedType, elapsed, startFeed, stopFeed }
+  return { feedActive, feedSide, feedType, elapsed, startFeed, switchSide, stopFeed }
 }

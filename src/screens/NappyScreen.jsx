@@ -35,6 +35,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
   const [editingTime,  setEditingTime]  = useState(false)
   const [justLogged,   setJustLogged]   = useState(false)
   const [confirmDel,   setConfirmDel]   = useState(null)
+  const [showAll,      setShowAll]      = useState(false)
 
   // Guard: don't overwrite state while user is actively composing a nappy entry.
   // Runs for an empty array too, so the list clears when the household has no entries.
@@ -112,7 +113,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
   const inputStyle = {
     background: p.bg, border: `1px solid ${p.border}`, borderRadius: 11,
     padding: '10px 12px', fontSize: 14, color: p.text,
-    fontFamily: "'DM Sans', sans-serif", outline: 'none',
+    fontFamily: "'Jost', sans-serif", outline: 'none',
   }
 
   return (
@@ -148,7 +149,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
           {['wet', 'poo', 'both'].map(t => (
             <button key={t} style={btnStyle(t)} onClick={() => setType(t)}>
               <span style={{ fontSize: t === 'both' ? 18 : 22, lineHeight: 1 }}>{TYPE_META[t].emoji}</span>
-              <span style={{ fontSize: 12, fontWeight: 500, fontFamily: "'DM Sans', sans-serif" }}>{TYPE_META[t].label}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, fontFamily: "'Jost', sans-serif" }}>{TYPE_META[t].label}</span>
             </button>
           ))}
         </div>
@@ -223,14 +224,14 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
         {nappies.length === 0 ? (
           <span style={{ fontSize: 13, color: p.sub }}>No nappies logged yet. Tap a type above to begin.</span>
         ) : (
-          nappies.slice(0, 20).map((n, i) => {
+          (showAll ? nappies : nappies.slice(0, 5)).map((n, i, shown) => {
             const meta  = TYPE_META[n.type]
             const pooC  = POO_COLORS.find(c => c.id === n.pooColor)
             return (
               <div key={n.id} style={{
                 display: 'flex', alignItems: 'center',
                 padding: '10px 0',
-                borderBottom: i < Math.min(nappies.length, 20) - 1 ? `1px solid ${p.border}` : 'none',
+                borderBottom: i < shown.length - 1 ? `1px solid ${p.border}` : 'none',
               }}>
                 {/* Type dot */}
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: meta.dot, marginRight: 10, flexShrink: 0 }} />
@@ -263,6 +264,13 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
               </div>
             )
           })
+        )}
+
+        {nappies.length > 5 && (
+          <button onClick={() => setShowAll(v => !v)}
+            style={{ width: '100%', marginTop: 10, padding: '10px', borderRadius: 11, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 12, color: p.sub, fontWeight: 500 }}>
+            {showAll ? 'Show fewer' : `Show all ${nappies.length}`}
+          </button>
         )}
       </div>
 

@@ -1,19 +1,22 @@
 import { useState } from 'react'
 import { brand, palette } from '../../theme.js'
-import { timeStr, todayDateStr } from '../../utils/time.js'
+import { timeStr, todayDateStr, dateStr } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { POO_COLORS } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
 
-export default function AddNappyModal({ night, onSave, onClose }) {
+// `initial` switches the modal into edit mode: fields are pre-filled and the
+// title/button reflect editing. The caller decides how to persist the result.
+export default function AddNappyModal({ night, onSave, onClose, initial = null }) {
   const p = palette(night)
   const { input: inputStyle, label: labelStyle } = makeModalStyles(p)
+  const editing = !!initial
 
-  const [type,     setType]     = useState('wet')
-  const [pooColor, setPooColor] = useState('mustard')
-  const [date,     setDate]     = useState(todayDateStr())
-  const [logTime,  setLogTime]  = useState(timeStr())
+  const [type,     setType]     = useState(initial?.type ?? 'wet')
+  const [pooColor, setPooColor] = useState(initial?.pooColor ?? 'mustard')
+  const [date,     setDate]     = useState(initial ? dateStr(initial.loggedAt) : todayDateStr())
+  const [logTime,  setLogTime]  = useState(initial ? timeStr(initial.loggedAt) : timeStr())
 
   const needsColor = type === 'poo' || type === 'both'
 
@@ -25,7 +28,7 @@ export default function AddNappyModal({ night, onSave, onClose }) {
   }
 
   return (
-    <ModalShell title="Log nappy" night={night} onClose={onClose}>
+    <ModalShell title={editing ? 'Edit nappy' : 'Log nappy'} night={night} onClose={onClose}>
       <span style={labelStyle}>Type</span>
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
         {[
@@ -68,7 +71,7 @@ export default function AddNappyModal({ night, onSave, onClose }) {
       </div>
 
       <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-        Log nappy
+        {editing ? 'Save changes' : 'Log nappy'}
       </button>
     </ModalShell>
   )
