@@ -391,17 +391,24 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
               </button>
             </div>
           ) : (
-            <button onClick={openNameEdit} aria-label="Edit your name"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, lineHeight: 1.1 }}>
-                {displayName}
-              </span>
-              {babyName && <span style={{ fontSize: 12, color: p.sub }}>· {babyName}</span>}
-              <span aria-hidden="true" style={{ fontSize: 11, color: p.sub }}>✎</span>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+              <button onClick={openNameEdit} aria-label="Edit your name"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, lineHeight: 1.1 }}>
+                  {displayName}
+                </span>
+                <span aria-hidden="true" style={{ fontSize: 11, color: p.sub }}>✎</span>
+              </button>
+              {babyName && !editingBaby && (
+                <button onClick={openBabyEdit} aria-label="Edit baby name"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <span style={{ fontSize: 12, color: p.sub }}>· {babyName}</span>
+                </button>
+              )}
+            </div>
           )}
 
-          {/* Baby name — shown inline above; this editor appears on demand */}
+          {/* First-time add, and the inline editor for an existing name */}
           {!babyName && !editingBaby && (
             <button onClick={openBabyEdit} aria-label="Add baby name"
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -428,12 +435,6 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
                 Save
               </button>
             </div>
-          )}
-          {babyName && !editingBaby && (
-            <button onClick={openBabyEdit} aria-label="Edit baby name"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 2, fontSize: 11, color: p.sub }}>
-              edit baby
-            </button>
           )}
         </div>
 
@@ -688,7 +689,13 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
       </button>
 
       <button onClick={() => setScreen('prepare')} style={navCardStyle}>
-        <span style={navIconStyle}>🎒</span>
+        <span style={navIconStyle}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={brand.sand} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="7" width="18" height="13" rx="2" />
+            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <path d="M3 13h18" />
+          </svg>
+        </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: p.text }}>Going out</span>
           <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 1 }}>Nappy-bag checklist before you leave</span>
