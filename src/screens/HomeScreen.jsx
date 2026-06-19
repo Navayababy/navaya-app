@@ -158,7 +158,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
     return [...feedItems, ...nappyItems, ...sleepItems]
       .filter(e => e.at)
       .sort((a, b) => new Date(b.at) - new Date(a.at))
-      .slice(0, 5)
+      .slice(0, 3)
   }, [sessions, nappies, sleeps])
 
   // The feed is saved the moment it stops — the mood check-in only patches it
@@ -524,13 +524,6 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
         </div>
       </div>
 
-      {/* ── Editorial quote ── */}
-      <div style={{ padding: '12px 18px 2px' }}>
-        <p style={{ fontSize: 14, color: p.sub, fontStyle: 'italic', lineHeight: 1.55, fontFamily: "'Cormorant Garamond', serif", margin: 0, textAlign: 'center' }}>
-          "{quote}"
-        </p>
-      </div>
-
       {/* ── Feed timer card (primary quick-log) ── */}
       <div style={{ margin: '12px 14px 0', background: p.card, borderRadius: CARD_RADIUS, border: `1px solid ${p.border}` }}>
         <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -721,7 +714,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
           <span style={{ fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase' }}>Recent</span>
           <button onClick={() => setScreen('history')}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: brand.sand, fontWeight: 500 }}>
-            Logbook ›
+            View all ›
           </button>
         </div>
         {timeline.length === 0 ? (
@@ -768,8 +761,15 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
         </div>
       </button>
 
+      {/* ── Editorial closing note ── */}
+      <div style={{ padding: '22px 26px 4px' }}>
+        <p style={{ fontSize: 13, color: p.sub, fontStyle: 'italic', lineHeight: 1.5, fontFamily: "'Cormorant Garamond', serif", margin: 0, textAlign: 'center', opacity: 0.85 }}>
+          "{quote}"
+        </p>
+      </div>
+
       {/* ── Instagram link ── */}
-      <div style={{ padding: '20px 14px 28px', textAlign: 'center' }}>
+      <div style={{ padding: '14px 14px 28px', textAlign: 'center' }}>
         <a
           href="https://www.instagram.com/navaya.life"
           target="_blank"

@@ -120,30 +120,6 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
   const sleepTodaySecs = useMemo(() => sleepSecsOnDay(sleepList), [sleepList])
 
-  // Same last-7-days window as the insights panel, so the summary strip and
-  // the insights never disagree about what "this week" means.
-  const weekFeeds = useMemo(() => {
-    const start = new Date()
-    start.setHours(0, 0, 0, 0)
-    start.setDate(start.getDate() - 6)
-    return feeds.filter(s => new Date(s.startedAt) >= start)
-  }, [feeds])
-
-  // Average duration covers breast feeds only — bottle feeds are measured in ml
-  const weekAvgDuration = useMemo(() => {
-    const breast = weekFeeds.filter(s => !isBottleFeed(s))
-    if (!breast.length) return 0
-    return Math.round(breast.reduce((a, s) => a + (s.durationSecs || 0), 0) / breast.length)
-  }, [weekFeeds])
-
-  const weekBottleMl = useMemo(() =>
-    weekFeeds.filter(isBottleFeed).reduce((a, s) => a + (s.amountMl || 0), 0)
-  , [weekFeeds])
-
-  const leftCount  = weekFeeds.filter(s => s.side === 'L').length
-  const rightCount = weekFeeds.filter(s => s.side === 'R').length
-  const weekMood   = useMemo(() => averageFeedMood(weekFeeds), [weekFeeds])
-
   const fmtGap = (mins) => {
     if (mins == null) return '—'
     const h = Math.floor(mins / 60)
@@ -343,8 +319,9 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
             </div>
           )}
         </div>
-        <button onClick={() => setAddMode('picker')} style={{ width: 36, height: 36, borderRadius: '50%', background: brand.bark, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-          <span style={{ color: brand.sand, fontSize: 22, lineHeight: 1, marginTop: -1 }}>+</span>
+        <button onClick={() => setAddMode('picker')} aria-label="Add entry" style={{ display: 'flex', alignItems: 'center', gap: 6, background: brand.bark, border: 'none', borderRadius: 20, padding: '8px 15px 8px 13px', cursor: 'pointer', marginBottom: 4, WebkitTapHighlightColor: 'transparent' }}>
+          <span style={{ color: brand.sand, fontSize: 17, lineHeight: 1, marginTop: -1 }}>+</span>
+          <span style={{ color: brand.sand, fontSize: 13, fontWeight: 500 }}>Add</span>
         </button>
       </div>
 
@@ -365,14 +342,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       </div>
 
       <div style={{ padding: '0 14px 10px' }}>
-        <button onClick={() => setShowInsights(v => !v)} style={{ width: '100%', border: `1px solid ${p.border}`, borderRadius: 12, background: p.card, color: p.text, padding: '12px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, WebkitTapHighlightColor: 'transparent' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left' }}>
-            <span aria-hidden="true" style={{ color: brand.sand, fontSize: 14 }}>✦</span>
-            <span>
-              <span style={{ display: 'block', color: p.text, fontWeight: 500 }}>{showInsights ? 'Back to your logbook' : "This week's gentle patterns"}</span>
-              {!showInsights && <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 1 }}>A calm look at the last 7 days — no pressure.</span>}
-            </span>
-          </span>
+        <button onClick={() => setShowInsights(v => !v)} style={{ width: '100%', border: `1px solid ${p.border}`, borderRadius: 12, background: p.card, color: p.text, padding: '12px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, WebkitTapHighlightColor: 'transparent' }}>
+          <span>{showInsights ? 'Back to logbook' : 'Weekly summary'}</span>
           <span style={{ color: p.sub, fontSize: 14, flexShrink: 0, transform: showInsights ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }}>›</span>
         </button>
       </div>
@@ -442,35 +413,6 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* ── This week summary ── */}
-      {!showInsights && weekFeeds.length > 0 && (
-        <div style={{ margin: '0 14px 14px', background: p.card, borderRadius: 12, border: `1px solid ${p.border}`, padding: '11px 14px 12px' }}>
-          <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 8 }}>
-            Last 7 days
-          </span>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
-            {[
-              { label: 'Feeds',      value: weekFeeds.length },
-              { label: 'Breast avg', value: weekAvgDuration > 0 ? fmtMins(weekAvgDuration) : '—' },
-              { label: 'Bottle',     value: weekBottleMl > 0 ? `${weekBottleMl}ml` : '—' },
-              { label: 'Sleep/day',  value: insights.avgSleepSecsPerDay ? fmtMins(insights.avgSleepSecsPerDay) : '—' },
-            ].map(item => (
-              <div key={item.label}>
-                <span style={{ display: 'block', fontSize: 9.5, color: p.sub, lineHeight: 1.3 }}>{item.label}</span>
-                <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 600, marginTop: 2 }}>{item.value}</span>
-              </div>
-            ))}
-          </div>
-          {(weekMood || (leftCount + rightCount) > 0) && (
-            <div style={{ marginTop: 9, paddingTop: 8, borderTop: `1px solid ${p.border}`, fontSize: 11, color: p.sub }}>
-              {weekMood && <>Feeds felt <span style={{ color: p.text, fontWeight: 500 }}>{weekMood.emoji} {weekMood.label.toLowerCase()}</span></>}
-              {weekMood && (leftCount + rightCount) > 0 && ' · '}
-              {(leftCount + rightCount) > 0 && <>Left/Right <span style={{ color: p.text, fontWeight: 500 }}>{leftCount}/{rightCount}</span></>}
-            </div>
-          )}
         </div>
       )}
 

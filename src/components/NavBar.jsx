@@ -3,7 +3,7 @@ import { palette } from '../theme.js'
 // Prepare is reached from the Home screen card rather than the nav bar —
 // it's a before-you-go-out task, not a many-times-a-day one like these five.
 const tabs = [
-  { id: 'home',    icon: '◉', label: 'Feed'    },
+  { id: 'home',    icon: '⌂', label: 'Home'    },
   { id: 'nappy',   icon: '◈', label: 'Nappy'   },
   { id: 'sleep',   icon: '☾', label: 'Sleep'   },
   { id: 'history', icon: '≡', label: 'Logbook' },
