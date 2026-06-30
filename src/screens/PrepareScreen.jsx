@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { brand, palette } from '../theme.js'
 import { getChecked, setChecked as saveChecked, getCustomItems, setCustomItems as saveCustomItems, getHiddenDefaults, saveHiddenDefaults } from '../lib/storage.js'
 import { PREPARE_DEFAULT_ITEMS as DEFAULT_ITEMS } from '../lib/constants.js'
+import { trackEvent } from '../lib/analytics.js'
 
 const PROTECTED_ID = 'cover'
 
@@ -24,6 +25,10 @@ export default function PrepareScreen({ night, setScreen }) {
     const next = { ...checked, [id]: !checked[id] }
     setChecked(next)
     saveChecked(next)
+    const doneNext = allItems.filter(i => next[i.id]).length
+    if (!ready && doneNext === totalCount && totalCount > 0) {
+      trackEvent('prepare_checklist_completed', { item_count: totalCount })
+    }
   }
 
   const addItem = () => {

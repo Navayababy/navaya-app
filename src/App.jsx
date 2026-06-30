@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { getNightMode, setNightMode, hasNightPref, getNightHintSeen, setNightHintSeen, getDismissedAnnouncements, dismissAnnouncement } from './lib/storage.js'
 import { getActiveAnnouncement } from './lib/db.js'
 import { isSupabaseConfigured } from './lib/supabase.js'
+import { initAnalytics, trackScreen, identifyUser, resetAnalyticsUser } from './lib/analytics.js'
 import { useViewportHeight } from './hooks/useViewportHeight.js'
 import { useFeedTimer } from './hooks/useFeedTimer.js'
 import { useSleepTimer } from './hooks/useSleepTimer.js'
@@ -66,6 +67,13 @@ export default function App() {
     refreshSharedSessions, refreshSharedNappies, refreshSharedMedicines, refreshSharedSleeps,
     resyncAll,
   } = useHousehold()
+
+  useEffect(() => { initAnalytics() }, [])
+  useEffect(() => { trackScreen(screen) }, [screen])
+  useEffect(() => {
+    if (authUser) identifyUser(authUser.id, { role: profile?.role || null })
+    else resetAnalyticsUser()
+  }, [authUser, profile?.role])
 
   const toggleNight = () => {
     setNight(n => { setNightMode(!n); return !n })

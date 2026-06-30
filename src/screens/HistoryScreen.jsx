@@ -6,6 +6,7 @@ import { fmt, fmtMins, dayLabel, dayShort, timeStr, todayDateStr } from '../util
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep, isBottleFeed } from '../lib/normalize.js'
 import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL, bottleLabel } from '../lib/constants.js'
 import { averageFeedMood, computeWeeklyInsights, sleepSecsOnDay } from '../lib/stats.js'
+import { trackEvent } from '../lib/analytics.js'
 import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
@@ -164,6 +165,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
   const handleAddFeed = (session) => {
     setSessions(addSession(session))
+    trackEvent('feed_logged', { feed_type: session.feedType || 'breast', side: session.side || null, source: 'logbook_manual' })
     if (sharedMode && authUser && profile?.household_id) {
       syncWrite('feed.insert', {
         id:           session.id,
@@ -185,6 +187,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
   const handleAddNappy = (nappy) => {
     setNappies(addNappy(nappy))
+    trackEvent('nappy_logged', { type: nappy.type, source: 'logbook_manual' })
     if (sharedMode && authUser && profile?.household_id) {
       syncWrite('nappy.insert', { id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type: nappy.type, pooColor: nappy.pooColor, loggedAt: nappy.loggedAt })
         .then(({ ok }) => { if (ok) onRefreshNappies?.() })
@@ -194,6 +197,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
   const handleAddSleep = (sleep) => {
     setSleeps(addSleep(sleep))
+    trackEvent('sleep_logged', { duration_mins: sleep.durationSecs ? Math.round(sleep.durationSecs / 60) : null, source: 'logbook_manual' })
     if (sharedMode && authUser && profile?.household_id) {
       syncWrite('sleep.insert', {
         id:           sleep.id,
@@ -209,6 +213,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
   const handleAddMedicine = (medicine) => {
     setMedicines(addMedicine(medicine))
+    trackEvent('medicine_logged', { form: medicine.form || null })
     if (sharedMode && authUser && profile?.household_id) {
       syncWrite('medicine.insert', { ...medicine, householdId: profile.household_id, loggedBy: authUser.id })
         .then(({ ok }) => { if (ok) onRefreshMedicines?.() })

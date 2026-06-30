@@ -6,6 +6,7 @@ import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtSince } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeSleep, isBottleFeed, feedTypeOf } from '../lib/normalize.js'
 import { newId } from '../lib/id.js'
+import { trackEvent } from '../lib/analytics.js'
 
 const QUOTES = [
   // — Verified breast milk facts —
@@ -157,6 +158,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
     const sessionData = stopFeed()
     const session = { id: newId(), ...sessionData, amountMl: null, milkType: null, mood: null }
     setSessions(sortByTime(addSession(session)))
+    trackEvent('feed_logged', { feed_type: session.feedType, side: session.side || null })
 
     pendingRemoteRef.current = null
     if (authUser && profile?.household_id) {
@@ -271,6 +273,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
     const loggedAt = new Date().toISOString()
     const nappy = { id: newId(), type, pooColor: null, loggedAt }
     setNappies(addNappy(nappy))
+    trackEvent('nappy_logged', { type, source: 'home_quick_log' })
     if (authUser && profile?.household_id) {
       syncWrite('nappy.insert', { id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type, pooColor: null, loggedAt })
         .then(({ ok }) => { if (ok) onNappySaved?.() })
@@ -286,6 +289,7 @@ export default function HomeScreen({ night, onNightToggle, setScreen, onAskSage,
     const sleepData = stopSleep()
     const sleep = { id: newId(), ...sleepData }
     setSleeps(addSleep(sleep))
+    trackEvent('sleep_logged', { duration_mins: sleep.durationSecs ? Math.round(sleep.durationSecs / 60) : null, source: 'home' })
     if (authUser && profile?.household_id) {
       syncWrite('sleep.insert', {
         id:           sleep.id,

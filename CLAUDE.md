@@ -19,6 +19,8 @@ Create a `.env` file at the root for local development:
 ```
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
+VITE_POSTHOG_KEY=...        # optional — analytics dashboard, see SETUP.md
+VITE_POSTHOG_HOST=...       # optional — defaults to https://us.i.posthog.com
 ```
 
 The Vercel serverless function (`api/chat.js`) reads `ANTHROPIC_API_KEY` from the server environment (set in Vercel dashboard).
@@ -34,6 +36,8 @@ Navaya is a mobile-first React SPA (max-width 430px) for breastfeeding tracking.
 **Data layer** — user data is persisted to `localStorage` via `src/lib/storage.js`, with optional household sharing through Supabase (`src/lib/db.js`, `src/lib/sync.js`, `src/lib/outbox.js`, `useHousehold`). Writes go to localStorage first, then sync to the shared household; offline writes queue in the outbox. Pure stats live in `src/lib/stats.js` and are unit-tested.
 
 **AI chat** — `ChatScreen` POSTs conversation history to `/api/chat`, a Vercel serverless function that streams from the Anthropic API (claude-sonnet-4-6) keeping the API key server-side.
+
+**Analytics** — `src/lib/analytics.js` wraps PostHog (`posthog-js`). No-ops entirely if `VITE_POSTHOG_KEY` isn't set. `App.jsx` calls `initAnalytics()` once, tracks `screen_view` on tab changes, and calls `identifyUser(authUser.id)` so a signed-in user's events link across devices (id only — never email/name). Screens call `trackEvent(name, props)` at the point a feed/nappy/sleep/medicine is logged, Sage is asked a question, the prepare checklist is completed, or a household account/invite action happens. Event properties stay coarse (enums, counts, duration buckets) — never free text, names or emails, since this app handles infant health data.
 
 **Theming** — `src/theme.js` exports `light`, `dark`, and `brand` colour palettes. Every component calls `palette(night)` to get the active colours. Night mode preference is persisted via `storage.js`. Typography uses Cormorant Garamond (headings/display) and Jost (body/UI), loaded from Google Fonts.
 

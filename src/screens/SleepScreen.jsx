@@ -6,6 +6,7 @@ import { normalizeSleep } from '../lib/normalize.js'
 import { sleepSecsOnDay } from '../lib/stats.js'
 import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO, dayShort } from '../utils/time.js'
 import { newId } from '../lib/id.js'
+import { trackEvent } from '../lib/analytics.js'
 
 // h:mm:ss for long-running sleeps, mm:ss under an hour
 function fmtClock(secs) {
@@ -79,6 +80,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     const sleepData = stopSleep()
     const sleep = { id: newId(), ...sleepData }
     setSleeps(addSleep(sleep))
+    trackEvent('sleep_logged', { duration_mins: sleep.durationSecs ? Math.round(sleep.durationSecs / 60) : null, source: 'sleep_tab_timer' })
     shareSleep(sleep)
   }
 
@@ -94,6 +96,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
     const sleep = { id: newId(), startedAt, endedAt, durationSecs }
     setSleeps(addSleep(sleep))
+    trackEvent('sleep_logged', { duration_mins: durationSecs ? Math.round(durationSecs / 60) : null, source: 'sleep_tab_backfill' })
     shareSleep(sleep)
     setAddingPast(false)
     setLogDate(dateStr())

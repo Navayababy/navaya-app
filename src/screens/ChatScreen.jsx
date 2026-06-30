@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { brand, palette } from '../theme.js'
+import { trackEvent } from '../lib/analytics.js'
 
 const SUGGESTIONS = [
   "My latch feels painful — is this normal?",
@@ -36,6 +37,7 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
   const send = async (text) => {
     const q = text.trim()
     if (!q || loading) return
+    trackEvent('sage_message_sent', { suggestion: SUGGESTIONS.includes(q) })
 
     const userMsg = { id: `${Date.now()}-user`, role: 'user', content: q }
     const history = [...messages, userMsg]

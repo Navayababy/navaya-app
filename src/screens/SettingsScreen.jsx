@@ -3,6 +3,7 @@ import { brand, palette } from '../theme.js'
 import { signIn, signUp, signOut, createHousehold, createInviteCode, acceptInvite } from '../lib/db.js'
 import { isSupabaseConfigured } from '../lib/supabase.js'
 import { outboxSize } from '../lib/outbox.js'
+import { trackEvent } from '../lib/analytics.js'
 
 function Card({ children, p }) {
   return (
@@ -80,6 +81,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
     if (error) {
       setAuthMsg({ text: error.message, isError: true })
     } else {
+      trackEvent('account_created')
       setAuthMsg({ text: 'Check your email to confirm your account, then sign in.', isError: false })
       setAuthTab('signin')
     }
@@ -98,6 +100,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
     if (error) {
       setHouseholdMsg({ text: error.message, isError: true })
     } else {
+      trackEvent('household_created')
       onProfileUpdate()
     }
     setHouseholdLoading(false)
@@ -110,6 +113,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
     if (error) {
       setHouseholdMsg({ text: error.message, isError: true })
     } else {
+      trackEvent('household_invite_created')
       setInviteCode(code)
     }
     setHouseholdLoading(false)
@@ -130,6 +134,7 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
     if (error) {
       setHouseholdMsg({ text: error.message, isError: true })
     } else {
+      trackEvent('household_invite_accepted')
       setJoinCode('')
       onProfileUpdate()
     }

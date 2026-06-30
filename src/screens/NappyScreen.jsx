@@ -5,6 +5,7 @@ import { syncWrite } from '../lib/sync.js'
 import { dateStr, timeStr, fmtDayTime } from '../utils/time.js'
 import { POO_COLORS } from '../lib/constants.js'
 import { newId } from '../lib/id.js'
+import { trackEvent } from '../lib/analytics.js'
 
 function timeSinceShort(iso) {
   if (!iso) return '—'
@@ -75,6 +76,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
     const loggedAt   = new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
     const nappy = { id: newId(), type, pooColor: needsColor ? pooColor : null, loggedAt }
     setNappies(addNappy(nappy))
+    trackEvent('nappy_logged', { type, source: 'nappy_tab' })
     if (authUser && profile?.household_id) {
       syncWrite('nappy.insert', { id: nappy.id, householdId: profile.household_id, loggedBy: authUser.id, type, pooColor: nappy.pooColor, loggedAt })
         .then(({ ok }) => { if (ok) onNappySaved?.() })

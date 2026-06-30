@@ -175,6 +175,35 @@ Whenever you want to update the app:
 
 ---
 
+## Optional — Step 11: See how people are using the app
+
+The app can quietly send anonymous usage events (app opened, feed logged, nappy logged, etc.) to a free dashboard tool called **PostHog**. This is optional — skip this whole section if you don't want it. Nothing is tracked until you do this.
+
+1. Go to **posthog.com** and sign up for a free account (no card needed)
+2. When asked to create a project, give it any name (e.g. "Navaya")
+3. In your new project, go to **Project Settings** → copy the **Project API Key** (starts with `phc_...`) and note your **region** (US or EU) — this decides your host URL:
+   - US: `https://us.i.posthog.com`
+   - EU: `https://eu.i.posthog.com`
+4. **Locally:** open the `.env` file you created earlier and add two lines:
+   ```
+   VITE_POSTHOG_KEY=phc_your_key_here
+   VITE_POSTHOG_HOST=https://us.i.posthog.com
+   ```
+5. **On the live app:** in Vercel, go to your project → **Settings** → **Environment Variables** → **Add**, and add `VITE_POSTHOG_KEY` and `VITE_POSTHOG_HOST` the same way you added the Anthropic key. Then go to **Deployments** and **Redeploy**.
+6. Use the app for a bit (start a feed, log a nappy), then go back to **posthog.com** → your project → **Activity** — you should see events like `feed_logged` and `screen_view` appearing within a minute or two.
+
+**A quick dashboard to glance at:** in PostHog, go to **Dashboards** → **New dashboard** → **Start from template**, and add these insights:
+- A trend of `screen_view` events grouped by `screen` — shows which tab people open most (Feed, Nappy, Sleep, Logbook, Sage)
+- Unique users of `feed_logged`, `nappy_logged`, `sleep_logged`, `medicine_logged` and `sage_message_sent` (weekly), each as a separate insight — shows how many people use each feature and how often
+- A trend of `account_created` (all-time, cumulative) — running total of people who've signed up
+- A trend of `household_invite_accepted` — how many partners have joined a household
+
+Pin that dashboard so it's the first thing you see when you log in to PostHog — that's your at-a-glance sense check.
+
+**Privacy note:** only anonymous, coarse events are sent (e.g. "a breast feed was logged on the left side") — never baby names, parent names, chat messages, or medicine names/notes.
+
+---
+
 ## Getting help
 
 If anything goes wrong, take a screenshot of the error and share it. Every error message tells you exactly what went wrong — the trick is knowing how to read it.
