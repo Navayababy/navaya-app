@@ -241,6 +241,9 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
                   <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: isNext ? brand.sand : p.text }}>
                     {side === 'L' ? 'Left' : 'Right'}
                   </span>
+                  {isNext && (
+                    <span style={{ fontSize: 9, color: brand.sand, letterSpacing: '.04em' }}>suggested</span>
+                  )}
                 </button>
               )
             })}
