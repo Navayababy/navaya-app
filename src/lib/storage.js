@@ -17,6 +17,7 @@ const KEYS = {
   userName:       'navaya_user_name',
   activeTimer:    'navaya_active_timer',
   activeSleep:    'navaya_active_sleep',
+  pendingSleep:   'navaya_pending_sleep',
   dismissedAnnouncements: 'navaya_dismissed_announcements',
   lastOpenedAt:   'navaya_last_opened_at',
 };
@@ -171,6 +172,26 @@ export function setActiveSleep(startedAt) {
 
 export function clearActiveSleep() {
   localStorage.removeItem(KEYS.activeSleep);
+}
+
+// A stopped sleep awaiting end-time confirmation (see SleepScreen). The
+// active timer is already cleared by the time this exists, so this is the
+// only record of it until the user confirms — it must survive a tab switch,
+// reload or the app being closed, not just live in component state.
+export function getPendingSleep() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.pendingSleep) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+export function savePendingSleep(sleep) {
+  localStorage.setItem(KEYS.pendingSleep, JSON.stringify(sleep));
+}
+
+export function clearPendingSleep() {
+  localStorage.removeItem(KEYS.pendingSleep);
 }
 
 // ── Checklist ────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSleeps, addSleep, babyDisplayName } from '../lib/storage.js'
+import { getSleeps, addSleep, babyDisplayName, getPendingSleep, savePendingSleep, clearPendingSleep } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
 import { sleepSecsOnDay } from '../lib/stats.js'
@@ -31,9 +31,14 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
   // Stopping the timer doesn't save right away — it asks "is this the right
   // time?" first, since the tap to end it often lands a few minutes after
-  // baby actually woke up. Nothing is written until that's confirmed.
-  const [pendingSleep, setPendingSleep] = useState(null)   // { startedAt, endedAt, durationSecs }
-  const [confirmTime,  setConfirmTime]  = useState('')
+  // baby actually woke up. The active timer is already cleared by then, so
+  // this is persisted too (not just component state) — otherwise switching
+  // tabs or closing the app before confirming would silently lose the sleep.
+  const [pendingSleep, setPendingSleep] = useState(() => getPendingSleep())   // { startedAt, endedAt, durationSecs }
+  const [confirmTime,  setConfirmTime]  = useState(() => {
+    const restored = getPendingSleep()
+    return restored ? timeStr(restored.endedAt) : ''
+  })
 
   // Keep the list in sync with shared sleeps when in shared mode.
   // Skipped while the user is composing a manual entry.
@@ -79,6 +84,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
   const handleStop = () => {
     const sleepData = stopSleep()
+    savePendingSleep(sleepData)
     setPendingSleep(sleepData)
     setConfirmTime(timeStr(sleepData.endedAt))
   }
@@ -92,6 +98,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     const sleep = { id: newId(), startedAt: pendingSleep.startedAt, endedAt, durationSecs }
     setSleeps(addSleep(sleep))
     shareSleep(sleep)
+    clearPendingSleep()
     setPendingSleep(null)
   }
 
