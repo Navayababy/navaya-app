@@ -45,7 +45,7 @@ export default function SplashScreen({ onDone }) {
       alignItems:     'center',
       justifyContent: 'center',
       padding:        '0 36px',
-      background:     brand.sand,
+      background:     brand.bark,
       zIndex:         9999,
       opacity:        fading ? 0 : 1,
       transition:     'opacity 0.5s ease',
@@ -55,7 +55,7 @@ export default function SplashScreen({ onDone }) {
           where the quote lands — that stays perfectly centred either way. */}
       <div style={{ position: 'absolute', top: '13%', left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
         <svg width="240" height="240" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-          <rect width="512" height="512" fill={brand.sand} />
+          <rect width="512" height="512" fill={brand.bark} />
           <text
             x="256"
             y="256"
@@ -65,12 +65,12 @@ export default function SplashScreen({ onDone }) {
             fontWeight="500"
             fontSize="82"
             letterSpacing="18"
-            fill={brand.bark}
+            fill={brand.sand}
           >NAVAYA</text>
         </svg>
       </div>
 
-      <p className="fade-up" style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: 26, color: brand.bark, opacity: 0.85, textAlign: 'center', lineHeight: 1.5, margin: 0 }}>
+      <p className="fade-up" style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: 26, color: brand.parchment, opacity: 0.85, textAlign: 'center', lineHeight: 1.5, margin: 0 }}>
         "{quote}"
       </p>
     </div>

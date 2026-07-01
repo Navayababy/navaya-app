@@ -16,6 +16,7 @@ import PrepareScreen from './screens/PrepareScreen.jsx'
 import SettingsScreen from './screens/SettingsScreen.jsx'
 import NavBar        from './components/NavBar.jsx'
 import AnnouncementBanner from './components/AnnouncementBanner.jsx'
+import InstallBanner  from './components/InstallBanner.jsx'
 import SplashScreen   from './components/SplashScreen.jsx'
 import { brand, palette } from './theme.js'
 
@@ -104,6 +105,7 @@ export default function App() {
     }}>
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       {announcement && <AnnouncementBanner night={night} announcement={announcement} onDismiss={dismissBanner} />}
+      <InstallBanner night={night} />
       {nightHint && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: palette(night).card, borderBottom: `1px solid ${palette(night).navBdr}` }}>
           <span style={{ fontSize: 13, flexShrink: 0 }} aria-hidden="true">☽</span>

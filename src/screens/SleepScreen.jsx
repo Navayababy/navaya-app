@@ -34,11 +34,19 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   // baby actually woke up. The active timer is already cleared by then, so
   // this is persisted too (not just component state) — otherwise switching
   // tabs or closing the app before confirming would silently lose the sleep.
-  const [pendingSleep, setPendingSleep] = useState(() => getPendingSleep())   // { startedAt, endedAt, durationSecs }
+  // The persisted record also carries whatever the user has typed into the
+  // confirmation field so far — otherwise an edit made just before a tab
+  // switch or reload would silently revert to the original stop time.
+  const [pendingSleep, setPendingSleep] = useState(() => getPendingSleep())   // { startedAt, endedAt, durationSecs, confirmTime }
   const [confirmTime,  setConfirmTime]  = useState(() => {
     const restored = getPendingSleep()
-    return restored ? timeStr(restored.endedAt) : ''
+    return restored ? (restored.confirmTime || timeStr(restored.endedAt)) : ''
   })
+
+  const updateConfirmTime = (value) => {
+    setConfirmTime(value)
+    if (pendingSleep) savePendingSleep({ ...pendingSleep, confirmTime: value })
+  }
 
   // Keep the list in sync with shared sleeps when in shared mode.
   // Skipped while the user is composing a manual entry.
@@ -84,9 +92,10 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
   const handleStop = () => {
     const sleepData = stopSleep()
-    savePendingSleep(sleepData)
+    const initialConfirmTime = timeStr(sleepData.endedAt)
+    savePendingSleep({ ...sleepData, confirmTime: initialConfirmTime })
     setPendingSleep(sleepData)
-    setConfirmTime(timeStr(sleepData.endedAt))
+    setConfirmTime(initialConfirmTime)
   }
 
   // There's no sleep.update sync — rather than save then patch, the record
@@ -181,7 +190,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
           <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Adjust it if the timer ran on a bit longer than the actual nap.</span>
           <input
             type="time" value={confirmTime}
-            onChange={e => setConfirmTime(e.target.value)}
+            onChange={e => updateConfirmTime(e.target.value)}
             style={{ ...inputStyle, width: '100%', marginBottom: 14, fontSize: 20, textAlign: 'center' }}
           />
           <button onClick={confirmSleep}

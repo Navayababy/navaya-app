@@ -20,6 +20,7 @@ const KEYS = {
   pendingSleep:   'navaya_pending_sleep',
   dismissedAnnouncements: 'navaya_dismissed_announcements',
   lastOpenedAt:   'navaya_last_opened_at',
+  installBannerDismissed: 'navaya_install_banner_dismissed',
 };
 
 // ── Sessions ────────────────────────────────────────────────────────────────
@@ -312,6 +313,16 @@ export function dismissAnnouncement(id) {
     localStorage.setItem(KEYS.dismissedAnnouncements, JSON.stringify(dismissed.slice(-50)));
   }
   return dismissed;
+}
+
+// ── Install banner ───────────────────────────────────────────────────────────
+
+export function getInstallBannerDismissed() {
+  return localStorage.getItem(KEYS.installBannerDismissed) === '1';
+}
+
+export function dismissInstallBanner() {
+  localStorage.setItem(KEYS.installBannerDismissed, '1');
 }
 
 // ── Active timer ─────────────────────────────────────────────────────────────
