@@ -21,7 +21,7 @@ function fmtClock(secs) {
 // already happened) rather than showing both flows at once.
 export default function SleepScreen({ night, timer, authUser, profile, sharedSleeps, onSleepSaved }) {
   const p = palette(night)
-  const { sleepActive, sleepElapsed, startSleep, stopSleep } = timer
+  const { sleepActive, sleepElapsed, sleepId, startSleep, stopSleep, adoptActiveSleep, releaseActiveSleep } = timer
 
   const [sleeps,     setSleeps]     = useState(() => getSleeps())
   const [addingPast, setAddingPast] = useState(false)
@@ -57,13 +57,49 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     if (pendingSleep) savePendingSleep({ ...pendingSleep, confirmEndTime: value })
   }
 
-  // Keep the list in sync with shared sleeps when in shared mode.
+  // Keep the list in sync with shared sleeps when in shared mode. An
+  // in-progress sleep (no ended_at yet) is excluded — it's not a completed
+  // record, it's what the active-timer/adopt logic below is for.
   // Skipped while the user is composing a manual entry.
   useEffect(() => {
     if (!sharedSleeps) return
     if (addingPast) return
-    setSleeps(sharedSleeps.map(normalizeSleep))
+    setSleeps(sharedSleeps.filter(s => s.ended_at != null).map(normalizeSleep))
   }, [sharedSleeps, addingPast])
+
+  // The one open (ended_at null) sleep in the household, if any — this is
+  // what makes a sleep started on one device show up as active on another.
+  const sharedActiveSleep = useMemo(() =>
+    sharedSleeps?.find(s => s.ended_at == null) || null
+  , [sharedSleeps])
+
+  // Someone in the household started a sleep — including this device, once
+  // its own insert round-trips back through realtime (a no-op by then,
+  // since sleepId already matches). Skipped while we're mid-confirm on our
+  // own stop, so the adjustable-times card can't be yanked away mid-edit.
+  useEffect(() => {
+    if (!sharedActiveSleep) return
+    if (pendingSleep) return
+    if (sleepActive && sleepId === sharedActiveSleep.id) return
+    adoptActiveSleep(sharedActiveSleep.id, new Date(sharedActiveSleep.started_at).getTime())
+  }, [sharedActiveSleep, pendingSleep, sleepActive, sleepId, adoptActiveSleep])
+
+  // Whether the sleep we're actively tracking now has an end time in the
+  // shared list — i.e. a household member ended it (immediately on their
+  // "awake" tap, ahead of their own time-confirmation). Checked by id rather
+  // than by "no active sleep in the list" so this can never fire on the
+  // brief round-trip gap right after this device's own insert.
+  const trackedSleepClosedRemotely = useMemo(() => {
+    if (!sleepId || !sharedSleeps) return false
+    const row = sharedSleeps.find(s => s.id === sleepId)
+    return !!(row && row.ended_at)
+  }, [sharedSleeps, sleepId])
+
+  useEffect(() => {
+    if (!trackedSleepClosedRemotely) return
+    if (!sleepActive || pendingSleep) return
+    releaseActiveSleep()
+  }, [trackedSleepClosedRemotely, sleepActive, pendingSleep, releaseActiveSleep])
 
   // Re-render every 30s so the relative times stay current
   const [, setClockTick] = useState(0)
@@ -87,6 +123,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     ? fmtSince(lastSleep.endedAt)
     : null
 
+  // For manual/past entries, which never go through an open-row phase.
   const shareSleep = (sleep) => {
     if (!authUser || !profile?.household_id) return
     syncWrite('sleep.insert', {
@@ -99,6 +136,38 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     }).then(({ ok }) => { if (ok) onSleepSaved?.() })
   }
 
+  // Opens the shared row the instant the timer starts, so realtime delivers
+  // it to every household device right away rather than only once confirmed.
+  const shareSleepStart = (id, startedAtIso) => {
+    if (!authUser || !profile?.household_id) return
+    syncWrite('sleep.insert', {
+      id,
+      householdId:  profile.household_id,
+      loggedBy:     authUser.id,
+      startedAt:    startedAtIso,
+      endedAt:      null,
+      durationSecs: null,
+    }).then(({ ok }) => { if (ok) onSleepSaved?.() })
+  }
+
+  // Patches the open row — used both for the immediate raw stop time (so a
+  // partner's device drops out of "active" right away) and for the
+  // corrected times once confirmed.
+  const shareSleepUpdate = (sleep) => {
+    if (!authUser || !profile?.household_id) return
+    syncWrite('sleep.update', {
+      id:           sleep.id,
+      startedAt:    sleep.startedAt,
+      endedAt:      sleep.endedAt,
+      durationSecs: sleep.durationSecs,
+    }).then(({ ok }) => { if (ok) onSleepSaved?.() })
+  }
+
+  const handleStart = () => {
+    const { id, startedAt } = startSleep()
+    shareSleepStart(id, new Date(startedAt).toISOString())
+  }
+
   const handleStop = () => {
     const sleepData = stopSleep()
     const initialConfirmStartTime = timeStr(sleepData.startedAt)
@@ -107,14 +176,18 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     setPendingSleep(sleepData)
     setConfirmStartTime(initialConfirmStartTime)
     setConfirmEndTime(initialConfirmEndTime)
+    // Raw stop time, ahead of whatever adjustment happens on confirm — this
+    // is what lets a household member's device see it end immediately.
+    shareSleepUpdate(sleepData)
   }
 
-  // There's no sleep.update sync — rather than save then patch, the record
-  // is only created once the (possibly adjusted) start/end times are
-  // confirmed. Each edited time is re-dated against its own original
-  // instant, so a correction that pushes the start (or end) across a
-  // midnight boundary — in either direction — lands on the right day
-  // rather than inheriting the original, now-wrong date.
+  // The row was already opened on start (see handleStart) and closed with a
+  // raw stop time (see handleStop) — confirming just patches it with the
+  // (possibly adjusted) final times, it never inserts. Each edited time is
+  // re-dated against its own original instant, so a correction that pushes
+  // the start (or end) across a midnight boundary — in either direction —
+  // lands on the right day rather than inheriting the original, now-wrong
+  // date.
   const confirmSleep = () => {
     if (!pendingSleep) return
     const startedAt = nearestDateForTime(pendingSleep.startedAt, confirmStartTime)
@@ -127,9 +200,9 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
       endedAt = d.toISOString()
     }
     const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
-    const sleep = { id: newId(), startedAt, endedAt, durationSecs }
+    const sleep = { id: pendingSleep.id || newId(), startedAt, endedAt, durationSecs }
     setSleeps(addSleep(sleep))
-    shareSleep(sleep)
+    shareSleepUpdate(sleep)
     clearPendingSleep()
     setPendingSleep(null)
   }
@@ -264,7 +337,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
             )}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={startSleep}
+            <button onClick={handleStart}
               style={{ flex: 1, minHeight: 84, borderRadius: 16, border: 'none', cursor: 'pointer', background: brand.bark, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               <span style={{ fontSize: 18, color: brand.sand, lineHeight: 1 }}>☾</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: brand.sand }}>Start sleep timer</span>
