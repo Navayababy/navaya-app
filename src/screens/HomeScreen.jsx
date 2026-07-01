@@ -114,32 +114,33 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
   // clear, oversized button rather than a tile in a dense grid.
   // Every row keeps the same dark-brown fill (that's the "high contrast,
   // oversized" foundation) — each action's own accent only tints its
-  // border and icon badge, so the five read as a family with a hero each,
+  // border and icon badge, so the four read as a family with a hero each,
   // not identical blocks distinguished by text alone.
-  // Sized to fit five rows plus the header and secondary card on one
-  // screen without scrolling, trimmed down slightly from the four-row version.
-  const rowStyle = (accent) => ({ display: 'flex', alignItems: 'center', gap: 14, width: '100%', minHeight: 68, borderRadius: 18, border: `1.5px solid ${accent}`, background: brand.bark, cursor: 'pointer', padding: '0 18px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' })
-  const iconWrapStyle = (accent) => ({ width: 38, height: 38, borderRadius: '50%', background: `${accent}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 })
-  const primaryLabel = { fontSize: 17, fontWeight: 600, color: brand.sand, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
+  const rowStyle = (accent) => ({ display: 'flex', alignItems: 'center', gap: 16, width: '100%', minHeight: 76, borderRadius: 20, border: `1.5px solid ${accent}`, background: brand.bark, cursor: 'pointer', padding: '0 20px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' })
+  const iconWrapStyle = (accent) => ({ width: 42, height: 42, borderRadius: '50%', background: `${accent}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 })
+  const primaryLabel = { fontSize: 18, fontWeight: 600, color: brand.sand, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
   const primaryChevron = { marginLeft: 'auto', color: brand.sand, opacity: 0.55, fontSize: 18, flexShrink: 0 }
+  // Secondary rows (Going out, Ask Sage) share one quieter style — available
+  // and clearly labelled, just not competing with the four actions above.
+  const secondaryRow = { display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 32px)', margin: '8px 16px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg, position: 'relative' }}>
       {/* Settings — pinned to the corner, out of the main flow so it doesn't
           claim one of the evenly-spread content slots below */}
       <button onClick={() => setScreen('settings')}
-        style={{ position: 'absolute', top: 14, right: 16, zIndex: 1, background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '6px 13px', cursor: 'pointer', color: profile?.household_id ? brand.green : p.sub, fontSize: 12 }}>
+        style={{ position: 'absolute', top: 16, right: 16, zIndex: 1, background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '6px 13px', cursor: 'pointer', color: profile?.household_id ? brand.green : p.sub, fontSize: 12 }}>
         {profile?.household_id ? '● Sharing' : '⚙ Settings'}
       </button>
 
-      <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '48px 0 14px' }}>
+      <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '48px 0 16px' }}>
 
       {/* ── Greeting — the one moment of warmth, given real room ── */}
       <div style={{ padding: '4px 16px 4px', textAlign: 'center' }}>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 14, color: brand.sand, letterSpacing: '.14em', textTransform: 'uppercase' }}>
           {welcomeBack ? 'Welcome back' : `Good ${greeting()}`}
         </span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 38, fontWeight: 400, color: p.heading, lineHeight: 1.15, marginTop: 4 }}>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 40, fontWeight: 400, color: p.heading, lineHeight: 1.15, marginTop: 4 }}>
           {userName || 'Welcome'}
         </span>
         {/* No name yet — invite adding one rather than faking familiarity
@@ -155,39 +156,38 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
         )}
       </div>
 
-      {/* ── What do you want to do? ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '10px 16px 0' }}>
+      {/* ── What do you want to do? — the four things logged every day ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 16px 0' }}>
         <button onClick={() => setScreen('feed')} style={rowStyle(brand.accent)}>
           <span style={iconWrapStyle(brand.accent)}><BottleIcon color={brand.accent} size={22} /></span>
           <span style={primaryLabel}>Log a feed</span>
           <span style={primaryChevron}>›</span>
         </button>
         <button onClick={() => setScreen('nappy')} style={rowStyle(brand.mist)}>
-          <span style={iconWrapStyle(brand.mist)}><span style={{ fontSize: 19, color: brand.mist, lineHeight: 1 }}>◈</span></span>
+          <span style={iconWrapStyle(brand.mist)}><span style={{ fontSize: 20, color: brand.mist, lineHeight: 1 }}>◈</span></span>
           <span style={primaryLabel}>Log a nappy</span>
           <span style={primaryChevron}>›</span>
         </button>
         <button onClick={() => setScreen('sleep')} style={rowStyle(brand.green)}>
-          <span style={iconWrapStyle(brand.green)}><span style={{ fontSize: 19, color: brand.green, lineHeight: 1 }}>☾</span></span>
+          <span style={iconWrapStyle(brand.green)}><span style={{ fontSize: 20, color: brand.green, lineHeight: 1 }}>☾</span></span>
           <span style={primaryLabel}>Log sleep</span>
           <span style={primaryChevron}>›</span>
         </button>
         <button onClick={onLogMedicine} style={rowStyle(brand.rose)}>
-          <span style={iconWrapStyle(brand.rose)}><PillIcon color={brand.rose} size={19} /></span>
+          <span style={iconWrapStyle(brand.rose)}><PillIcon color={brand.rose} size={20} /></span>
           <span style={primaryLabel}>Log medicine</span>
-          <span style={primaryChevron}>›</span>
-        </button>
-        <button onClick={() => onAskSage('')} style={rowStyle(brand.sand)}>
-          <span style={iconWrapStyle(brand.sand)}><span style={{ fontSize: 19, color: brand.sand, lineHeight: 1 }}>✦</span></span>
-          <span style={primaryLabel}>Ask Sage</span>
           <span style={primaryChevron}>›</span>
         </button>
       </div>
 
-      {/* ── Secondary: Going out — occasional, so it stays visually quieter
-          and clearly subordinate to the actions above ── */}
-      <button onClick={() => setScreen('prepare')}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 32px)', margin: '10px 16px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
+      {/* ── Secondary: Sage and Going out — both available, neither
+          competing with the four logging actions above ── */}
+      <button onClick={() => onAskSage('')} style={secondaryRow}>
+        <span style={{ color: brand.sand, fontSize: 16, flexShrink: 0 }}>✦</span>
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: p.text }}>Ask Sage</span>
+        <span style={{ color: p.sub, fontSize: 15 }}>›</span>
+      </button>
+      <button onClick={() => setScreen('prepare')} style={secondaryRow}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={brand.sand} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
           <rect x="3" y="7" width="18" height="13" rx="2" />
           <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
