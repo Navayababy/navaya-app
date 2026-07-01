@@ -7,6 +7,7 @@ import { useFeedTimer } from './hooks/useFeedTimer.js'
 import { useSleepTimer } from './hooks/useSleepTimer.js'
 import { useHousehold } from './hooks/useHousehold.js'
 import HomeScreen    from './screens/HomeScreen.jsx'
+import FeedScreen    from './screens/FeedScreen.jsx'
 import HistoryScreen from './screens/HistoryScreen.jsx'
 import NappyScreen   from './screens/NappyScreen.jsx'
 import SleepScreen   from './screens/SleepScreen.jsx'
@@ -15,6 +16,7 @@ import PrepareScreen from './screens/PrepareScreen.jsx'
 import SettingsScreen from './screens/SettingsScreen.jsx'
 import NavBar        from './components/NavBar.jsx'
 import AnnouncementBanner from './components/AnnouncementBanner.jsx'
+import SplashScreen   from './components/SplashScreen.jsx'
 import { brand, palette } from './theme.js'
 
 // Low-light hours — used only to auto-suggest night mode before the user has
@@ -25,6 +27,7 @@ const isAfterDark = () => {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true)
   const [screen, setScreen] = useState('home')
   // Honour an explicit choice; otherwise ease into night mode after dark.
   const [night, setNight]   = useState(() => (hasNightPref() ? getNightMode() : isAfterDark()))
@@ -37,6 +40,9 @@ export default function App() {
   // open so the parent stays in control of whether to send it.
   const [chatSeed, setChatSeed] = useState('')
   const [announcement, setAnnouncement] = useState(null)
+  // Set when "Log medicine" is tapped on Home — tells the Logbook to open
+  // its Add Medicine modal immediately rather than the type picker.
+  const [openAddMedicine, setOpenAddMedicine] = useState(false)
 
   // Fetch the live broadcast banner once on load. RLS only returns active,
   // in-window rows; we then suppress anything this device has dismissed.
@@ -79,6 +85,10 @@ export default function App() {
   // Open Sage, optionally pre-seeding a contextual question from a Home nudge.
   const askSage = (prompt = '') => { setChatSeed(prompt); setScreen('chat') }
 
+  // Medicine logging lives in the Logbook's Add-entry flow already — Home's
+  // card just jumps straight there instead of duplicating that UI.
+  const logMedicine = () => { setOpenAddMedicine(true); setScreen('history') }
+
   const bg = night ? '#1A1410' : '#F5F0EB'
   const appHeight = viewportHeight ? `${viewportHeight}px` : '100dvh'
 
@@ -92,6 +102,7 @@ export default function App() {
       background:    bg,
       overflow:      'hidden',
     }}>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       {announcement && <AnnouncementBanner night={night} announcement={announcement} onDismiss={dismissBanner} />}
       {nightHint && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: palette(night).card, borderBottom: `1px solid ${palette(night).navBdr}` }}>
@@ -110,13 +121,14 @@ export default function App() {
         </div>
       )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home'    && <HomeScreen    night={night} onNightToggle={toggleNight} setScreen={setScreen} onAskSage={askSage} timer={timerProps} sleepTimer={sleepTimerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedSleeps={sharedSleeps} onSessionSaved={refreshSharedSessions} onNappySaved={refreshSharedNappies} onSleepSaved={refreshSharedSleeps} />}
+        {screen === 'home'    && <HomeScreen    night={night} setScreen={setScreen} onAskSage={askSage} onLogMedicine={logMedicine} timer={timerProps} sleepTimer={sleepTimerProps} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedSleeps={sharedSleeps} />}
+        {screen === 'feed'    && <FeedScreen    night={night} timer={timerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onSessionSaved={refreshSharedSessions} />}
         {screen === 'nappy'   && <NappyScreen   night={night} authUser={authUser} profile={profile} sharedNappies={sharedNappies} onNappySaved={refreshSharedNappies} />}
         {screen === 'sleep'   && <SleepScreen   night={night} timer={sleepTimerProps} authUser={authUser} profile={profile} sharedSleeps={sharedSleeps} onSleepSaved={refreshSharedSleeps} />}
-        {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} sharedSleeps={sharedSleeps} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} onRefreshSleeps={refreshSharedSleeps} />}
+        {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} sharedSleeps={sharedSleeps} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} onRefreshSleeps={refreshSharedSleeps} openAddMedicine={openAddMedicine} onAddMedicineConsumed={() => setOpenAddMedicine(false)} />}
         {screen === 'chat'    && <ChatScreen    night={night} messages={chatMessages} setMessages={setChatMessages} seed={chatSeed} onSeedConsumed={() => setChatSeed('')} />}
         {screen === 'prepare' && <PrepareScreen night={night} setScreen={setScreen} />}
-        {screen === 'settings' && <SettingsScreen night={night} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
+        {screen === 'settings' && <SettingsScreen night={night} onNightToggle={toggleNight} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
       </div>
       <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={timerProps.feedActive} sleepActive={sleepTimerProps.sleepActive} />
     </div>

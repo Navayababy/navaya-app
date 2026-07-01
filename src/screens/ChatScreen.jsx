@@ -115,10 +115,13 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: p.bg, minHeight: 0 }}>
 
-      {/* Header */}
-      <div style={{ padding: '20px 16px 12px', flexShrink: 0 }}>
+      {/* Header — centred, matching Feed/Nappy/Sleep/Logbook/Prepare */}
+      <div style={{ padding: '20px 16px 12px', flexShrink: 0, textAlign: 'center' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.sand}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+          <span style={{ fontSize: 24, color: brand.sand, lineHeight: 1 }}>✦</span>
+        </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your breastfeeding companion</span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Sage</span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 400, color: p.heading, marginTop: 4 }}>Sage</span>
       </div>
 
       {/* Messages */}
