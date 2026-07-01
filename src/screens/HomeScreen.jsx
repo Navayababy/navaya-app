@@ -120,9 +120,10 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
   const iconWrapStyle = (accent) => ({ width: 42, height: 42, borderRadius: '50%', background: `${accent}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 })
   const primaryLabel = { fontSize: 18, fontWeight: 600, color: brand.sand, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
   const primaryChevron = { marginLeft: 'auto', color: brand.sand, opacity: 0.55, fontSize: 18, flexShrink: 0 }
-  // Secondary rows (Going out, Ask Sage) share one quieter style — available
-  // and clearly labelled, just not competing with the four actions above.
-  const secondaryRow = { display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 32px)', margin: '8px 16px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }
+  // Secondary pair (Sage, Going out) sit side by side, together spanning the
+  // same width as the four rows above — a matched, quieter pair rather than
+  // two full-width rows adrift with space between them.
+  const secondaryCard = { flex: 1, minHeight: 76, borderRadius: 18, border: `1px solid ${p.border}`, background: p.card, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, WebkitTapHighlightColor: 'transparent' }
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg, position: 'relative' }}>
@@ -180,25 +181,25 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
         </button>
       </div>
 
-      {/* ── Secondary: Sage and Going out — both available, neither
-          competing with the four logging actions above ── */}
-      <button onClick={() => onAskSage('')} style={secondaryRow}>
-        <span style={{ color: brand.sand, fontSize: 16, flexShrink: 0 }}>✦</span>
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: p.text }}>Ask Sage</span>
-        <span style={{ color: p.sub, fontSize: 15 }}>›</span>
-      </button>
-      <button onClick={() => setScreen('prepare')} style={secondaryRow}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={brand.sand} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
-          <rect x="3" y="7" width="18" height="13" rx="2" />
-          <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          <path d="M3 13h18" />
-        </svg>
-        <span style={{ flex: 1, fontSize: 13, fontWeight: 500, color: p.text }}>Going out</span>
-        <span style={{ fontSize: 11, color: prepProgress.done === prepProgress.total && prepProgress.total > 0 ? brand.green : p.sub, fontWeight: 500 }}>
-          {prepProgress.done === prepProgress.total && prepProgress.total > 0 ? '✓ Packed' : `${prepProgress.done}/${prepProgress.total}`}
-        </span>
-        <span style={{ color: p.sub, fontSize: 15 }}>›</span>
-      </button>
+      {/* ── Secondary: Sage and Going out — a matched pair, available but
+          not competing with the four logging actions above ── */}
+      <div style={{ display: 'flex', gap: 10, padding: '10px 16px 0' }}>
+        <button onClick={() => onAskSage('')} style={secondaryCard}>
+          <span style={{ color: brand.sand, fontSize: 18, lineHeight: 1 }}>✦</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: p.text }}>Ask Sage</span>
+        </button>
+        <button onClick={() => setScreen('prepare')} style={secondaryCard}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={brand.sand} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="7" width="18" height="13" rx="2" />
+            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <path d="M3 13h18" />
+          </svg>
+          <span style={{ fontSize: 13, fontWeight: 600, color: p.text }}>Going out</span>
+          <span style={{ fontSize: 10, color: prepProgress.done === prepProgress.total && prepProgress.total > 0 ? brand.green : p.sub, fontWeight: 500 }}>
+            {prepProgress.done === prepProgress.total && prepProgress.total > 0 ? '✓ Packed' : `${prepProgress.done}/${prepProgress.total}`}
+          </span>
+        </button>
+      </div>
 
       </div>
     </div>
