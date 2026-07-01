@@ -34,6 +34,7 @@ export const brand = {
   green:   '#6B8F71',
   accent:  '#D4956A',
   mist:    '#7FA3B5',   // cool counterpoint used only to tell the four Home actions apart
+  rose:    '#C46B6B',   // medicine's accent in the same Home action family
 };
 
 export function palette(night) {

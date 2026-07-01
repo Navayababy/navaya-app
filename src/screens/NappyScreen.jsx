@@ -149,66 +149,71 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
           ))}
         </div>
 
-        {/* Poo colour picker */}
-        {needsColor && (
-          <div style={{ marginBottom: 16 }}>
-            <span style={{ display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 10 }}>Colour</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {POO_COLORS.map(c => (
-                <button key={c.id} onClick={() => setPooColor(c.id)} style={{
-                  width: 32, height: 32, borderRadius: '50%', background: c.hex, padding: 0,
-                  border:   pooColor === c.id ? `2px solid ${brand.sand}` : `2px solid transparent`,
-                  outline:  pooColor === c.id ? `2px solid ${brand.bark}` : 'none',
-                  outlineOffset: 1,
-                  cursor:  'pointer', flexShrink: 0, transition: 'all .15s',
-                  WebkitTapHighlightColor: 'transparent',
-                }} />
-              ))}
-              <span style={{ fontSize: 12, color: p.sub, marginLeft: 2 }}>{selectedColor?.label}</span>
-            </div>
-            {selectedColor?.note && (
-              <div style={{ marginTop: 10, padding: '10px 12px', background: p.bg, borderRadius: 11, border: `1px solid ${p.border}` }}>
-                <span style={{ fontSize: 12, color: p.sub, lineHeight: 1.55 }}>{selectedColor.note}</span>
+        {/* Everything below only appears once a type is picked — nothing to
+            weigh up before that first tap. */}
+        {type && (
+          <>
+            {/* Poo colour picker */}
+            {needsColor && (
+              <div style={{ marginBottom: 16 }}>
+                <span style={{ display: 'block', fontSize: 11, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 10 }}>Colour</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {POO_COLORS.map(c => (
+                    <button key={c.id} onClick={() => setPooColor(c.id)} style={{
+                      width: 32, height: 32, borderRadius: '50%', background: c.hex, padding: 0,
+                      border:   pooColor === c.id ? `2px solid ${brand.sand}` : `2px solid transparent`,
+                      outline:  pooColor === c.id ? `2px solid ${brand.bark}` : 'none',
+                      outlineOffset: 1,
+                      cursor:  'pointer', flexShrink: 0, transition: 'all .15s',
+                      WebkitTapHighlightColor: 'transparent',
+                    }} />
+                  ))}
+                  <span style={{ fontSize: 12, color: p.sub, marginLeft: 2 }}>{selectedColor?.label}</span>
+                </div>
+                {selectedColor?.note && (
+                  <div style={{ marginTop: 10, padding: '10px 12px', background: p.bg, borderRadius: 11, border: `1px solid ${p.border}` }}>
+                    <span style={{ fontSize: 12, color: p.sub, lineHeight: 1.55 }}>{selectedColor.note}</span>
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* Time */}
-        <div style={{ marginBottom: 16 }}>
-          {editingTime ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
-              <input type="time" value={logTime} onChange={e => setLogTime(e.target.value)} style={{ ...inputStyle, flex: 1   }} />
+            {/* Time */}
+            <div style={{ marginBottom: 16 }}>
+              {editingTime ? (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
+                  <input type="time" value={logTime} onChange={e => setLogTime(e.target.value)} style={{ ...inputStyle, flex: 1   }} />
+                </div>
+              ) : (
+                <button onClick={() => setEditingTime(true)} style={{
+                  width: '100%', ...inputStyle, cursor: 'pointer',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <span>🕐 {logTime} · {logDate === dateStr() ? 'Now' : logDate}</span>
+                  <span style={{ fontSize: 12, opacity: 0.45 }}>edit</span>
+                </button>
+              )}
             </div>
-          ) : (
-            <button onClick={() => setEditingTime(true)} style={{
-              width: '100%', ...inputStyle, cursor: 'pointer',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <span>🕐 {logTime} · {logDate === dateStr() ? 'Now' : logDate}</span>
-              <span style={{ fontSize: 12, opacity: 0.45 }}>edit</span>
-            </button>
-          )}
-        </div>
 
-        {/* Log button / confirmation */}
-        {justLogged ? (
-          <div style={{ padding: '16px', borderRadius: 14, background: brand.green, textAlign: 'center' }}>
-            <span style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>✓ Logged</span>
-          </div>
-        ) : (
-          <button onClick={handleLog} disabled={!type} style={{
-            width: '100%', padding: '16px', borderRadius: 14, border: 'none',
-            background: type ? brand.bark : p.border,
-            color:      type ? brand.sand : p.sub,
-            cursor:     type ? 'pointer'  : 'default',
-            fontSize: 15, fontWeight: 600,
-            transition: 'all .2s',
-            WebkitTapHighlightColor: 'transparent',
-          }}>
-            Log nappy
-          </button>
+            {/* Log button / confirmation */}
+            {justLogged ? (
+              <div style={{ padding: '16px', borderRadius: 14, background: brand.green, textAlign: 'center' }}>
+                <span style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>✓ Logged</span>
+              </div>
+            ) : (
+              <button onClick={handleLog} style={{
+                width: '100%', padding: '16px', borderRadius: 14, border: 'none',
+                background: brand.bark,
+                color:      brand.sand,
+                cursor:     'pointer',
+                fontSize: 15, fontWeight: 600,
+                WebkitTapHighlightColor: 'transparent',
+              }}>
+                Log nappy
+              </button>
+            )}
+          </>
         )}
       </div>
 

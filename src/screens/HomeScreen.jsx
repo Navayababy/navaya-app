@@ -24,10 +24,20 @@ function BottleIcon({ color, size = 26 }) {
   )
 }
 
+// A capsule/pill glyph, same thin-stroke style as the bottle icon.
+function PillIcon({ color, size = 22 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="8.5" width="16" height="7" rx="3.5" transform="rotate(-45 12 12)" />
+      <line x1="12" y1="8.5" x2="12" y2="15.5" transform="rotate(-45 12 12)" />
+    </svg>
+  )
+}
+
 // The launch screen: answers "what do you want to do" and nothing else.
 // Feed, Nappy, Sleep and Sage each own their real logging UI on their own
 // tab — this screen only routes to them, it never re-implements them.
-export default function HomeScreen({ night, setScreen, onAskSage, profile, timer, sleepTimer, sharedSessions, sharedNappies, sharedSleeps }) {
+export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine, profile, timer, sleepTimer, sharedSessions, sharedNappies, sharedSleeps }) {
   const p = palette(night)
   const { feedActive, feedType, feedSide } = timer
   const { sleepActive } = sleepTimer
@@ -104,11 +114,13 @@ export default function HomeScreen({ night, setScreen, onAskSage, profile, timer
   // clear, oversized button rather than a tile in a dense grid.
   // Every row keeps the same dark-brown fill (that's the "high contrast,
   // oversized" foundation) — each action's own accent only tints its
-  // border and icon badge, so the four read as a family with a hero each,
-  // not four identical blocks distinguished by text alone.
-  const rowStyle = (accent) => ({ display: 'flex', alignItems: 'center', gap: 16, width: '100%', minHeight: 80, borderRadius: 20, border: `1.5px solid ${accent}`, background: brand.bark, cursor: 'pointer', padding: '0 20px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' })
-  const iconWrapStyle = (accent) => ({ width: 44, height: 44, borderRadius: '50%', background: `${accent}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 })
-  const primaryLabel = { fontSize: 19, fontWeight: 600, color: brand.sand, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
+  // border and icon badge, so the five read as a family with a hero each,
+  // not identical blocks distinguished by text alone.
+  // Sized to fit five rows plus the header and secondary card on one
+  // screen without scrolling, trimmed down slightly from the four-row version.
+  const rowStyle = (accent) => ({ display: 'flex', alignItems: 'center', gap: 14, width: '100%', minHeight: 68, borderRadius: 18, border: `1.5px solid ${accent}`, background: brand.bark, cursor: 'pointer', padding: '0 18px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' })
+  const iconWrapStyle = (accent) => ({ width: 38, height: 38, borderRadius: '50%', background: `${accent}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 })
+  const primaryLabel = { fontSize: 17, fontWeight: 600, color: brand.sand, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
   const primaryChevron = { marginLeft: 'auto', color: brand.sand, opacity: 0.55, fontSize: 18, flexShrink: 0 }
 
   return (
@@ -116,61 +128,66 @@ export default function HomeScreen({ night, setScreen, onAskSage, profile, timer
       {/* Settings — pinned to the corner, out of the main flow so it doesn't
           claim one of the evenly-spread content slots below */}
       <button onClick={() => setScreen('settings')}
-        style={{ position: 'absolute', top: 18, right: 16, zIndex: 1, background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '6px 13px', cursor: 'pointer', color: profile?.household_id ? brand.green : p.sub, fontSize: 12 }}>
+        style={{ position: 'absolute', top: 14, right: 16, zIndex: 1, background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '6px 13px', cursor: 'pointer', color: profile?.household_id ? brand.green : p.sub, fontSize: 12 }}>
         {profile?.household_id ? '● Sharing' : '⚙ Settings'}
       </button>
 
-      <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '56px 0 20px' }}>
+      <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '48px 0 14px' }}>
 
       {/* ── Greeting — the one moment of warmth, given real room ── */}
-      <div style={{ padding: '10px 16px 8px', textAlign: 'center' }}>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 15, color: brand.sand, letterSpacing: '.14em', textTransform: 'uppercase' }}>
+      <div style={{ padding: '4px 16px 4px', textAlign: 'center' }}>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 14, color: brand.sand, letterSpacing: '.14em', textTransform: 'uppercase' }}>
           {welcomeBack ? 'Welcome back' : `Good ${greeting()}`}
         </span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 46, fontWeight: 400, color: p.heading, lineHeight: 1.15, marginTop: 4 }}>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 38, fontWeight: 400, color: p.heading, lineHeight: 1.15, marginTop: 4 }}>
           {userName || 'Welcome'}
         </span>
         {/* No name yet — invite adding one rather than faking familiarity
             with a placeholder like "there". */}
         {!userName && (
           <button onClick={() => setScreen('settings')}
-            style={{ display: 'block', margin: '6px auto 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: p.sub, letterSpacing: '.02em' }}>
+            style={{ display: 'block', margin: '4px auto 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: p.sub, letterSpacing: '.02em' }}>
             + Add your name
           </button>
         )}
         {glanceLine && (
-          <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.5, marginTop: 10 }}>{glanceLine}</span>
+          <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.4, marginTop: 6 }}>{glanceLine}</span>
         )}
       </div>
 
       {/* ── What do you want to do? ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '22px 16px 0' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, padding: '10px 16px 0' }}>
         <button onClick={() => setScreen('feed')} style={rowStyle(brand.accent)}>
-          <span style={iconWrapStyle(brand.accent)}><BottleIcon color={brand.accent} /></span>
+          <span style={iconWrapStyle(brand.accent)}><BottleIcon color={brand.accent} size={22} /></span>
           <span style={primaryLabel}>Log a feed</span>
           <span style={primaryChevron}>›</span>
         </button>
         <button onClick={() => setScreen('nappy')} style={rowStyle(brand.mist)}>
-          <span style={iconWrapStyle(brand.mist)}><span style={{ fontSize: 22, color: brand.mist, lineHeight: 1 }}>◈</span></span>
+          <span style={iconWrapStyle(brand.mist)}><span style={{ fontSize: 19, color: brand.mist, lineHeight: 1 }}>◈</span></span>
           <span style={primaryLabel}>Log a nappy</span>
           <span style={primaryChevron}>›</span>
         </button>
         <button onClick={() => setScreen('sleep')} style={rowStyle(brand.green)}>
-          <span style={iconWrapStyle(brand.green)}><span style={{ fontSize: 22, color: brand.green, lineHeight: 1 }}>☾</span></span>
+          <span style={iconWrapStyle(brand.green)}><span style={{ fontSize: 19, color: brand.green, lineHeight: 1 }}>☾</span></span>
           <span style={primaryLabel}>Log sleep</span>
           <span style={primaryChevron}>›</span>
         </button>
+        <button onClick={onLogMedicine} style={rowStyle(brand.rose)}>
+          <span style={iconWrapStyle(brand.rose)}><PillIcon color={brand.rose} size={19} /></span>
+          <span style={primaryLabel}>Log medicine</span>
+          <span style={primaryChevron}>›</span>
+        </button>
         <button onClick={() => onAskSage('')} style={rowStyle(brand.sand)}>
-          <span style={iconWrapStyle(brand.sand)}><span style={{ fontSize: 22, color: brand.sand, lineHeight: 1 }}>✦</span></span>
+          <span style={iconWrapStyle(brand.sand)}><span style={{ fontSize: 19, color: brand.sand, lineHeight: 1 }}>✦</span></span>
           <span style={primaryLabel}>Ask Sage</span>
           <span style={primaryChevron}>›</span>
         </button>
       </div>
 
       {/* ── Secondary: Going out — occasional, so it stays visually quieter
-          and clearly subordinate to the four actions above ── */}
+          and clearly subordinate to the actions above ── */}
       <button onClick={() => setScreen('prepare')}
-        style={{ display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 32px)', margin: '20px 16px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '13px 14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 10, width: 'calc(100% - 32px)', margin: '10px 16px 0', background: p.card, borderRadius: 14, border: `1px solid ${p.border}`, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={brand.sand} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
           <rect x="3" y="7" width="18" height="13" rx="2" />
           <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />

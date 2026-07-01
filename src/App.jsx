@@ -40,6 +40,9 @@ export default function App() {
   // open so the parent stays in control of whether to send it.
   const [chatSeed, setChatSeed] = useState('')
   const [announcement, setAnnouncement] = useState(null)
+  // Set when "Log medicine" is tapped on Home — tells the Logbook to open
+  // its Add Medicine modal immediately rather than the type picker.
+  const [openAddMedicine, setOpenAddMedicine] = useState(false)
 
   // Fetch the live broadcast banner once on load. RLS only returns active,
   // in-window rows; we then suppress anything this device has dismissed.
@@ -82,6 +85,10 @@ export default function App() {
   // Open Sage, optionally pre-seeding a contextual question from a Home nudge.
   const askSage = (prompt = '') => { setChatSeed(prompt); setScreen('chat') }
 
+  // Medicine logging lives in the Logbook's Add-entry flow already — Home's
+  // card just jumps straight there instead of duplicating that UI.
+  const logMedicine = () => { setOpenAddMedicine(true); setScreen('history') }
+
   const bg = night ? '#1A1410' : '#F5F0EB'
   const appHeight = viewportHeight ? `${viewportHeight}px` : '100dvh'
 
@@ -114,11 +121,11 @@ export default function App() {
         </div>
       )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {screen === 'home'    && <HomeScreen    night={night} setScreen={setScreen} onAskSage={askSage} timer={timerProps} sleepTimer={sleepTimerProps} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedSleeps={sharedSleeps} />}
+        {screen === 'home'    && <HomeScreen    night={night} setScreen={setScreen} onAskSage={askSage} onLogMedicine={logMedicine} timer={timerProps} sleepTimer={sleepTimerProps} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedSleeps={sharedSleeps} />}
         {screen === 'feed'    && <FeedScreen    night={night} timer={timerProps} authUser={authUser} profile={profile} sharedSessions={sharedSessions} onSessionSaved={refreshSharedSessions} />}
         {screen === 'nappy'   && <NappyScreen   night={night} authUser={authUser} profile={profile} sharedNappies={sharedNappies} onNappySaved={refreshSharedNappies} />}
         {screen === 'sleep'   && <SleepScreen   night={night} timer={sleepTimerProps} authUser={authUser} profile={profile} sharedSleeps={sharedSleeps} onSleepSaved={refreshSharedSleeps} />}
-        {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} sharedSleeps={sharedSleeps} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} onRefreshSleeps={refreshSharedSleeps} />}
+        {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} sharedSleeps={sharedSleeps} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} onRefreshSleeps={refreshSharedSleeps} openAddMedicine={openAddMedicine} onAddMedicineConsumed={() => setOpenAddMedicine(false)} />}
         {screen === 'chat'    && <ChatScreen    night={night} messages={chatMessages} setMessages={setChatMessages} seed={chatSeed} onSeedConsumed={() => setChatSeed('')} />}
         {screen === 'prepare' && <PrepareScreen night={night} setScreen={setScreen} />}
         {screen === 'settings' && <SettingsScreen night={night} onNightToggle={toggleNight} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}

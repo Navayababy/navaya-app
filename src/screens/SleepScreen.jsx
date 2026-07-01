@@ -4,7 +4,7 @@ import { getSleeps, addSleep, babyDisplayName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
 import { sleepSecsOnDay } from '../lib/stats.js'
-import { fmtMins, fmtSince, timeAgo, dateStr, buildISO } from '../utils/time.js'
+import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO } from '../utils/time.js'
 import { newId } from '../lib/id.js'
 
 // h:mm:ss for long-running sleeps, mm:ss under an hour
@@ -17,6 +17,8 @@ function fmtClock(secs) {
 }
 
 // Log-only screen — no history list here — that's what the Logbook is for.
+// Starts simple: two choices (start the live timer, or log a sleep that
+// already happened) rather than showing both flows at once.
 export default function SleepScreen({ night, timer, authUser, profile, sharedSleeps, onSleepSaved }) {
   const p = palette(night)
   const { sleepActive, sleepElapsed, startSleep, stopSleep } = timer
@@ -26,6 +28,12 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   const [logDate,    setLogDate]    = useState(() => dateStr())
   const [startTime,  setStartTime]  = useState('13:00')
   const [endTime,    setEndTime]    = useState('14:00')
+
+  // Stopping the timer doesn't save right away — it asks "is this the right
+  // time?" first, since the tap to end it often lands a few minutes after
+  // baby actually woke up. Nothing is written until that's confirmed.
+  const [pendingSleep, setPendingSleep] = useState(null)   // { startedAt, endedAt, durationSecs }
+  const [confirmTime,  setConfirmTime]  = useState('')
 
   // Keep the list in sync with shared sleeps when in shared mode.
   // Skipped while the user is composing a manual entry.
@@ -71,9 +79,20 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
   const handleStop = () => {
     const sleepData = stopSleep()
-    const sleep = { id: newId(), ...sleepData }
+    setPendingSleep(sleepData)
+    setConfirmTime(timeStr(sleepData.endedAt))
+  }
+
+  // There's no sleep.update sync — rather than save then patch, the record
+  // is only created once the (possibly adjusted) end time is confirmed.
+  const confirmSleep = () => {
+    if (!pendingSleep) return
+    const endedAt = buildISO(dateStr(pendingSleep.endedAt), confirmTime)
+    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(pendingSleep.startedAt)) / 1000))
+    const sleep = { id: newId(), startedAt: pendingSleep.startedAt, endedAt, durationSecs }
     setSleeps(addSleep(sleep))
     shareSleep(sleep)
+    setPendingSleep(null)
   }
 
   const handleAddPast = () => {
@@ -126,79 +145,86 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
         ))}
       </div>
 
-      {/* Sleep timer card */}
-      <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}` }}>
-        <div style={{ padding: '16px 18px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: sleepActive ? brand.accent : brand.sand, flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: p.sub, letterSpacing: '.04em' }}>
-            {sleepActive ? 'Sleeping' : 'Ready to start'}
-          </span>
-          {!sleepActive && timeSinceLast !== null && (
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: p.sub }}>woke {timeSinceLast}{timeSinceLast !== 'just now' ? ' ago' : ''}</span>
-          )}
-        </div>
-
-        <div style={{ textAlign: 'center', padding: '22px 0 18px' }}>
-          {sleepActive ? (
-            <>
-              <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 60, fontWeight: 300, color: p.heading, lineHeight: 1, letterSpacing: '-1px' }}>
-                {fmtClock(sleepElapsed)}
-              </span>
-              <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 4, letterSpacing: '.08em', textTransform: 'uppercase' }}>
-                asleep
-              </span>
-            </>
-          ) : (
-            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 300, color: p.sub, lineHeight: 1 }}>
-              {timeSinceLast !== null
-                ? timeSinceLast === 'just now' ? 'just woke up' : `${timeSinceLast} since last sleep`
-                : 'Track naps and night sleep'}
+      {sleepActive ? (
+        /* ── Live timer ── */
+        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}` }}>
+          <div style={{ padding: '16px 18px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: brand.accent, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: p.sub, letterSpacing: '.04em' }}>Sleeping</span>
+          </div>
+          <div style={{ textAlign: 'center', padding: '22px 0 18px' }}>
+            <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 60, fontWeight: 300, color: p.heading, lineHeight: 1, letterSpacing: '-1px' }}>
+              {fmtClock(sleepElapsed)}
             </span>
-          )}
-        </div>
-
-        <div style={{ padding: '0 16px 18px' }}>
-          {sleepActive ? (
+            <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 4, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+              asleep
+            </span>
+          </div>
+          <div style={{ padding: '0 16px 18px' }}>
             <button onClick={handleStop}
               style={{ width: '100%', padding: '18px', borderRadius: 16, border: `1.5px solid ${p.heading}`, cursor: 'pointer', background: 'transparent', color: p.heading, fontSize: 15, fontWeight: 600 }}>
               {babyDisplayName()}&apos;s awake
             </button>
-          ) : (
-            <button onClick={startSleep}
-              style={{ width: '100%', padding: '18px', borderRadius: 16, border: 'none', cursor: 'pointer', background: brand.bark, color: brand.sand, fontSize: 15, fontWeight: 600 }}>
-              ☾ &nbsp;{babyDisplayName()}&apos;s asleep
-            </button>
-          )}
+          </div>
         </div>
-      </div>
-
-      {/* Add a past sleep */}
-      <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, padding: '14px 16px' }}>
-        {addingPast ? (
-          <>
-            <span style={{ display: 'block', fontSize: 12, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 12 }}>Add a sleep</span>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-              <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
-            </div>
-            <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 14 }}>
-              If the end time is earlier than the start, we&apos;ll assume the sleep crossed midnight.
-            </span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setAddingPast(false)} style={{ flex: 1, padding: '14px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 14, color: p.sub }}>Cancel</button>
-              <button onClick={handleAddPast} style={{ flex: 1, padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>Save</button>
-            </div>
-          </>
-        ) : (
-          <button onClick={() => setAddingPast(true)}
-            style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: p.sub, padding: '4px 0', textAlign: 'left' }}>
-            + Add a sleep you forgot to log
+      ) : pendingSleep ? (
+        /* ── Confirm the end time before saving ── */
+        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, padding: '18px 16px' }}>
+          <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>Did {babyDisplayName(true)} wake up around this time?</span>
+          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Adjust it if the timer ran on a bit longer than the actual nap.</span>
+          <input
+            type="time" value={confirmTime}
+            onChange={e => setConfirmTime(e.target.value)}
+            style={{ ...inputStyle, width: '100%', marginBottom: 14, fontSize: 20, textAlign: 'center' }}
+          />
+          <button onClick={confirmSleep}
+            style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 15, color: brand.sand, fontWeight: 600 }}>
+            Save
           </button>
-        )}
-      </div>
+        </div>
+      ) : addingPast ? (
+        /* ── Manual past entry ── */
+        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, padding: '18px 16px' }}>
+          <span style={{ display: 'block', fontSize: 12, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 12 }}>Add a sleep</span>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+            <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+          </div>
+          <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 14 }}>
+            If the end time is earlier than the start, we&apos;ll assume the sleep crossed midnight.
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setAddingPast(false)} style={{ flex: 1, padding: '14px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 14, color: p.sub }}>Cancel</button>
+            <button onClick={handleAddPast} style={{ flex: 1, padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>Save</button>
+          </div>
+        </div>
+      ) : (
+        /* ── Two simple choices ── */
+        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, padding: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: brand.sand, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: p.sub, letterSpacing: '.04em' }}>Ready to start</span>
+            {timeSinceLast !== null && (
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: p.sub }}>woke {timeSinceLast}{timeSinceLast !== 'just now' ? ' ago' : ''}</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={startSleep}
+              style={{ flex: 1, minHeight: 84, borderRadius: 16, border: 'none', cursor: 'pointer', background: brand.bark, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <span style={{ fontSize: 18, color: brand.sand, lineHeight: 1 }}>☾</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: brand.sand }}>Start sleep timer</span>
+            </button>
+            <button onClick={() => setAddingPast(true)}
+              style={{ flex: 1, minHeight: 84, borderRadius: 16, border: `1.5px solid ${p.border}`, cursor: 'pointer', background: 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <span style={{ fontSize: 18, color: p.text, lineHeight: 1 }}>+</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: p.text }}>Log a sleep</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       </div>
     </div>

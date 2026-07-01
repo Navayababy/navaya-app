@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, deleteSleep, getBabyName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
@@ -34,7 +34,7 @@ function PartnerAttributionIndicator({ entry, sharedMode, authUser }) {
 
 
 // ── Main screen ───────────────────────────────────────────────────────────────
-export default function HistoryScreen({ night, authUser, profile, sharedSessions, sharedNappies, sharedMedicines, sharedSleeps, onRefreshSessions, onRefreshNappies, onRefreshMedicines, onRefreshSleeps }) {
+export default function HistoryScreen({ night, authUser, profile, sharedSessions, sharedNappies, sharedMedicines, sharedSleeps, onRefreshSessions, onRefreshNappies, onRefreshMedicines, onRefreshSleeps, openAddMedicine, onAddMedicineConsumed }) {
   const p = palette(night)
   const sharedMode = !!(profile?.household_id && sharedSessions)
   const babyName = getBabyName()
@@ -56,6 +56,13 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'medicine'
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
   const [showInsights, setShowInsights] = useState(false)
+
+  // Arriving here from Home's "Log medicine" card — open the modal directly.
+  useEffect(() => {
+    if (!openAddMedicine) return
+    setAddMode('medicine')
+    onAddMedicineConsumed?.()
+  }, [openAddMedicine, onAddMedicineConsumed])
 
   const feeds = sharedMode
     ? sharedSessions.map(normalizeFeedSession)
