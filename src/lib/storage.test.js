@@ -112,8 +112,8 @@ describe('sleeps', () => {
 
   it('tracks the active sleep marker', () => {
     expect(getActiveSleep()).toBeNull()
-    setActiveSleep(1234)
-    expect(getActiveSleep()).toEqual({ startedAt: 1234 })
+    setActiveSleep('sleep-1', 1234)
+    expect(getActiveSleep()).toEqual({ id: 'sleep-1', startedAt: 1234 })
     clearActiveSleep()
     expect(getActiveSleep()).toBeNull()
   })

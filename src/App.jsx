@@ -63,6 +63,16 @@ export default function App() {
     setAnnouncement(null)
   }
 
+  // Keeps the browser/OS chrome colour matching what's actually on screen:
+  // the splash's brown while it's showing (already the default in index.html),
+  // then the real light/dark background once it's faded — otherwise a night
+  // -mode user is left with a cream status bar over a dark app.
+  useEffect(() => {
+    if (showSplash) return
+    document.querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', night ? '#1A1410' : '#F5F0EB')
+  }, [showSplash, night])
+
   const viewportHeight = useViewportHeight()
   const timerProps = useFeedTimer()
   const sleepTimerProps = useSleepTimer()
@@ -102,6 +112,7 @@ export default function App() {
       flexDirection: 'column',
       background:    bg,
       overflow:      'hidden',
+      paddingTop:    'env(safe-area-inset-top, 0px)',
     }}>
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       {announcement && <AnnouncementBanner night={night} announcement={announcement} onDismiss={dismissBanner} />}

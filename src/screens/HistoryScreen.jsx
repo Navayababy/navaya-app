@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, deleteSleep, getBabyName } from '../lib/storage.js'
+import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, updateSleep, deleteSleep, getBabyName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, dayShort, timeStr, todayDateStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep, isBottleFeed } from '../lib/normalize.js'
@@ -46,7 +46,9 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
   const nappyList    = sharedMode && sharedNappies   ? sharedNappies.map(normalizeNappy)     : nappies
   const medicineList = sharedMode && sharedMedicines ? sharedMedicines.map(normalizeMedicine) : medicines
-  const sleepList    = sharedMode && sharedSleeps    ? sharedSleeps.map(normalizeSleep)       : sleeps
+  // A sleep in progress (no ended_at yet) has no place in a historical
+  // logbook — it's what the Sleep tab's live timer is for.
+  const sleepList    = sharedMode && sharedSleeps    ? sharedSleeps.filter(s => s.ended_at != null).map(normalizeSleep) : sleeps
   // Every day group starts collapsed — the logbook is for looking things up,
   // not for greeting you with everything already unfurled.
   const [openDay,     setOpenDay]     = useState(null)
@@ -224,9 +226,9 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     setAddMode(null)
   }
 
-  // There is no nappy.update / sleep.update sync handler, so an edit is a
-  // delete of the old entry followed by an insert of the corrected one — both
-  // already-tested paths. The corrected entry carries a fresh id.
+  // There is no nappy.update sync handler, so an edit is a delete of the old
+  // entry followed by an insert of the corrected one — both already-tested
+  // paths. The corrected entry carries a fresh id.
   const handleEditNappy = async (oldId, nappy) => {
     deleteNappy(oldId)
     setNappies(addNappy(nappy))
@@ -241,16 +243,15 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     setEditNappy(null)
   }
 
+  // Sleep has a real update sync handler (unlike nappies above), so an edit
+  // patches the existing row in place — the id (and any household member's
+  // ability to end/correct it) stays the same.
   const handleEditSleep = async (oldId, sleep) => {
-    deleteSleep(oldId)
-    setSleeps(addSleep(sleep))
-    if (sharedMode) {
-      const { ok } = await syncWrite('sleep.delete', { id: oldId })
-      if (ok) onRefreshSleeps?.()
-      if (authUser && profile?.household_id) {
-        syncWrite('sleep.insert', { id: sleep.id, householdId: profile.household_id, loggedBy: authUser.id, startedAt: sleep.startedAt, endedAt: sleep.endedAt, durationSecs: sleep.durationSecs })
-          .then(({ ok }) => { if (ok) onRefreshSleeps?.() })
-      }
+    const changes = { startedAt: sleep.startedAt, endedAt: sleep.endedAt, durationSecs: sleep.durationSecs }
+    setSleeps(updateSleep(oldId, changes))
+    if (sharedMode && authUser && profile?.household_id) {
+      syncWrite('sleep.update', { id: oldId, ...changes })
+        .then(({ ok }) => { if (ok) onRefreshSleeps?.() })
     }
     setEditSleep(null)
   }

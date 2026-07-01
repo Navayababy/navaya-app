@@ -150,6 +150,19 @@ export async function insertSleepLog({ id, householdId, loggedBy, startedAt, end
   return { error }
 }
 
+// Unlike updateFeedSession, any household member may call this — see the
+// sleeps_update RLS policy. Ending or correcting a sleep someone else in the
+// household started is the point of live cross-device sync.
+export async function updateSleepLog(id, { startedAt, endedAt, durationSecs }) {
+  const { data, error } = await supabase
+    .from('sleep_logs')
+    .update({ started_at: startedAt, ended_at: endedAt, duration_secs: durationSecs ?? null })
+    .eq('id', id)
+    .select()
+    .single()
+  return { data, error }
+}
+
 export async function getRecentSleepLogs(householdId, limit = 200) {
   const { data, error } = await supabase
     .from('sleep_logs')

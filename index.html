@@ -2,14 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Navaya" />
     <meta name="application-name" content="Navaya" />
-    <meta name="theme-color" content="#F5F0EB" />
+    <!-- Matches manifest background_color and the in-app SplashScreen so the
+         native launch splash, browser chrome and first React paint are all
+         the same brown — App.jsx swaps this once the splash has faded. -->
+    <meta name="theme-color" content="#4A3728" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/icons/navaya-icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/navaya-icon-192.png" />
     <title>Navaya</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet" />

@@ -167,8 +167,8 @@ export function getActiveSleep() {
   }
 }
 
-export function setActiveSleep(startedAt) {
-  localStorage.setItem(KEYS.activeSleep, JSON.stringify({ startedAt }));
+export function setActiveSleep(id, startedAt) {
+  localStorage.setItem(KEYS.activeSleep, JSON.stringify({ id, startedAt }));
 }
 
 export function clearActiveSleep() {
