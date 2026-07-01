@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, addSession, updateSession, babyDisplayName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
-import { fmt, fmtSince, timeStr, dateStr, buildISO } from '../utils/time.js'
+import { fmt, fmtSince, timeStr, nearestDateForTime } from '../utils/time.js'
 import { normalizeFeedSession, isBottleFeed, feedTypeOf } from '../lib/normalize.js'
 import { newId } from '../lib/id.js'
 
@@ -130,9 +130,14 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
   // then moves on to the amount/mood check-in exactly as before.
   const confirmFeedEndTime = () => {
     if (!pendingSession) return
-    const startedAt = buildISO(dateStr(pendingSession.startedAt), confirmStartTime)
-    let endedAt = buildISO(dateStr(pendingSession.endedAt), confirmEndTime)
-    // An end time at or before the start means the feed crossed midnight
+    // Each edited time is re-dated against its own original instant, so a
+    // correction that pushes the start (or end) across a midnight boundary —
+    // in either direction — lands on the right day rather than inheriting
+    // the original, now-wrong date.
+    const startedAt = nearestDateForTime(pendingSession.startedAt, confirmStartTime)
+    let endedAt = nearestDateForTime(pendingSession.endedAt, confirmEndTime)
+    // Safety net for the (now rare) case both corrected times still end up
+    // out of order — never save a negative-duration feed.
     if (new Date(endedAt) <= new Date(startedAt)) {
       const d = new Date(endedAt)
       d.setDate(d.getDate() + 1)

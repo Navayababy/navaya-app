@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { fmt, fmtMins, fmtSince, timeAgo, dayLabel, dayShort, fmtDayTime, timeStr, dateStr, buildISO, todayDateStr, dayKey } from './time.js'
+import { fmt, fmtMins, fmtSince, timeAgo, dayLabel, dayShort, fmtDayTime, timeStr, dateStr, buildISO, todayDateStr, dayKey, nearestDateForTime } from './time.js'
 
 // Fixed "now": Tuesday 9 June 2026, 14:30 local time
 const NOW = new Date(2026, 5, 9, 14, 30, 0)
@@ -120,5 +120,42 @@ describe('buildISO', () => {
     expect(d.getDate()).toBe(9)
     expect(d.getHours()).toBe(14)
     expect(d.getMinutes()).toBe(5)
+  })
+})
+
+describe('nearestDateForTime', () => {
+  it('keeps a same-day correction on the reference date', () => {
+    const ref = new Date(2026, 5, 9, 14, 20).toISOString()
+    const iso = nearestDateForTime(ref, '14:05')
+    expect(dateStr(iso)).toBe('2026-06-09')
+    expect(timeStr(iso)).toBe('14:05')
+  })
+
+  it('rolls a correction forward across midnight when that is closer', () => {
+    // Original start was 23:50 on the 8th; the corrected time (00:02) is
+    // actually just after midnight on the 9th, not the same 23:50 evening.
+    const ref = new Date(2026, 5, 8, 23, 50).toISOString()
+    const iso = nearestDateForTime(ref, '00:02')
+    expect(dateStr(iso)).toBe('2026-06-09')
+    expect(timeStr(iso)).toBe('00:02')
+  })
+
+  it('rolls a correction backward across midnight when that is closer', () => {
+    // Original was 00:05 on the 9th; corrected to 23:58, which is closer to
+    // the evening before than 23:58 later that same night.
+    const ref = new Date(2026, 5, 9, 0, 5).toISOString()
+    const iso = nearestDateForTime(ref, '23:58')
+    expect(dateStr(iso)).toBe('2026-06-08')
+    expect(timeStr(iso)).toBe('23:58')
+  })
+
+  it('fixes the reported bug: correcting a pre-midnight start to just after midnight', () => {
+    const startedAt = new Date(2026, 5, 8, 23, 50).toISOString()
+    const endedAt   = new Date(2026, 5, 9, 0, 10).toISOString()
+    const correctedStart = nearestDateForTime(startedAt, '00:02')
+    const correctedEnd   = nearestDateForTime(endedAt, '00:10')
+    const durationSecs = Math.round((new Date(correctedEnd) - new Date(correctedStart)) / 1000)
+    expect(dateStr(correctedStart)).toBe('2026-06-09')
+    expect(durationSecs).toBe(8 * 60)
   })
 })
