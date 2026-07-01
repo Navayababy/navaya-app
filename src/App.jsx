@@ -16,6 +16,7 @@ import PrepareScreen from './screens/PrepareScreen.jsx'
 import SettingsScreen from './screens/SettingsScreen.jsx'
 import NavBar        from './components/NavBar.jsx'
 import AnnouncementBanner from './components/AnnouncementBanner.jsx'
+import SplashScreen   from './components/SplashScreen.jsx'
 import { brand, palette } from './theme.js'
 
 // Low-light hours — used only to auto-suggest night mode before the user has
@@ -26,6 +27,7 @@ const isAfterDark = () => {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true)
   const [screen, setScreen] = useState('home')
   // Honour an explicit choice; otherwise ease into night mode after dark.
   const [night, setNight]   = useState(() => (hasNightPref() ? getNightMode() : isAfterDark()))
@@ -93,6 +95,7 @@ export default function App() {
       background:    bg,
       overflow:      'hidden',
     }}>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       {announcement && <AnnouncementBanner night={night} announcement={announcement} onDismiss={dismissBanner} />}
       {nightHint && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: palette(night).card, borderBottom: `1px solid ${palette(night).navBdr}` }}>
