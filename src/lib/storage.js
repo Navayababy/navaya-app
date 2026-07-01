@@ -18,6 +18,7 @@ const KEYS = {
   activeTimer:    'navaya_active_timer',
   activeSleep:    'navaya_active_sleep',
   dismissedAnnouncements: 'navaya_dismissed_announcements',
+  lastOpenedAt:   'navaya_last_opened_at',
 };
 
 // ── Sessions ────────────────────────────────────────────────────────────────
@@ -255,6 +256,19 @@ export function setBabyName(name) {
 // for mid-sentence use ("when baby drifts off") vs sentence start ("Baby").
 export function babyDisplayName(lower = false) {
   return getBabyName() || (lower ? 'baby' : 'Baby');
+}
+
+// ── Splash greeting ──────────────────────────────────────────────────────────
+
+// When the app was last opened, so the splash can tell a same-day return
+// ("Welcome back") from a longer gap ("We missed you"). Read before writing —
+// callers need the previous value before recording this visit.
+export function getLastOpenedAt() {
+  return localStorage.getItem(KEYS.lastOpenedAt);
+}
+
+export function setLastOpenedAt() {
+  localStorage.setItem(KEYS.lastOpenedAt, new Date().toISOString());
 }
 
 // ── Announcements ────────────────────────────────────────────────────────────
