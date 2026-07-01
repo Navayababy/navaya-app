@@ -87,6 +87,24 @@ export function buildISO(dateVal, timeVal) {
   return new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
 }
 
+// Rebuilds a corrected time-of-day into a full timestamp, choosing whichever
+// calendar date (the reference instant's day, or the day before/after) lands
+// closest to that reference. A correction that crosses a midnight boundary —
+// in either direction — otherwise silently keeps the original, wrong date,
+// which is exactly the case a same-day rebuild via buildISO(dateStr(ref), ...)
+// gets wrong.
+export function nearestDateForTime(referenceIso, timeVal) {
+  const ref = new Date(referenceIso)
+  const candidates = [-1, 0, 1].map(offset => {
+    const d = new Date(ref)
+    d.setDate(d.getDate() + offset)
+    return buildISO(dateStr(d), timeVal)
+  })
+  return candidates.reduce((best, candidate) =>
+    Math.abs(new Date(candidate) - ref) < Math.abs(new Date(best) - ref) ? candidate : best
+  )
+}
+
 export function todayDateStr() {
   return dateStr()
 }
