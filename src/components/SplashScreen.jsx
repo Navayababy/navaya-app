@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { brand } from '../theme.js'
 
 // Warm, general-parenting quotes — about savouring the moment, not surviving
@@ -22,12 +22,20 @@ export default function SplashScreen({ onDone }) {
   const [fading, setFading] = useState(false)
   const [quote]  = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)])
 
+  // App passes a fresh inline function on every one of its own re-renders
+  // (auth/household data settling in, etc). Keeping onDone out of the effect
+  // dependencies — via a ref that's always current — means the countdown
+  // starts once on mount and can't be silently restarted by an unrelated
+  // parent re-render, which was leaving the splash stuck on screen.
+  const onDoneRef = useRef(onDone)
+  onDoneRef.current = onDone
+
   useEffect(() => {
     // A real pause so the quote can actually be read before the cross-fade.
     const fadeTimer = setTimeout(() => setFading(true), 4000)
-    const doneTimer = setTimeout(() => onDone(),        4500)
+    const doneTimer = setTimeout(() => onDoneRef.current(), 4500)
     return () => { clearTimeout(fadeTimer); clearTimeout(doneTimer) }
-  }, [onDone])
+  }, [])
 
   return (
     <div style={{
