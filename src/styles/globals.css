@@ -10,6 +10,10 @@ html, body, #root {
 }
 
 body {
+  /* Matches the native launch splash and the in-app SplashScreen brown so
+     there's no flash of the browser's default background before either
+     paints. */
+  background: #4A3728;
   font-family: 'Jost', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

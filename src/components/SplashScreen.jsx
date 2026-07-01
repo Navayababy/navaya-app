@@ -21,6 +21,19 @@ const QUOTES = [
 export default function SplashScreen({ onDone }) {
   const [fading, setFading] = useState(false)
   const [quote]  = useState(() => QUOTES[Math.floor(Math.random() * QUOTES.length)])
+  // Cormorant Garamond loads over the network; showing the quote before it's
+  // ready renders it in a fallback serif first, then reflows to the real
+  // font mid-splash — the "jolt" this screen exists to avoid. Wait for it
+  // (capped, in case fonts.ready never settles) before revealing the text.
+  const [fontsReady, setFontsReady] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    const ready = document.fonts?.ready ?? Promise.resolve()
+    const capped = Promise.race([ready, new Promise(r => setTimeout(r, 1500))])
+    capped.then(() => { if (!cancelled) setFontsReady(true) })
+    return () => { cancelled = true }
+  }, [])
 
   // App passes a fresh inline function on every one of its own re-renders
   // (auth/household data settling in, etc). Keeping onDone out of the effect
@@ -70,9 +83,11 @@ export default function SplashScreen({ onDone }) {
         </svg>
       </div>
 
-      <p className="fade-up" style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: 26, color: brand.parchment, opacity: 0.85, textAlign: 'center', lineHeight: 1.5, margin: 0 }}>
-        "{quote}"
-      </p>
+      {fontsReady && (
+        <p className="fade-up" style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: 26, color: brand.parchment, opacity: 0.85, textAlign: 'center', lineHeight: 1.5, margin: 0 }}>
+          "{quote}"
+        </p>
+      )}
     </div>
   )
 }
