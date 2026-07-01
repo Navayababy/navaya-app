@@ -11,9 +11,13 @@ begin;
 
 alter table public.sleep_logs alter column ended_at drop not null;
 
+-- NOT VALID: enforced for new/updated rows without requiring every existing
+-- row to already satisfy it. Some legacy rows predate this check and would
+-- otherwise block the migration outright; validate the constraint later
+-- once/if that historical data gets cleaned up.
 alter table public.sleep_logs drop constraint if exists sleep_logs_time_check;
 alter table public.sleep_logs add constraint sleep_logs_time_check
-  check (ended_at is null or ended_at >= started_at);
+  check (ended_at is null or ended_at >= started_at) not valid;
 
 grant update on table public.sleep_logs to authenticated;
 
