@@ -7,7 +7,12 @@ function isStandalone() {
 }
 
 function isIOS() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+  const ua = navigator.userAgent
+  if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return true
+  // Since iPadOS 13, Safari sends a desktop-style "Macintosh" user agent by
+  // default (no "iPad" token at all), so the check above misses it entirely.
+  // A real Mac reports 0 touch points; an iPad, even with this UA, doesn't.
+  return /Macintosh/.test(ua) && navigator.maxTouchPoints > 1
 }
 
 // Nudges a browser visitor towards the installed app. Android/Chrome/Edge
