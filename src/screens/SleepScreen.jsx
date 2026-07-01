@@ -4,7 +4,7 @@ import { getSleeps, addSleep, babyDisplayName, getPendingSleep, savePendingSleep
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
 import { sleepSecsOnDay } from '../lib/stats.js'
-import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO } from '../utils/time.js'
+import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO, nearestDateForTime } from '../utils/time.js'
 import { newId } from '../lib/id.js'
 
 // h:mm:ss for long-running sleeps, mm:ss under an hour
@@ -29,23 +29,32 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   const [startTime,  setStartTime]  = useState('13:00')
   const [endTime,    setEndTime]    = useState('14:00')
 
-  // Stopping the timer doesn't save right away — it asks "is this the right
-  // time?" first, since the tap to end it often lands a few minutes after
-  // baby actually woke up. The active timer is already cleared by then, so
-  // this is persisted too (not just component state) — otherwise switching
-  // tabs or closing the app before confirming would silently lose the sleep.
-  // The persisted record also carries whatever the user has typed into the
-  // confirmation field so far — otherwise an edit made just before a tab
-  // switch or reload would silently revert to the original stop time.
-  const [pendingSleep, setPendingSleep] = useState(() => getPendingSleep())   // { startedAt, endedAt, durationSecs, confirmTime }
-  const [confirmTime,  setConfirmTime]  = useState(() => {
+  // Stopping the timer doesn't save right away — it asks "is this right?"
+  // first, since the tap to start often lands after baby's actually asleep,
+  // and the tap to end often lands a few minutes after baby actually woke
+  // up. The active timer is already cleared by then, so this is persisted
+  // too (not just component state) — otherwise switching tabs or closing
+  // the app before confirming would silently lose the sleep. The persisted
+  // record also carries whatever the user has typed into the confirmation
+  // fields so far — otherwise an edit made just before a tab switch or
+  // reload would silently revert to the original start/stop times.
+  const [pendingSleep, setPendingSleep] = useState(() => getPendingSleep())   // { startedAt, endedAt, durationSecs, confirmStartTime, confirmEndTime }
+  const [confirmStartTime, setConfirmStartTime] = useState(() => {
     const restored = getPendingSleep()
-    return restored ? (restored.confirmTime || timeStr(restored.endedAt)) : ''
+    return restored ? (restored.confirmStartTime || timeStr(restored.startedAt)) : ''
+  })
+  const [confirmEndTime, setConfirmEndTime] = useState(() => {
+    const restored = getPendingSleep()
+    return restored ? (restored.confirmEndTime || timeStr(restored.endedAt)) : ''
   })
 
-  const updateConfirmTime = (value) => {
-    setConfirmTime(value)
-    if (pendingSleep) savePendingSleep({ ...pendingSleep, confirmTime: value })
+  const updateConfirmStartTime = (value) => {
+    setConfirmStartTime(value)
+    if (pendingSleep) savePendingSleep({ ...pendingSleep, confirmStartTime: value })
+  }
+  const updateConfirmEndTime = (value) => {
+    setConfirmEndTime(value)
+    if (pendingSleep) savePendingSleep({ ...pendingSleep, confirmEndTime: value })
   }
 
   // Keep the list in sync with shared sleeps when in shared mode.
@@ -92,19 +101,33 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
   const handleStop = () => {
     const sleepData = stopSleep()
-    const initialConfirmTime = timeStr(sleepData.endedAt)
-    savePendingSleep({ ...sleepData, confirmTime: initialConfirmTime })
+    const initialConfirmStartTime = timeStr(sleepData.startedAt)
+    const initialConfirmEndTime = timeStr(sleepData.endedAt)
+    savePendingSleep({ ...sleepData, confirmStartTime: initialConfirmStartTime, confirmEndTime: initialConfirmEndTime })
     setPendingSleep(sleepData)
-    setConfirmTime(initialConfirmTime)
+    setConfirmStartTime(initialConfirmStartTime)
+    setConfirmEndTime(initialConfirmEndTime)
   }
 
   // There's no sleep.update sync — rather than save then patch, the record
-  // is only created once the (possibly adjusted) end time is confirmed.
+  // is only created once the (possibly adjusted) start/end times are
+  // confirmed. Each edited time is re-dated against its own original
+  // instant, so a correction that pushes the start (or end) across a
+  // midnight boundary — in either direction — lands on the right day
+  // rather than inheriting the original, now-wrong date.
   const confirmSleep = () => {
     if (!pendingSleep) return
-    const endedAt = buildISO(dateStr(pendingSleep.endedAt), confirmTime)
-    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(pendingSleep.startedAt)) / 1000))
-    const sleep = { id: newId(), startedAt: pendingSleep.startedAt, endedAt, durationSecs }
+    const startedAt = nearestDateForTime(pendingSleep.startedAt, confirmStartTime)
+    let endedAt = nearestDateForTime(pendingSleep.endedAt, confirmEndTime)
+    // Safety net for the (now rare) case both corrected times still end up
+    // out of order — never save a negative-duration sleep.
+    if (new Date(endedAt) <= new Date(startedAt)) {
+      const d = new Date(endedAt)
+      d.setDate(d.getDate() + 1)
+      endedAt = d.toISOString()
+    }
+    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
+    const sleep = { id: newId(), startedAt, endedAt, durationSecs }
     setSleeps(addSleep(sleep))
     shareSleep(sleep)
     clearPendingSleep()
@@ -184,15 +207,28 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
           </div>
         </div>
       ) : pendingSleep ? (
-        /* ── Confirm the end time before saving ── */
+        /* ── Confirm the start and end time before saving ── */
         <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, padding: '18px 16px' }}>
-          <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>Did {babyDisplayName(true)} wake up around this time?</span>
-          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Adjust it if the timer ran on a bit longer than the actual nap.</span>
-          <input
-            type="time" value={confirmTime}
-            onChange={e => updateConfirmTime(e.target.value)}
-            style={{ ...inputStyle, width: '100%', marginBottom: 14, fontSize: 20, textAlign: 'center' }}
-          />
+          <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>Did {babyDisplayName(true)} fall asleep and wake up around these times?</span>
+          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Adjust either if the timer was started or stopped a little late.</span>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase' }}>Fell asleep</span>
+              <input
+                type="time" value={confirmStartTime}
+                onChange={e => updateConfirmStartTime(e.target.value)}
+                style={{ ...inputStyle, width: '100%', fontSize: 18, textAlign: 'center', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase' }}>Woke up</span>
+              <input
+                type="time" value={confirmEndTime}
+                onChange={e => updateConfirmEndTime(e.target.value)}
+                style={{ ...inputStyle, width: '100%', fontSize: 18, textAlign: 'center', boxSizing: 'border-box' }}
+              />
+            </div>
+          </div>
           <button onClick={confirmSleep}
             style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 15, color: brand.sand, fontWeight: 600 }}>
             Save
