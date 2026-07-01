@@ -1,9 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, getNappies, getSleeps, getUserName, getChecked, getCustomItems, getHiddenDefaults, getLastOpenedAt, setLastOpenedAt } from '../lib/storage.js'
+import { getUserName, getChecked, getCustomItems, getHiddenDefaults, getLastOpenedAt, setLastOpenedAt } from '../lib/storage.js'
 import { PREPARE_DEFAULT_ITEMS } from '../lib/constants.js'
-import { fmtSince } from '../utils/time.js'
-import { normalizeFeedSession, normalizeNappy, normalizeSleep } from '../lib/normalize.js'
 
 function greeting() {
   const h = new Date().getHours()
@@ -37,14 +35,9 @@ function PillIcon({ color, size = 22 }) {
 // The launch screen: answers "what do you want to do" and nothing else.
 // Feed, Nappy, Sleep and Sage each own their real logging UI on their own
 // tab — this screen only routes to them, it never re-implements them.
-export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine, profile, timer, sleepTimer, sharedSessions, sharedNappies, sharedSleeps }) {
+export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine, profile }) {
   const p = palette(night)
-  const { feedActive, feedType, feedSide } = timer
-  const { sleepActive } = sleepTimer
 
-  const [sessions, setSessions] = useState(() => getSessions())
-  const [nappies,  setNappies]  = useState(() => getNappies())
-  const [sleeps,   setSleeps]   = useState(() => getSleeps())
   const [userName] = useState(() => getUserName() || '')
 
   // "Welcome back" replaces the time-of-day greeting once a day or more has
@@ -56,51 +49,6 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
     return last ? (Date.now() - new Date(last).getTime()) >= 24 * 60 * 60 * 1000 : false
   })
   useEffect(() => { setLastOpenedAt() }, [])
-
-  useEffect(() => {
-    if (!sharedSessions) return
-    setSessions(sharedSessions.map(normalizeFeedSession))
-  }, [sharedSessions])
-  useEffect(() => {
-    if (!sharedNappies) return
-    setNappies(sharedNappies.map(normalizeNappy))
-  }, [sharedNappies])
-  useEffect(() => {
-    if (!sharedSleeps) return
-    setSleeps(sharedSleeps.map(normalizeSleep))
-  }, [sharedSleeps])
-
-  // Re-render every 30s so the "since" times in the glance line stay current
-  const [, setClockTick] = useState(0)
-  useEffect(() => {
-    const tick = setInterval(() => setClockTick(t => t + 1), 30000)
-    return () => clearInterval(tick)
-  }, [])
-
-  const lastSession = useMemo(() =>
-    sessions.reduce((latest, s) => !latest || new Date(s.startedAt) > new Date(latest.startedAt) ? s : latest, null)
-  , [sessions])
-  const lastNappy = useMemo(() =>
-    nappies.reduce((latest, n) => !latest || new Date(n.loggedAt) > new Date(latest.loggedAt) ? n : latest, null)
-  , [nappies])
-  const lastSleep = useMemo(() =>
-    sleeps.reduce((latest, s) => !latest || new Date(s.endedAt) > new Date(latest.endedAt) ? s : latest, null)
-  , [sleeps])
-
-  const feedGlance = feedActive
-    ? `Feeding now${feedType === 'bottle' ? '' : ` · ${feedSide === 'L' ? 'left' : 'right'}`}`
-    : lastSession?.endedAt
-      ? `Fed ${fmtSince(lastSession.endedAt)}${fmtSince(lastSession.endedAt) !== 'just now' ? ' ago' : ''}`
-      : null
-  const nappyGlance = lastNappy
-    ? `Nappy ${fmtSince(lastNappy.loggedAt)}${fmtSince(lastNappy.loggedAt) !== 'just now' ? ' ago' : ''}`
-    : null
-  const sleepGlance = sleepActive
-    ? 'Asleep now'
-    : lastSleep?.endedAt
-      ? `Awake ${fmtSince(lastSleep.endedAt)}${fmtSince(lastSleep.endedAt) !== 'just now' ? ' ago' : ''}`
-      : null
-  const glanceLine = [feedGlance, nappyGlance, sleepGlance].filter(Boolean).join('  ·  ')
 
   // Prepare checklist progress for the secondary card below.
   const [prepProgress] = useState(() => {
@@ -151,9 +99,6 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
             style={{ display: 'block', margin: '4px auto 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: p.sub, letterSpacing: '.02em' }}>
             + Add your name
           </button>
-        )}
-        {glanceLine && (
-          <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.4, marginTop: 6 }}>{glanceLine}</span>
         )}
       </div>
 
