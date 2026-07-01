@@ -41,8 +41,8 @@ export default function App() {
   // open so the parent stays in control of whether to send it.
   const [chatSeed, setChatSeed] = useState('')
   const [announcement, setAnnouncement] = useState(null)
-  // Set when "Log medicine" is tapped on Home — tells the Logbook to open
-  // its Add Medicine modal immediately rather than the type picker.
+  // Set when "Medicine" is tapped on Home — tells the Logbook to open its
+  // Add Medicine modal immediately rather than the type picker.
   const [openAddMedicine, setOpenAddMedicine] = useState(false)
 
   // Fetch the live broadcast banner once on load. RLS only returns active,
