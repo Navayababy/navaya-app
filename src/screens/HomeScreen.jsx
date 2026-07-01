@@ -118,8 +118,16 @@ export default function HomeScreen({ night, setScreen, onAskSage, profile, timer
           Good {greeting()}
         </span>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 46, fontWeight: 400, color: p.heading, lineHeight: 1.15, marginTop: 4 }}>
-          {userName || 'there'}
+          {userName || 'Welcome'}
         </span>
+        {/* No name yet — invite adding one rather than faking familiarity
+            with a placeholder like "there". */}
+        {!userName && (
+          <button onClick={() => setScreen('settings')}
+            style={{ display: 'block', margin: '6px auto 0', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: p.sub, letterSpacing: '.02em' }}>
+            + Add your name
+          </button>
+        )}
         {glanceLine && (
           <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.5, marginTop: 10 }}>{glanceLine}</span>
         )}
