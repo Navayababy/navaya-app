@@ -67,10 +67,12 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
   const rowStyle = (accent) => ({ display: 'flex', alignItems: 'center', gap: 16, width: '100%', minHeight: 76, borderRadius: 20, border: `1.5px solid ${accent}`, background: brand.bark, cursor: 'pointer', padding: '0 20px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' })
   const iconWrapStyle = (accent) => ({ width: 42, height: 42, borderRadius: '50%', background: `${accent}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 })
   // Parchment (near-white) rather than sand for the label itself — sand's
-  // tan-on-brown contrast (~5:1) reads as soft/blurry at this weight since
-  // both are the same warm hue; parchment's ~9:1 contrast gives the label a
-  // crisp edge while sand stays for each row's accent — border, icon, chevron.
-  const primaryLabel = { fontSize: 18, fontWeight: 700, color: brand.parchment, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
+  // tan-on-brown contrast (~5:1) reads as soft since both are the same warm
+  // hue. Bold weight made it worse, not better: light text on a dark fill
+  // "blooms" at heavier weights (the halation/irradiation effect — bright
+  // strokes visually bleed into the dark background), so medium weight at
+  // the higher-contrast colour is what actually reads crisp.
+  const primaryLabel = { fontSize: 18, fontWeight: 500, color: brand.parchment, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
   const primaryChevron = { marginLeft: 'auto', color: brand.sand, opacity: 0.55, fontSize: 18, flexShrink: 0 }
   // Secondary pair (Sage, Going out) sit side by side, together spanning the
   // same width as the four rows above — a matched, quieter pair rather than
