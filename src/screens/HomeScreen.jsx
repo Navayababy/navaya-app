@@ -92,12 +92,13 @@ export default function HomeScreen({ night, setScreen, onAskSage, profile, timer
 
   // Full-width rows rather than a 2x2 grid — each action reads as its own
   // clear, oversized button rather than a tile in a dense grid.
-  // A visible sand border, not just the fill colour, is what keeps these
-  // legible in night mode — brand.bark and the near-black night background
-  // sit too close in luminance for the fill alone to read as a button edge.
-  const primaryRow = { display: 'flex', alignItems: 'center', gap: 16, width: '100%', minHeight: 80, borderRadius: 20, border: `1.5px solid ${brand.sand}`, background: brand.bark, cursor: 'pointer', padding: '0 20px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }
+  // Every row keeps the same dark-brown fill (that's the "high contrast,
+  // oversized" foundation) — each action's own accent only tints its
+  // border and icon badge, so the four read as a family with a hero each,
+  // not four identical blocks distinguished by text alone.
+  const rowStyle = (accent) => ({ display: 'flex', alignItems: 'center', gap: 16, width: '100%', minHeight: 80, borderRadius: 20, border: `1.5px solid ${accent}`, background: brand.bark, cursor: 'pointer', padding: '0 20px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' })
+  const iconWrapStyle = (accent) => ({ width: 44, height: 44, borderRadius: '50%', background: `${accent}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 })
   const primaryLabel = { fontSize: 19, fontWeight: 600, color: brand.sand, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
-  const primaryIconWrap = { width: 44, height: 44, borderRadius: '50%', background: 'rgba(196,168,130,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }
   const primaryChevron = { marginLeft: 'auto', color: brand.sand, opacity: 0.55, fontSize: 18, flexShrink: 0 }
 
   return (
@@ -126,23 +127,23 @@ export default function HomeScreen({ night, setScreen, onAskSage, profile, timer
 
       {/* ── What do you want to do? ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '22px 16px 0' }}>
-        <button onClick={() => setScreen('feed')} style={primaryRow}>
-          <span style={primaryIconWrap}><BottleIcon color={brand.sand} /></span>
+        <button onClick={() => setScreen('feed')} style={rowStyle(brand.accent)}>
+          <span style={iconWrapStyle(brand.accent)}><BottleIcon color={brand.accent} /></span>
           <span style={primaryLabel}>Log a feed</span>
           <span style={primaryChevron}>›</span>
         </button>
-        <button onClick={() => setScreen('nappy')} style={primaryRow}>
-          <span style={primaryIconWrap}><span style={{ fontSize: 22, color: brand.sand, lineHeight: 1 }}>◈</span></span>
+        <button onClick={() => setScreen('nappy')} style={rowStyle(brand.mist)}>
+          <span style={iconWrapStyle(brand.mist)}><span style={{ fontSize: 22, color: brand.mist, lineHeight: 1 }}>◈</span></span>
           <span style={primaryLabel}>Log a nappy</span>
           <span style={primaryChevron}>›</span>
         </button>
-        <button onClick={() => setScreen('sleep')} style={primaryRow}>
-          <span style={primaryIconWrap}><span style={{ fontSize: 22, color: brand.sand, lineHeight: 1 }}>☾</span></span>
+        <button onClick={() => setScreen('sleep')} style={rowStyle(brand.green)}>
+          <span style={iconWrapStyle(brand.green)}><span style={{ fontSize: 22, color: brand.green, lineHeight: 1 }}>☾</span></span>
           <span style={primaryLabel}>Log sleep</span>
           <span style={primaryChevron}>›</span>
         </button>
-        <button onClick={() => onAskSage('')} style={primaryRow}>
-          <span style={primaryIconWrap}><span style={{ fontSize: 22, color: brand.sand, lineHeight: 1 }}>✦</span></span>
+        <button onClick={() => onAskSage('')} style={rowStyle(brand.sand)}>
+          <span style={iconWrapStyle(brand.sand)}><span style={{ fontSize: 22, color: brand.sand, lineHeight: 1 }}>✦</span></span>
           <span style={primaryLabel}>Ask Sage</span>
           <span style={primaryChevron}>›</span>
         </button>

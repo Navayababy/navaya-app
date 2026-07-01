@@ -104,9 +104,12 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
       <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '12px 0' }}>
 
       {/* Header */}
-      <div style={{ padding: '8px 16px 16px' }}>
+      <div style={{ padding: '8px 16px 16px', textAlign: 'center' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.green}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+          <span style={{ fontSize: 24, color: brand.green, lineHeight: 1 }}>☾</span>
+        </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Rest &amp; recharge</span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Sleep</span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 400, color: p.heading, marginTop: 4 }}>Sleep</span>
       </div>
 
       {/* Stats — bigger, roomier tiles */}

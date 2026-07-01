@@ -33,6 +33,7 @@ export const brand = {
   cream:   '#F5F0EB',
   green:   '#6B8F71',
   accent:  '#D4956A',
+  mist:    '#7FA3B5',   // cool counterpoint used only to tell the four Home actions apart
 };
 
 export function palette(night) {

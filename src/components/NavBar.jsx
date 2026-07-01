@@ -14,13 +14,15 @@ function BottleIcon() {
 
 // Prepare is reached from the Home screen card rather than the nav bar —
 // it's a before-you-go-out task, not a many-times-a-day one like these six.
+// Logging tabs run left to right in the order they happen in a day, with
+// Sage and the Logbook (lookup, not logging) trailing at the end.
 const tabs = [
   { id: 'home',    icon: '⌂',              label: 'Home'    },
   { id: 'feed',    icon: <BottleIcon />,    label: 'Feed'    },
   { id: 'nappy',   icon: '◈',              label: 'Nappy'   },
   { id: 'sleep',   icon: '☾',              label: 'Sleep'   },
-  { id: 'history', icon: '≡',              label: 'Logbook' },
   { id: 'chat',    icon: '✦',              label: 'Sage'    },
+  { id: 'history', icon: '≡',              label: 'Logbook' },
 ]
 
 export default function NavBar({ screen, setScreen, night, feedActive, sleepActive }) {

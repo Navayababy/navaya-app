@@ -12,6 +12,18 @@ function todayMidnight() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime()
 }
 
+// Same glyph and accent as the "Log a feed" card on Home, so the icon
+// carries over from the tap that brought you here.
+function BottleIcon({ color, size = 26 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="2" width="6" height="3.5" rx="1" />
+      <path d="M9.5 5.5 8.3 8.6A3 3 0 0 0 7 11v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9a3 3 0 0 0-1.3-2.4L14.5 5.5" />
+      <path d="M7.3 13.5h9.4" />
+    </svg>
+  )
+}
+
 // Dedicated feed tab — the timer plus feed-only context. Nappy and sleep
 // logging live on their own tabs; this screen no longer duplicates them.
 // No history list here — that's what the Logbook is for; this screen is
@@ -175,9 +187,12 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
       <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '12px 0' }}>
 
       {/* Header */}
-      <div style={{ padding: '8px 16px 16px' }}>
+      <div style={{ padding: '8px 16px 16px', textAlign: 'center' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.accent}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+          <BottleIcon color={brand.accent} size={26} />
+        </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Nourish &amp; nurture</span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Feed</span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 400, color: p.heading, marginTop: 4 }}>Feed</span>
       </div>
 
       {/* Stats — bigger, roomier tiles */}

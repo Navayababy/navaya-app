@@ -47,8 +47,9 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const nappyList    = sharedMode && sharedNappies   ? sharedNappies.map(normalizeNappy)     : nappies
   const medicineList = sharedMode && sharedMedicines ? sharedMedicines.map(normalizeMedicine) : medicines
   const sleepList    = sharedMode && sharedSleeps    ? sharedSleeps.map(normalizeSleep)       : sleeps
-  // Open today's group by default so a just-logged entry is one tap from edit.
-  const [openDay,     setOpenDay]     = useState(() => dayLabel(new Date()))
+  // Every day group starts collapsed — the logbook is for looking things up,
+  // not for greeting you with everything already unfurled.
+  const [openDay,     setOpenDay]     = useState(null)
   const [editSession, setEditSession] = useState(null)
   const [editNappy,   setEditNappy]   = useState(null)
   const [editSleep,   setEditSleep]   = useState(null)
@@ -298,31 +299,34 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', background: p.bg }}>
+    <div style={{ flex: 1, overflowY: 'auto', background: p.bg, position: 'relative' }}>
 
-      <div style={{ padding: '20px 16px 12px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-        <div>
-          <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>
-            {sharedMode ? 'Shared logbook' : 'Your journey'}
-          </span>
-          <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Logbook</span>
-          {sharedMode && (
-            <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-              <span style={{ fontSize: 11, color: p.sub, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: brand.accent, display: 'inline-block', flexShrink: 0 }} />
-                You
-              </span>
-              <span style={{ fontSize: 11, color: p.sub, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: brand.green, display: 'inline-block', flexShrink: 0 }} />
-                Partner
-              </span>
-            </div>
-          )}
+      <button onClick={() => setAddMode('picker')} aria-label="Add entry"
+        style={{ position: 'absolute', top: 16, right: 16, zIndex: 1, display: 'flex', alignItems: 'center', gap: 6, background: brand.bark, border: 'none', borderRadius: 20, padding: '8px 15px 8px 13px', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+        <span style={{ color: brand.sand, fontSize: 17, lineHeight: 1, marginTop: -1 }}>+</span>
+        <span style={{ color: brand.sand, fontSize: 13, fontWeight: 500 }}>Add</span>
+      </button>
+
+      <div style={{ padding: '20px 16px 12px', textAlign: 'center' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.sand}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+          <span style={{ fontSize: 22, color: brand.sand, lineHeight: 1 }}>≡</span>
         </div>
-        <button onClick={() => setAddMode('picker')} aria-label="Add entry" style={{ display: 'flex', alignItems: 'center', gap: 6, background: brand.bark, border: 'none', borderRadius: 20, padding: '8px 15px 8px 13px', cursor: 'pointer', marginBottom: 4, WebkitTapHighlightColor: 'transparent' }}>
-          <span style={{ color: brand.sand, fontSize: 17, lineHeight: 1, marginTop: -1 }}>+</span>
-          <span style={{ color: brand.sand, fontSize: 13, fontWeight: 500 }}>Add</span>
-        </button>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>
+          {sharedMode ? 'Shared logbook' : 'Your journey'}
+        </span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 400, color: p.heading, marginTop: 4 }}>Logbook</span>
+        {sharedMode && (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 8 }}>
+            <span style={{ fontSize: 11, color: p.sub, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: brand.accent, display: 'inline-block', flexShrink: 0 }} />
+              You
+            </span>
+            <span style={{ fontSize: 11, color: p.sub, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: brand.green, display: 'inline-block', flexShrink: 0 }} />
+              Partner
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Today stats ── */}
