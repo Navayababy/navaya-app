@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
 import { getSessions, addSession, updateSession, babyDisplayName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
-import { fmt, fmtSince } from '../utils/time.js'
+import { fmt, fmtSince, timeStr, dateStr, buildISO } from '../utils/time.js'
 import { normalizeFeedSession, isBottleFeed, feedTypeOf } from '../lib/normalize.js'
 import { newId } from '../lib/id.js'
 
@@ -39,6 +39,10 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
   const [milkInput,      setMilkInput]     = useState('expressed')
   const [pendingSession, setPending]       = useState(null)
   const [partnerFlash,   setPartnerFlash]  = useState(false)
+  // Confirm the actual end time before moving on to mood/amount — the tap to
+  // finish a feed often lands a little after it actually ended.
+  const [showEndTimeConfirm, setShowEndTimeConfirm] = useState(false)
+  const [confirmEndTime,     setConfirmEndTime]      = useState('')
   const flashTimersRef = useRef([])
 
   useEffect(() => {
@@ -111,7 +115,40 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
     }
 
     setPending(session)
-    if (session.feedType === 'bottle') {
+    setConfirmEndTime(timeStr(session.endedAt))
+    setShowEndTimeConfirm(true)
+  }
+
+  useEffect(() => () => flashTimersRef.current.forEach(clearTimeout), [])
+
+  // The feed is already saved (with the raw stop time) by the time this
+  // runs — confirming just patches the end time if it needed adjusting,
+  // then moves on to the amount/mood check-in exactly as before.
+  const confirmFeedEndTime = () => {
+    if (!pendingSession) return
+    const endedAt = buildISO(dateStr(pendingSession.endedAt), confirmEndTime)
+    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(pendingSession.startedAt)) / 1000))
+    const changes = { endedAt, durationSecs }
+    setSessions(sortByTime(updateSession(pendingSession.id, changes)))
+    setPending(prev => (prev ? { ...prev, ...changes } : prev))
+    const remote = pendingRemoteRef.current
+    if (remote) {
+      remote.then(() => {
+        syncWrite('feed.update', {
+          id:           pendingSession.id,
+          side:         pendingSession.side,
+          startedAt:    pendingSession.startedAt,
+          endedAt,
+          durationSecs,
+          moodScore:    pendingSession.mood ?? null,
+          feedType:     feedTypeOf(pendingSession),
+          amountMl:     pendingSession.amountMl ?? null,
+          milkType:     pendingSession.milkType ?? null,
+        }).then(({ ok }) => { if (ok) onSessionSaved?.() })
+      })
+    }
+    setShowEndTimeConfirm(false)
+    if (pendingSession.feedType === 'bottle') {
       setAmountInput('')
       setMilkInput('expressed')
       setShowAmount(true)
@@ -119,8 +156,6 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
       setShowMood(true)
     }
   }
-
-  useEffect(() => () => flashTimersRef.current.forEach(clearTimeout), [])
 
   const saveMood = (mood) => {
     if (!pendingSession) return
@@ -285,6 +320,23 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
         <div className="fade-up" style={{ margin: '0 16px 16px', background: brand.green, borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ color: '#fff', fontSize: 13 }}>✓</span>
           <span style={{ fontSize: 13, color: '#fff', fontWeight: 500 }}>Your partner can see this feed</span>
+        </div>
+      )}
+
+      {/* Confirm the end time before moving on */}
+      {showEndTimeConfirm && (
+        <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, padding: '16px' }}>
+          <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>Did the feed end around this time?</span>
+          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Adjust it if you finished the feed before tapping stop.</span>
+          <input
+            type="time" value={confirmEndTime}
+            onChange={e => setConfirmEndTime(e.target.value)}
+            style={{ width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 20, textAlign: 'center', color: p.text, fontFamily: "'Jost', sans-serif", outline: 'none', marginBottom: 14, boxSizing: 'border-box' }}
+          />
+          <button onClick={confirmFeedEndTime}
+            style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>
+            Confirm
+          </button>
         </div>
       )}
 
