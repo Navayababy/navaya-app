@@ -3,6 +3,9 @@ import { brand, palette } from '../theme.js'
 import { signIn, signUp, signOut, createHousehold, createInviteCode, acceptInvite } from '../lib/db.js'
 import { isSupabaseConfigured } from '../lib/supabase.js'
 import { outboxSize } from '../lib/outbox.js'
+import { getUserName, setUserName, getBabyName, setBabyName } from '../lib/storage.js'
+
+const APP_URL = 'https://www.navayababy.co.uk'
 
 function Card({ children, p }) {
   return (
@@ -12,7 +15,7 @@ function Card({ children, p }) {
   )
 }
 
-export default function SettingsScreen({ night, authUser, profile, householdMembers = [], householdMembersError, onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
+export default function SettingsScreen({ night, onNightToggle, authUser, profile, householdMembers = [], householdMembersError, onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
   const p = palette(night)
   const householdMembersReady = Array.isArray(householdMembers)
   const memberList = householdMembersReady ? householdMembers : []
@@ -38,6 +41,27 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
   const [syncing,          setSyncing]          = useState(false)
   const [syncDone,         setSyncDone]         = useState(false)
   const [pendingSync,      setPendingSync]      = useState(() => outboxSize())
+
+  // ── Names & sharing ────────────────────────────────────────────────────────
+  const [parentName, setParentNameVal] = useState(() => getUserName())
+  const [babyNameVal, setBabyNameVal]  = useState(() => getBabyName())
+  const [shareMsg,    setShareMsg]     = useState(null)
+
+  const handleParentName = (v) => { setParentNameVal(v); setUserName(v.trim()) }
+  const handleBabyName   = (v) => { setBabyNameVal(v); setBabyName(v.trim()) }
+
+  const handleShareApp = async () => {
+    const shareData = { title: 'Navaya', text: 'Track feeds, nappies and sleep with Navaya.', url: APP_URL }
+    if (navigator.share) {
+      try { await navigator.share(shareData) } catch { /* user cancelled */ }
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(APP_URL)
+      setShareMsg('Link copied')
+      setTimeout(() => setShareMsg(null), 2000)
+    } catch { /* clipboard unavailable */ }
+  }
 
   const inputStyle = {
     width: '100%', background: p.bg, border: `1px solid ${p.border}`,
@@ -168,6 +192,66 @@ export default function SettingsScreen({ night, authUser, profile, householdMemb
           Your family
         </span>
       </div>
+
+      {/* ── Names & appearance ── */}
+      <Card p={p}>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 14 }}>
+          Preferences
+        </span>
+
+        <span style={labelStyle}>Your name</span>
+        <input
+          value={parentName}
+          onChange={e => handleParentName(e.target.value)}
+          placeholder="e.g. Sarah"
+          style={{ ...inputStyle, marginBottom: 14 }}
+        />
+
+        <span style={labelStyle}>Baby's name</span>
+        <input
+          value={babyNameVal}
+          onChange={e => handleBabyName(e.target.value)}
+          placeholder="e.g. Millie"
+          style={{ ...inputStyle, marginBottom: 16 }}
+        />
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTop: `1px solid ${p.border}` }}>
+          <div>
+            <span style={{ display: 'block', fontSize: 13, color: p.text, fontWeight: 500 }}>Night mode</span>
+            <span style={{ display: 'block', fontSize: 11, color: p.sub, marginTop: 2 }}>Switch the app to a darker palette</span>
+          </div>
+          <button onClick={onNightToggle} aria-label={night ? 'Switch to light mode' : 'Switch to night mode'}
+            style={{ background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '7px 14px', cursor: 'pointer', color: p.sub, fontSize: 12, display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+            <span aria-hidden="true">{night ? '☀' : '☽'}</span>{night ? 'Day' : 'Night'}
+          </button>
+        </div>
+      </Card>
+
+      {/* ── Share & follow ── */}
+      <Card p={p}>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 10 }}>
+          Spread the word
+        </span>
+        {shareMsg && (
+          <div style={{ fontSize: 12, color: brand.green, marginBottom: 10 }}>{shareMsg}</div>
+        )}
+        <button onClick={handleShareApp} style={secondaryBtn}>
+          Share Navaya
+        </button>
+        <a
+          href="https://www.instagram.com/navaya.life"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12, color: p.sub, textDecoration: 'none' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+            <circle cx="12" cy="12" r="4"/>
+            <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/>
+          </svg>
+          @navaya.life
+        </a>
+      </Card>
 
       {/* ── Auth card ── */}
       {!isSupabaseConfigured ? (
