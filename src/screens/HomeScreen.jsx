@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { brand, palette } from '../theme.js'
-import { getSessions, getNappies, getSleeps, getUserName, getChecked, getCustomItems, getHiddenDefaults } from '../lib/storage.js'
+import { getSessions, getNappies, getSleeps, getUserName, getChecked, getCustomItems, getHiddenDefaults, getLastOpenedAt, setLastOpenedAt } from '../lib/storage.js'
 import { PREPARE_DEFAULT_ITEMS } from '../lib/constants.js'
 import { fmtSince } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeSleep } from '../lib/normalize.js'
@@ -36,6 +36,16 @@ export default function HomeScreen({ night, setScreen, onAskSage, profile, timer
   const [nappies,  setNappies]  = useState(() => getNappies())
   const [sleeps,   setSleeps]   = useState(() => getSleeps())
   const [userName] = useState(() => getUserName() || '')
+
+  // "Welcome back" replaces the time-of-day greeting once a day or more has
+  // passed since the app was last opened — otherwise it's just "Good
+  // afternoon" as usual. Read once per visit, then record this visit for
+  // next time.
+  const [welcomeBack] = useState(() => {
+    const last = getLastOpenedAt()
+    return last ? (Date.now() - new Date(last).getTime()) >= 24 * 60 * 60 * 1000 : false
+  })
+  useEffect(() => { setLastOpenedAt() }, [])
 
   useEffect(() => {
     if (!sharedSessions) return
@@ -115,7 +125,7 @@ export default function HomeScreen({ night, setScreen, onAskSage, profile, timer
       {/* ── Greeting — the one moment of warmth, given real room ── */}
       <div style={{ padding: '10px 16px 8px', textAlign: 'center' }}>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 15, color: brand.sand, letterSpacing: '.14em', textTransform: 'uppercase' }}>
-          Good {greeting()}
+          {welcomeBack ? 'Welcome back' : `Good ${greeting()}`}
         </span>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 46, fontWeight: 400, color: p.heading, lineHeight: 1.15, marginTop: 4 }}>
           {userName || 'Welcome'}
