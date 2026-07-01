@@ -57,7 +57,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
   const [showInsights, setShowInsights] = useState(false)
 
-  // Arriving here from Home's "Log medicine" card — open the modal directly.
+  // Arriving here from Home's "Medicine" card — open the modal directly.
   useEffect(() => {
     if (!openAddMedicine) return
     setAddMode('medicine')

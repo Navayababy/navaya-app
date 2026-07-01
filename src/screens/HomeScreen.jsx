@@ -72,7 +72,11 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
   // "blooms" at heavier weights (the halation/irradiation effect — bright
   // strokes visually bleed into the dark background), so medium weight at
   // the higher-contrast colour is what actually reads crisp.
-  const primaryLabel = { fontSize: 18, fontWeight: 500, color: brand.parchment, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
+  // Labels are single bare nouns (icon + chevron + accent colour already
+  // signal "tap to log this") — a size bump uses the row's width on purpose
+  // now that there's less text, rather than stretching letter-spacing, which
+  // hurts legibility more than it helps fill space.
+  const primaryLabel = { fontSize: 21, fontWeight: 500, color: brand.parchment, fontFamily: "'Jost', sans-serif", letterSpacing: '.01em' }
   const primaryChevron = { marginLeft: 'auto', color: brand.sand, opacity: 0.55, fontSize: 18, flexShrink: 0 }
   // Secondary pair (Sage, Going out) sit side by side, together spanning the
   // same width as the four rows above — a matched, quieter pair rather than
@@ -112,22 +116,22 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 16px 0' }}>
         <button onClick={() => setScreen('feed')} style={rowStyle(brand.accent)}>
           <span style={iconWrapStyle(brand.accent)}><BottleIcon color={brand.accent} size={22} /></span>
-          <span style={primaryLabel}>Log a feed</span>
+          <span style={primaryLabel}>Feed</span>
           <span style={primaryChevron}>›</span>
         </button>
         <button onClick={() => setScreen('nappy')} style={rowStyle(brand.mist)}>
           <span style={iconWrapStyle(brand.mist)}><span style={{ fontSize: 20, color: brand.mist, lineHeight: 1 }}>◈</span></span>
-          <span style={primaryLabel}>Log a nappy</span>
+          <span style={primaryLabel}>Nappy</span>
           <span style={primaryChevron}>›</span>
         </button>
         <button onClick={() => setScreen('sleep')} style={rowStyle(brand.green)}>
           <span style={iconWrapStyle(brand.green)}><span style={{ fontSize: 20, color: brand.green, lineHeight: 1 }}>☾</span></span>
-          <span style={primaryLabel}>Log sleep</span>
+          <span style={primaryLabel}>Sleep</span>
           <span style={primaryChevron}>›</span>
         </button>
         <button onClick={onLogMedicine} style={rowStyle(brand.rose)}>
           <span style={iconWrapStyle(brand.rose)}><PillIcon color={brand.rose} size={20} /></span>
-          <span style={primaryLabel}>Log medicine</span>
+          <span style={primaryLabel}>Medicine</span>
           <span style={primaryChevron}>›</span>
         </button>
       </div>

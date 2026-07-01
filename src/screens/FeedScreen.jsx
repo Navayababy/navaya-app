@@ -12,8 +12,8 @@ function todayMidnight() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime()
 }
 
-// Same glyph and accent as the "Log a feed" card on Home, so the icon
-// carries over from the tap that brought you here.
+// Same glyph and accent as the "Feed" card on Home, so the icon carries
+// over from the tap that brought you here.
 function BottleIcon({ color, size = 26 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
