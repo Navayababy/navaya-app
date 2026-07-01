@@ -62,17 +62,24 @@ export default function PrepareScreen({ night, setScreen }) {
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', background: p.bg }}>
+    <div style={{ flex: 1, overflowY: 'auto', background: p.bg, position: 'relative' }}>
 
-      {/* Header */}
-      <div style={{ padding: '20px 16px 12px' }}>
-        <button onClick={() => setScreen?.('home')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 8px', fontSize: 12, color: p.sub, letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: 4 }}>
-          ‹ Home
-        </button>
+      <button onClick={() => setScreen?.('home')}
+        style={{ position: 'absolute', top: 18, left: 16, zIndex: 1, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 12, color: p.sub, letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: 4 }}>
+        ‹ Home
+      </button>
+
+      {/* Header — centred, matching Feed/Nappy/Sleep/Logbook */}
+      <div style={{ padding: '20px 16px 12px', textAlign: 'center' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.sand}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={brand.sand} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="4" />
+            <path d="M7 12l3 3 7-7" />
+          </svg>
+        </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Feed with confidence</span>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 400, color: p.heading, marginTop: 2 }}>Prepare to go out</span>
-        <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 4, lineHeight: 1.5 }}>Run through this before you leave. Everything ticked means you're ready.</span>
+        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 400, color: p.heading, marginTop: 4 }}>Prepare to go out</span>
+        <span style={{ display: 'block', fontSize: 12, color: p.sub, marginTop: 6, lineHeight: 1.5 }}>Run through this before you leave. Everything ticked means you're ready.</span>
       </div>
 
       {/* Progress card */}
