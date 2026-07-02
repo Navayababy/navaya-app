@@ -68,20 +68,21 @@ export function useHousehold() {
       const migrationKey = `navaya_migrated_${data.household_id}`
       let migrationFailed = false
       if (!localStorage.getItem(migrationKey)) {
-        const alreadySynced = await userHasDataInHousehold(data.household_id, userId)
-        if (!alreadySynced) {
-          try {
+        try {
+          // The already-synced check lives inside the try: if it throws, that
+          // is a failed migration attempt (no flag, retry next profile load),
+          // not a licence to skip or to re-run blind.
+          const alreadySynced = await userHasDataInHousehold(data.household_id, userId)
+          if (!alreadySynced) {
             await migrateLocalSessions(data.household_id, userId, getSessions())
             await migrateLocalNappies(data.household_id, userId, getNappies())
             await migrateLocalMedicines(data.household_id, userId, getMedicines())
-            localStorage.setItem(migrationKey, '1')
-          } catch (err) {
-            console.error('Migration failed, will retry next login:', err)
-            logError('migration.initial', err)
-            migrationFailed = true
           }
-        } else {
           localStorage.setItem(migrationKey, '1')
+        } catch (err) {
+          console.error('Migration failed, will retry next login:', err)
+          logError('migration.initial', err)
+          migrationFailed = true
         }
       }
       // Sleep tracking shipped after the original migration, so it has its own

@@ -205,28 +205,36 @@ export async function deleteMedicineLog(id) {
 // ── Migrations ────────────────────────────────────────────────────────────────
 
 export async function userHasDataInHousehold(householdId, userId) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('feed_sessions')
     .select('id')
     .eq('household_id', householdId)
     .eq('logged_by', userId)
     .limit(1)
+  // A failed check must not be read as "no data yet" — that would let the
+  // migration proceed (and its flag be written) on the strength of an error.
+  if (error) throw error
   return !!(data?.length)
 }
 
 // Rows that carry a client UUID are upserted (ignore duplicates), making a
 // re-run of the migration idempotent. Legacy rows without a UUID id fall back
 // to plain inserts; the migration flag is only set on full success, so they
-// are uploaded at most once.
+// are uploaded at most once. Supabase reports rejections (RLS, constraints)
+// via the returned `error` rather than by throwing, so each batch must be
+// checked and re-thrown — otherwise a rejected batch counts as success, the
+// flag gets written, and the entries are never retried.
 async function insertMigratedRows(table, rows) {
   const BATCH = 50
   const withId    = rows.filter(r => r.id)
   const withoutId = rows.filter(r => !r.id).map(({ id: _id, ...rest }) => rest)
   for (let i = 0; i < withId.length; i += BATCH) {
-    await supabase.from(table).upsert(withId.slice(i, i + BATCH), { onConflict: 'id', ignoreDuplicates: true })
+    const { error } = await supabase.from(table).upsert(withId.slice(i, i + BATCH), { onConflict: 'id', ignoreDuplicates: true })
+    if (error) throw error
   }
   for (let i = 0; i < withoutId.length; i += BATCH) {
-    await supabase.from(table).insert(withoutId.slice(i, i + BATCH))
+    const { error } = await supabase.from(table).insert(withoutId.slice(i, i + BATCH))
+    if (error) throw error
   }
 }
 
