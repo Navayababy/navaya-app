@@ -51,7 +51,9 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' })
   }
 
-  const { messages } = req.body
+  // req.body is undefined when the request has no JSON body (or a non-JSON
+  // content type) — that must be a 400, not an unhandled TypeError.
+  const { messages } = req.body || {}
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages array required' })
