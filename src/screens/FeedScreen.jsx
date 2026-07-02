@@ -127,15 +127,22 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
     setPending(session)
     setConfirmStartTime(timeStr(session.startedAt))
     setConfirmEndTime(timeStr(session.endedAt))
+    // A new stop supersedes any check-in card still open from a previous
+    // feed — pendingSession now points at this feed, so a stale card would
+    // save its answers onto the wrong session (or null the pending session
+    // before this feed's own card could save at all).
+    setShowMood(false)
     // Bottles get one combined check-in (times + amount + milk type) rather
     // than a separate time-confirmation step first — the amount and type are
     // what a bottle feed is really about, and a time card in front of them
     // read like the whole flow ended there.
     if (session.feedType === 'bottle') {
+      setShowEndTimeConfirm(false)
       setAmountInput('')
       setMilkInput('expressed')
       setShowAmount(true)
     } else {
+      setShowAmount(false)
       setShowEndTimeConfirm(true)
     }
   }
