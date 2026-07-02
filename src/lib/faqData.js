@@ -34,7 +34,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: 'Can I edit or delete something I logged by mistake?',
-        a: 'Yes — tap the entry in your Logbook. You can edit or delete anything you logged yourself; if your partner logged it, ask them to make the change (sleep is the one exception — either of you can adjust a sleep, since that\'s what lets you stop each other\'s timers).',
+        a: 'Yes — tap the entry in your Logbook. You can edit or delete anything you logged yourself; if your partner logged it, ask them to make the change. (A running sleep timer is the one thing you can both control — either of you can stop it — but once a sleep is saved, the same rule applies.)',
       },
       {
         q: 'Can I remove someone from my household, or leave a household myself?',
