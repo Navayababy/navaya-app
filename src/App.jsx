@@ -14,6 +14,7 @@ import SleepScreen   from './screens/SleepScreen.jsx'
 import ChatScreen    from './screens/ChatScreen.jsx'
 import PrepareScreen from './screens/PrepareScreen.jsx'
 import SettingsScreen from './screens/SettingsScreen.jsx'
+import HelpScreen    from './screens/HelpScreen.jsx'
 import NavBar        from './components/NavBar.jsx'
 import AnnouncementBanner from './components/AnnouncementBanner.jsx'
 import InstallBanner  from './components/InstallBanner.jsx'
@@ -141,7 +142,8 @@ export default function App() {
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} sharedSleeps={sharedSleeps} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} onRefreshSleeps={refreshSharedSleeps} openAddMedicine={openAddMedicine} onAddMedicineConsumed={() => setOpenAddMedicine(false)} />}
         {screen === 'chat'    && <ChatScreen    night={night} messages={chatMessages} setMessages={setChatMessages} seed={chatSeed} onSeedConsumed={() => setChatSeed('')} />}
         {screen === 'prepare' && <PrepareScreen night={night} setScreen={setScreen} />}
-        {screen === 'settings' && <SettingsScreen night={night} onNightToggle={toggleNight} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} migrationError={migrationError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
+        {screen === 'settings' && <SettingsScreen night={night} setScreen={setScreen} onNightToggle={toggleNight} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} migrationError={migrationError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
+        {screen === 'help'    && <HelpScreen    night={night} setScreen={setScreen} />}
       </div>
       <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={timerProps.feedActive} sleepActive={sleepTimerProps.sleepActive} />
     </div>

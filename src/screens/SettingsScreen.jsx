@@ -15,7 +15,7 @@ function Card({ children, p }) {
   )
 }
 
-export default function SettingsScreen({ night, onNightToggle, authUser, profile, householdMembers = [], householdMembersError, migrationError, onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
+export default function SettingsScreen({ night, setScreen, onNightToggle, authUser, profile, householdMembers = [], householdMembersError, migrationError, onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
   const p = palette(night)
   const householdMembersReady = Array.isArray(householdMembers)
   const memberList = householdMembersReady ? householdMembers : []
@@ -587,6 +587,9 @@ export default function SettingsScreen({ night, onNightToggle, authUser, profile
         <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.6, marginBottom: 14 }}>
           If something isn't working or you have a question about the app, we're here.
         </span>
+        <button onClick={() => setScreen?.('help')} style={{ ...secondaryBtn, marginTop: 0, marginBottom: 8 }}>
+          Help &amp; FAQ
+        </button>
         <a
           href="mailto:support@navayababy.co.uk"
           style={{
