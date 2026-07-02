@@ -37,7 +37,7 @@ function PillIcon({ color, size = 22 }) {
 // The launch screen: answers "what do you want to do" and nothing else.
 // Feed, Nappy, Sleep and Sage each own their real logging UI on their own
 // tab — this screen only routes to them, it never re-implements them.
-export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine, authUser, profile }) {
+export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine, onOpenHelp, authUser, profile }) {
   const p = palette(night)
 
   const [userName] = useState(() => getUserName() || '')
@@ -100,6 +100,14 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg, position: 'relative' }}>
+      {/* Help — the corner opposite Settings, so the way to answers is
+          always one tap from the launch screen rather than buried two
+          levels deep behind the settings button */}
+      <button onClick={() => onOpenHelp?.()} aria-label="Help and FAQ"
+        style={{ position: 'absolute', top: 16, left: 16, zIndex: 1, background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '6px 13px', cursor: 'pointer', color: p.sub, fontSize: 12 }}>
+        ? Help
+      </button>
+
       {/* Settings — pinned to the corner, out of the main flow so it doesn't
           claim one of the evenly-spread content slots below */}
       <button onClick={() => setScreen('settings')}

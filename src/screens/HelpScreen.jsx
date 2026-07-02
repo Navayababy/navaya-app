@@ -25,7 +25,7 @@ function AnswerText({ text, color }) {
 // Help & FAQ — reached from Settings, not the nav bar (like Prepare, it's an
 // occasional lookup, not a many-times-a-day tab). One question open at a
 // time keeps the page scannable; searching filters across every category.
-export default function HelpScreen({ night, setScreen }) {
+export default function HelpScreen({ night, setScreen, backTo = 'settings' }) {
   const p = palette(night)
 
   const [query, setQuery] = useState('')
@@ -58,9 +58,9 @@ export default function HelpScreen({ night, setScreen }) {
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg, position: 'relative' }}>
 
-      <button onClick={() => setScreen?.('settings')}
+      <button onClick={() => setScreen?.(backTo)}
         style={{ position: 'absolute', top: 18, left: 16, zIndex: 1, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 12, color: p.sub, letterSpacing: '.04em', display: 'flex', alignItems: 'center', gap: 4 }}>
-        ‹ Settings
+        ‹ {backTo === 'home' ? 'Home' : 'Settings'}
       </button>
 
       {/* Header — centred, matching Feed/Nappy/Sleep/Logbook/Prepare */}

@@ -5,6 +5,7 @@ import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtSince, timeStr, nearestDateForTime } from '../utils/time.js'
 import { normalizeFeedSession, isBottleFeed, feedTypeOf } from '../lib/normalize.js'
 import { newId } from '../lib/id.js'
+import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
 
 const sortByTime = arr => [...arr].sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
 
@@ -47,6 +48,11 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
   const [confirmStartTime,   setConfirmStartTime]    = useState('')
   const [confirmEndTime,     setConfirmEndTime]      = useState('')
   const flashTimersRef = useRef([])
+  // One-time note for shared households — the counterpart of SleepScreen's
+  // sync hint: a running feed timer is local to this device, unlike sleep,
+  // and the "partner can see this feed" flash only appears after saving.
+  const [feedSyncHintUnseen, dismissFeedSyncHint] = useOneTimeHint('feed_sync_hint_seen')
+  const showFeedSyncHint = feedSyncHintUnseen && !!(authUser && profile?.household_id)
 
   useEffect(() => {
     if (!sharedSessions) return
@@ -259,6 +265,19 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
           </div>
         ))}
       </div>
+
+      {/* ── One-time shared-household note, same pattern as the sleep hint ── */}
+      {showFeedSyncHint && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 16px 16px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14 }}>
+          <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
+            A feed timer only shows on this phone while it&apos;s running — your partner sees the feed in the shared logbook once you finish it.
+          </span>
+          <button onClick={dismissFeedSyncHint} aria-label="Dismiss"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: p.sub, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Feed timer card */}
       <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}` }}>
