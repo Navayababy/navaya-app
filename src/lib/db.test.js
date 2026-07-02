@@ -8,12 +8,32 @@ vi.mock('./supabase.js', () => ({
 import { supabase } from './supabase.js'
 import { migrateLocalNappies, migrateLocalSessions } from './db.js'
 
-const UUID = '123e4567-e89b-42d3-a456-426614174000'
-const ISO  = '2026-01-01T00:00:00.000Z'
+const UUID  = '123e4567-e89b-42d3-a456-426614174000'
+const UUID2 = '223e4567-e89b-42d3-a456-426614174000'
+const ISO   = '2026-01-01T10:00:00.000Z'
+const ISO2  = '2026-01-02T10:00:00.000Z'
 // Supabase surfaces RLS/constraint rejections as a returned error object,
 // never as a thrown exception — the exact case the migration must not
 // mistake for success.
-const rlsError = { code: '42501', message: 'permission denied for table nappy_logs' }
+const rlsError = { code: '42501', message: 'permission denied' }
+
+// Mock table handle covering both queries a migrate function makes: the
+// existing-rows content fetch (select→eq→eq→order→limit) and the upload
+// (upsert / insert).
+const mockTable = ({ existing = [], selectError = null, upsertError = null, insertError = null } = {}) => {
+  const upsert = vi.fn().mockResolvedValue({ error: upsertError })
+  const insert = vi.fn().mockResolvedValue({ error: insertError })
+  const limit  = vi.fn().mockResolvedValue(selectError ? { data: null, error: selectError } : { data: existing, error: null })
+  const select = vi.fn().mockReturnValue({
+    eq: vi.fn().mockReturnValue({
+      eq: vi.fn().mockReturnValue({
+        order: vi.fn().mockReturnValue({ limit }),
+      }),
+    }),
+  })
+  supabase.from.mockReturnValue({ select, upsert, insert })
+  return { upsert, insert, select }
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -21,56 +41,93 @@ beforeEach(() => {
 
 describe('migration batch error handling', () => {
   it('rejects when an upsert batch (UUID rows) returns an error', async () => {
-    supabase.from.mockReturnValue({
-      upsert: vi.fn().mockResolvedValue({ error: rlsError }),
-      insert: vi.fn().mockResolvedValue({ error: null }),
-    })
+    mockTable({ upsertError: rlsError })
     await expect(migrateLocalNappies('h1', 'u1', [{ id: UUID, type: 'wet', loggedAt: ISO }]))
       .rejects.toMatchObject({ code: '42501' })
   })
 
   it('rejects when a legacy-row insert batch returns an error', async () => {
-    supabase.from.mockReturnValue({
-      upsert: vi.fn().mockResolvedValue({ error: null }),
-      insert: vi.fn().mockResolvedValue({ error: rlsError }),
-    })
+    mockTable({ insertError: rlsError })
     // Non-UUID id → mapped to null → takes the plain-insert path
     await expect(migrateLocalNappies('h1', 'u1', [{ id: 'legacy-1', type: 'wet', loggedAt: ISO }]))
       .rejects.toMatchObject({ code: '42501' })
   })
 
+  it('rejects when the existing-rows fetch fails, so the flag is never set on a blind attempt', async () => {
+    const { upsert, insert } = mockTable({ selectError: { message: 'boom' } })
+    await expect(migrateLocalSessions('h1', 'u1', [{ id: UUID, startedAt: ISO, endedAt: ISO2, durationSecs: 60, side: 'L' }]))
+      .rejects.toMatchObject({ message: 'boom' })
+    expect(upsert).not.toHaveBeenCalled()
+    expect(insert).not.toHaveBeenCalled()
+  })
+
   it('resolves when every batch succeeds', async () => {
-    const upsert = vi.fn().mockResolvedValue({ error: null })
-    const insert = vi.fn().mockResolvedValue({ error: null })
-    supabase.from.mockReturnValue({ upsert, insert })
+    const { upsert, insert } = mockTable()
     await expect(migrateLocalSessions('h1', 'u1', [
-      { id: UUID,     startedAt: ISO, endedAt: ISO, durationSecs: 60, side: 'L' },
-      { id: 'legacy', startedAt: ISO, endedAt: ISO, durationSecs: 60, side: 'R' },
+      { id: UUID,     startedAt: ISO,  endedAt: ISO,  durationSecs: 60, side: 'L' },
+      { id: 'legacy', startedAt: ISO2, endedAt: ISO2, durationSecs: 60, side: 'R' },
     ])).resolves.toBeUndefined()
     expect(upsert).toHaveBeenCalledTimes(1)
     expect(insert).toHaveBeenCalledTimes(1)
   })
 })
 
-// A "does the user already have data?" sentinel used to guard the migration
-// and was removed on purpose: after a partial failure it reads as "already
-// migrated" and strands the remaining rows. Retry safety comes from the
-// idempotent upsert path above — this test pins the property that makes
-// running the migration twice harmless.
-describe('migration retry idempotency', () => {
-  it('re-sends every row through the ignore-duplicates upsert path on a retry', async () => {
-    const upsert = vi.fn().mockResolvedValue({ error: null })
-    const insert = vi.fn().mockResolvedValue({ error: null })
-    supabase.from.mockReturnValue({ upsert, insert })
-    const rows = [{ id: UUID, type: 'wet', loggedAt: ISO }]
-    await migrateLocalNappies('h1', 'u1', rows)
-    await migrateLocalNappies('h1', 'u1', rows)
-    expect(upsert).toHaveBeenCalledTimes(2)
-    expect(upsert).toHaveBeenLastCalledWith(
-      [expect.objectContaining({ id: UUID })],
-      { onConflict: 'id', ignoreDuplicates: true },
-    )
-    // The non-idempotent plain-insert path never fires for UUID rows
+// Rows uploaded by pre-UUID migrations exist on the server under generated
+// ids the local copies don't carry, so id-based upserts can't dedupe them.
+// The content check must recognise them by timestamps and skip them, while
+// never suppressing rows that are genuinely missing.
+describe('migration content dedupe', () => {
+  it('skips rows whose content already exists on the server, across timestamp formats', async () => {
+    const { upsert, insert } = mockTable({
+      // Postgres-style '+00:00' offset for the same instants as the local Z strings
+      existing: [{ started_at: '2026-01-01T10:00:00+00:00', ended_at: '2026-01-01T10:15:00+00:00' }],
+    })
+    await migrateLocalSessions('h1', 'u1', [
+      { id: UUID, startedAt: '2026-01-01T10:00:00.000Z', endedAt: '2026-01-01T10:15:00.000Z', durationSecs: 900, side: 'L' },
+    ])
+    expect(upsert).not.toHaveBeenCalled()
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('uploads only the rows that are missing from the server', async () => {
+    const { upsert } = mockTable({
+      existing: [{ started_at: ISO, ended_at: ISO }],
+    })
+    await migrateLocalSessions('h1', 'u1', [
+      { id: UUID,  startedAt: ISO,  endedAt: ISO,  durationSecs: 60, side: 'L' },
+      { id: UUID2, startedAt: ISO2, endedAt: ISO2, durationSecs: 60, side: 'R' },
+    ])
+    expect(upsert).toHaveBeenCalledTimes(1)
+    const uploaded = upsert.mock.calls[0][0]
+    expect(uploaded).toHaveLength(1)
+    expect(uploaded[0].id).toBe(UUID2)
+  })
+
+  it('treats same-time nappies of different types as distinct entries', async () => {
+    const { upsert } = mockTable({
+      existing: [{ logged_at: ISO, type: 'wet' }],
+    })
+    await migrateLocalNappies('h1', 'u1', [
+      { id: UUID,  type: 'wet', loggedAt: ISO },   // already on server → skipped
+      { id: UUID2, type: 'poo', loggedAt: ISO },   // same minute, different type → uploaded
+    ])
+    const uploaded = upsert.mock.calls[0][0]
+    expect(uploaded).toHaveLength(1)
+    expect(uploaded[0].type).toBe('poo')
+  })
+
+  it('re-running a fully landed migration uploads nothing (retry is a no-op)', async () => {
+    const { upsert, insert } = mockTable({
+      existing: [
+        { started_at: ISO,  ended_at: ISO },
+        { started_at: ISO2, ended_at: ISO2 },
+      ],
+    })
+    await migrateLocalSessions('h1', 'u1', [
+      { id: UUID,     startedAt: ISO,  endedAt: ISO,  durationSecs: 60, side: 'L' },
+      { id: 'legacy', startedAt: ISO2, endedAt: ISO2, durationSecs: 60, side: 'R' },
+    ])
+    expect(upsert).not.toHaveBeenCalled()
     expect(insert).not.toHaveBeenCalled()
   })
 })

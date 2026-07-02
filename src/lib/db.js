@@ -204,6 +204,40 @@ export async function deleteMedicineLog(id) {
 
 // ── Migrations ────────────────────────────────────────────────────────────────
 
+// Content signature for duplicate detection: epoch millis of the row's
+// timestamps plus a discriminator where two rows can legitimately share a
+// time. Comparing raw strings would miss the same instant written as
+// '...Z' locally and '+00:00' by Postgres.
+const timeSig = (...parts) => parts.map(p => {
+  if (p == null) return ''
+  const t = Date.parse(p)
+  return Number.isNaN(t) ? String(p) : t
+}).join('|')
+
+// Rows uploaded by migrations that predate client UUIDs live on the server
+// under generated ids the local copies know nothing about, so the id-based
+// upsert cannot recognise them and a retry would re-insert them under fresh
+// UUIDs. Before uploading, this user's existing rows are fetched once and
+// any local row matching by content is dropped — only rows genuinely missing
+// from the household are sent. Scoped to the user's own rows (logged_by) so
+// a partner's entry at the same moment can never suppress one of ours, and
+// ordered oldest-first so migration-era rows always sit inside the window.
+// Unlike the removed "already has data?" sentinel this is per-row: it can
+// skip only rows that provably exist, never a whole table. The deliberate
+// trade-off: an identical-content row is treated as already migrated rather
+// than risked as a duplicate.
+async function fetchExistingSigs(table, householdId, userId, timeColumn, columns, sigOf) {
+  const { data, error } = await supabase
+    .from(table)
+    .select(columns)
+    .eq('household_id', householdId)
+    .eq('logged_by', userId)
+    .order(timeColumn, { ascending: true })
+    .limit(1000)
+  if (error) throw error
+  return new Set((data || []).map(sigOf))
+}
+
 // Every row is upserted by its client UUID (ignore duplicates), so re-running
 // a partially failed migration is idempotent — callers upgrade legacy entries
 // to stable UUIDs first (see ensure*Uuids in storage.js). Rows that still
@@ -229,7 +263,9 @@ async function insertMigratedRows(table, rows) {
 
 export async function migrateLocalSessions(householdId, userId, localSessions) {
   if (!localSessions?.length) return
-  const rows = localSessions.map(s => ({
+  const existing = await fetchExistingSigs('feed_sessions', householdId, userId,
+    'started_at', 'started_at,ended_at', r => timeSig(r.started_at, r.ended_at))
+  const rows = localSessions.filter(s => !existing.has(timeSig(s.startedAt, s.endedAt))).map(s => ({
     id:            isUuid(s.id) ? s.id : null,
     household_id:  householdId,
     baby_id:       null,
@@ -243,37 +279,51 @@ export async function migrateLocalSessions(householdId, userId, localSessions) {
     amount_ml:     s.amountMl ?? null,
     milk_type:     s.milkType ?? null,
   }))
+  if (!rows.length) return
   await insertMigratedRows('feed_sessions', rows)
 }
 
 export async function migrateLocalNappies(householdId, userId, localNappies) {
   if (!localNappies?.length) return
-  const rows = localNappies.map(n => ({
+  // Type is part of the signature: a wee and a poo logged for the same
+  // minute are two real entries, not duplicates.
+  const existing = await fetchExistingSigs('nappy_logs', householdId, userId,
+    'logged_at', 'logged_at,type', r => `${timeSig(r.logged_at)}|${r.type || ''}`)
+  const rows = localNappies.filter(n => !existing.has(`${timeSig(n.loggedAt)}|${n.type || ''}`)).map(n => ({
     id: isUuid(n.id) ? n.id : null,
     household_id: householdId, logged_by: userId,
     type: n.type, poo_color: n.pooColor || null, logged_at: n.loggedAt,
   }))
+  if (!rows.length) return
   await insertMigratedRows('nappy_logs', rows)
 }
 
 export async function migrateLocalSleeps(householdId, userId, localSleeps) {
   if (!localSleeps?.length) return
-  const rows = localSleeps.map(s => ({
+  const existing = await fetchExistingSigs('sleep_logs', householdId, userId,
+    'started_at', 'started_at,ended_at', r => timeSig(r.started_at, r.ended_at))
+  const rows = localSleeps.filter(s => !existing.has(timeSig(s.startedAt, s.endedAt))).map(s => ({
     id: isUuid(s.id) ? s.id : null,
     household_id: householdId, logged_by: userId,
     started_at: s.startedAt, ended_at: s.endedAt, duration_secs: s.durationSecs ?? null,
   }))
+  if (!rows.length) return
   await insertMigratedRows('sleep_logs', rows)
 }
 
 export async function migrateLocalMedicines(householdId, userId, localMedicines) {
   if (!localMedicines?.length) return
-  const rows = localMedicines.map(m => ({
+  // Name is part of the signature: paracetamol and vitamin D given together
+  // are commonly logged with the same time.
+  const existing = await fetchExistingSigs('medicine_logs', householdId, userId,
+    'logged_at', 'logged_at,name', r => `${timeSig(r.logged_at)}|${(r.name || '').toLowerCase()}`)
+  const rows = localMedicines.filter(m => !existing.has(`${timeSig(m.loggedAt)}|${(m.name || '').toLowerCase()}`)).map(m => ({
     id: isUuid(m.id) ? m.id : null,
     household_id: householdId, logged_by: userId,
     name: m.name, medicine_id: m.medicineId || null, dose_ml: m.doseMl || null,
     form: m.form || null, notes: m.notes || null, logged_at: m.loggedAt,
   }))
+  if (!rows.length) return
   await insertMigratedRows('medicine_logs', rows)
 }
 
