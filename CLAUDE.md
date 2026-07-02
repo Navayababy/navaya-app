@@ -27,7 +27,7 @@ The Vercel serverless function (`api/chat.js`) reads `ANTHROPIC_API_KEY` from th
 
 Navaya is a mobile-first React SPA (max-width 430px) for breastfeeding tracking. It is deployed to Vercel as a PWA.
 
-**Routing** — there is no React Router. `App.jsx` holds a `screen` state string (`'home' | 'feed' | 'nappy' | 'sleep' | 'history' | 'chat' | 'prepare' | 'settings'`) and conditionally renders the matching screen component. `NavBar` shows six tabs (Home, Feed, Nappy, Sleep, Sage, Logbook); `prepare` and `settings` have no tab and are reached from cards/buttons on `HomeScreen`.
+**Routing** — there is no React Router. `App.jsx` holds a `screen` state string (`'home' | 'feed' | 'nappy' | 'sleep' | 'history' | 'chat' | 'prepare' | 'settings' | 'help'`) and conditionally renders the matching screen component. `NavBar` shows six tabs (Home, Feed, Nappy, Sleep, Sage, Logbook); `prepare` and `settings` have no tab and are reached from cards/buttons on `HomeScreen`; `help` is reached from the "Help & FAQ" button in `SettingsScreen`.
 
 **Timer state** — the feed and sleep timers live in hooks consumed by `App.jsx` (`useFeedTimer`, `useSleepTimer`) so they survive tab changes. `App` passes the timer prop bundles down to `FeedScreen` and `SleepScreen`.
 
@@ -50,3 +50,4 @@ Navaya is a mobile-first React SPA (max-width 430px) for breastfeeding tracking.
 - `ChatScreen` — Sage, the AI breastfeeding advisor, with suggestion chips on empty state
 - `PrepareScreen` — pre-outing checklist with progress bar, custom items (reached from the Home card, not the nav bar)
 - `SettingsScreen` — parent/baby names, night-mode toggle, account, household sharing/invites, manual sync, share/support/legal links
+- `HelpScreen` — in-app Help & FAQ: search plus category/question accordion over `src/lib/faqData.js` (reached from Settings, not the nav bar)
