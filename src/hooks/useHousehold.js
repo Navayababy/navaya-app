@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { getSessions, getNappies, getMedicines, getSleeps, setHouseholdLinked } from '../lib/storage.js'
 import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, getRecentSleepLogs, migrateLocalNappies, migrateLocalMedicines, migrateLocalSleeps, userHasDataInHousehold } from '../lib/db.js'
 import { flushOutbox } from '../lib/sync.js'
+import { logError } from '../lib/logError.js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js'
 
 // Auth + shared-household state: who is signed in, their profile, household
@@ -16,6 +17,10 @@ export function useHousehold() {
   const [sharedNappies,   setSharedNappies]   = useState(null)
   const [sharedMedicines, setSharedMedicines] = useState(null)
   const [sharedSleeps,    setSharedSleeps]    = useState(null)
+  // A failed local→shared migration is retried on the next profile load, but
+  // until then the user deserves to know their earlier entries haven't copied
+  // across yet (surfaced in Settings) rather than finding out from a partner.
+  const [migrationError,  setMigrationError]  = useState(false)
   const realtimeUnsub = useRef(null)
 
   // ── Auth init (only when Supabase is configured) ───────────────────────────
@@ -61,6 +66,7 @@ export function useHousehold() {
       // One-time migration: upload local data only if this user has no records in Supabase yet.
       // Flag is only set on full success so a failed migration can be retried on next login.
       const migrationKey = `navaya_migrated_${data.household_id}`
+      let migrationFailed = false
       if (!localStorage.getItem(migrationKey)) {
         const alreadySynced = await userHasDataInHousehold(data.household_id, userId)
         if (!alreadySynced) {
@@ -71,6 +77,8 @@ export function useHousehold() {
             localStorage.setItem(migrationKey, '1')
           } catch (err) {
             console.error('Migration failed, will retry next login:', err)
+            logError('migration.initial', err)
+            migrationFailed = true
           }
         } else {
           localStorage.setItem(migrationKey, '1')
@@ -85,8 +93,12 @@ export function useHousehold() {
           localStorage.setItem(sleepMigrationKey, '1')
         } catch (err) {
           console.error('Sleep migration failed, will retry next login:', err)
+          logError('migration.sleeps', err)
+          migrationFailed = true
         }
       }
+      // Also clears a stale warning once a later retry has succeeded.
+      setMigrationError(migrationFailed)
       // Deliver any writes queued while offline before refreshing the lists
       await flushOutbox()
       loadSharedSessions(data.household_id)
@@ -181,6 +193,7 @@ export function useHousehold() {
     profile,
     householdMembers,
     householdMembersError,
+    migrationError,
     sharedSessions,
     sharedNappies,
     sharedMedicines,

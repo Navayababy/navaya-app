@@ -55,6 +55,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const [editSession, setEditSession] = useState(null)
   const [editNappy,   setEditNappy]   = useState(null)
   const [editSleep,   setEditSleep]   = useState(null)
+  const [editMedicine, setEditMedicine] = useState(null)
   const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'medicine'
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
   const [showInsights, setShowInsights] = useState(false)
@@ -241,6 +242,23 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       }
     }
     setEditNappy(null)
+  }
+
+  // Medicine, like nappies, has no update sync handler — an edit is a delete
+  // of the old entry followed by an insert of the corrected one, both
+  // already-tested paths. The corrected entry carries a fresh id.
+  const handleEditMedicine = async (oldId, medicine) => {
+    deleteMedicine(oldId)
+    setMedicines(addMedicine(medicine))
+    if (sharedMode) {
+      const { ok } = await syncWrite('medicine.delete', { id: oldId })
+      if (ok) onRefreshMedicines?.()
+      if (authUser && profile?.household_id) {
+        syncWrite('medicine.insert', { ...medicine, householdId: profile.household_id, loggedBy: authUser.id })
+          .then(({ ok }) => { if (ok) onRefreshMedicines?.() })
+      }
+    }
+    setEditMedicine(null)
   }
 
   // Sleep has a real update sync handler (unlike nappies above), so an edit
@@ -513,14 +531,17 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                               </span>
                             )}
                           </div>
-                          {isDel ? (
+                          {/* RLS only lets the creator delete, so don't offer
+                              it to anyone else — a partner's tap would look
+                              like it worked and then silently do nothing. */}
+                          {canEdit && (isDel ? (
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                               <button onClick={(e) => { e.stopPropagation(); setConfirmDel(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
                               <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'nappy' }) }} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
                             </div>
                           ) : (
                             <button onClick={(e) => { e.stopPropagation(); setConfirmDel({ id: entry.id, type: 'nappy' }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
-                          )}
+                          ))}
                         </div>
                       )
                     }
@@ -574,8 +595,12 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
                     if (entry._type === 'medicine') {
                       const isDel = confirmDel?.id === entry.id
+                      const creatorId = getEntryCreatorId(entry)
+                      const canEdit   = !sharedMode || creatorId === authUser?.id
                       return (
-                        <div key={entry.id} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
+                        <div key={entry.id}
+                          style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle, cursor: canEdit && !isDel ? 'pointer' : 'default' }}
+                          onClick={() => canEdit && !isDel && setEditMedicine(entry)}>
                           <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.loggedAt)}</span>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
@@ -585,14 +610,16 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                             <span style={{ display: 'block', fontSize: 12, color: p.text }}>{entry.name}{entry.doseMl ? ` · ${entry.doseMl}ml` : ''}</span>
                             {entry.notes && <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{entry.notes}</span>}
                           </div>
-                          {isDel ? (
+                          {/* Same creator-only rule as nappies — RLS rejects
+                              anyone else's delete anyway. */}
+                          {canEdit && (isDel ? (
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                              <button onClick={() => setConfirmDel(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
-                              <button onClick={() => handleDelete({ id: entry.id, type: 'medicine' })} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); setConfirmDel(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'medicine' }) }} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
                             </div>
                           ) : (
-                            <button onClick={() => setConfirmDel({ id: entry.id, type: 'medicine' })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
-                          )}
+                            <button onClick={(e) => { e.stopPropagation(); setConfirmDel({ id: entry.id, type: 'medicine' }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
+                          ))}
                         </div>
                       )
                     }
@@ -619,6 +646,9 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       )}
       {editSleep && (
         <AddSleepModal night={night} initial={editSleep} onSave={(sleep) => handleEditSleep(editSleep.id, sleep)} onClose={() => setEditSleep(null)} />
+      )}
+      {editMedicine && (
+        <AddMedicineModal night={night} initial={editMedicine} onSave={(medicine) => handleEditMedicine(editMedicine.id, medicine)} onClose={() => setEditMedicine(null)} />
       )}
 
       {/* ── Add type picker ── */}

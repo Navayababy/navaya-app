@@ -22,6 +22,7 @@ const KEYS = {
   lastOpenedAt:   'navaya_last_opened_at',
   installBannerDismissed: 'navaya_install_banner_dismissed',
   householdLinked: 'navaya_household_linked',
+  guestNoticeDismissed: 'navaya_guest_notice_dismissed',
 };
 
 // ── Sessions ────────────────────────────────────────────────────────────────
@@ -324,6 +325,18 @@ export function getInstallBannerDismissed() {
 
 export function dismissInstallBanner() {
   localStorage.setItem(KEYS.installBannerDismissed, '1');
+}
+
+// ── Guest-mode notice ────────────────────────────────────────────────────────
+
+// One-time Home note telling signed-out users their data lives on this device
+// only (and can be backed up by signing in). Dismissed once, gone forever.
+export function getGuestNoticeDismissed() {
+  return localStorage.getItem(KEYS.guestNoticeDismissed) === '1';
+}
+
+export function dismissGuestNotice() {
+  localStorage.setItem(KEYS.guestNoticeDismissed, '1');
 }
 
 // ── Household link ───────────────────────────────────────────────────────────

@@ -1,21 +1,32 @@
 import { useState } from 'react'
 import { brand, palette } from '../../theme.js'
-import { timeStr, todayDateStr, timeAgo } from '../../utils/time.js'
+import { timeStr, dateStr, todayDateStr, timeAgo } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { MEDICINE_OPTIONS } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
 
-export default function AddMedicineModal({ night, onSave, onClose, recentMedicines = [] }) {
+// `initial` switches the modal into edit mode: fields are pre-filled and the
+// title/button reflect editing. The caller decides how to persist the result.
+export default function AddMedicineModal({ night, onSave, onClose, recentMedicines = [], initial = null }) {
   const p = palette(night)
   const { input: inputStyle, label: labelStyle } = makeModalStyles(p)
+  const editing = !!initial
 
-  const [medicineId, setMedicineId] = useState('paracetamol')
-  const [customName, setCustomName] = useState('')
-  const [doseMl,     setDoseMl]     = useState('')
-  const [date,       setDate]       = useState(todayDateStr())
-  const [logTime,    setLogTime]    = useState(timeStr())
-  const [notes,      setNotes]      = useState('')
+  // Recover the picker selection for an existing entry: its stored medicineId
+  // when present, else match by name (legacy entries), else Other + the name.
+  const initialOption = initial
+    ? (MEDICINE_OPTIONS.find(m => m.id === initial.medicineId)
+      || MEDICINE_OPTIONS.find(m => m.label.toLowerCase() === (initial.name || '').toLowerCase())
+      || MEDICINE_OPTIONS.find(m => m.id === 'other'))
+    : null
+
+  const [medicineId, setMedicineId] = useState(initialOption ? initialOption.id : 'paracetamol')
+  const [customName, setCustomName] = useState(initialOption?.id === 'other' ? (initial?.name || '') : '')
+  const [doseMl,     setDoseMl]     = useState(initial?.doseMl != null ? String(initial.doseMl) : '')
+  const [date,       setDate]       = useState(initial ? dateStr(initial.loggedAt) : todayDateStr())
+  const [logTime,    setLogTime]    = useState(initial ? timeStr(initial.loggedAt) : timeStr())
+  const [notes,      setNotes]      = useState(initial?.notes || '')
   const [error,      setError]      = useState(null)
 
   const selected = MEDICINE_OPTIONS.find(m => m.id === medicineId)
@@ -41,6 +52,9 @@ export default function AddMedicineModal({ night, onSave, onClose, recentMedicin
       return
     }
     setError(null)
+    // Always a fresh id — edits are persisted as delete-old + insert-corrected
+    // (there is no medicine.update sync handler), so the caller supplies the
+    // old id itself.
     onSave({
       id: newId(),
       name,
@@ -53,7 +67,7 @@ export default function AddMedicineModal({ night, onSave, onClose, recentMedicin
   }
 
   return (
-    <ModalShell title="Log medicine" night={night} onClose={onClose}>
+    <ModalShell title={editing ? 'Edit medicine' : 'Log medicine'} night={night} onClose={onClose}>
       <span style={labelStyle}>Medicine</span>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
         {MEDICINE_OPTIONS.map(m => (
@@ -71,7 +85,7 @@ export default function AddMedicineModal({ night, onSave, onClose, recentMedicin
         </>
       )}
 
-      {lastDose && (
+      {!editing && lastDose && (
         <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: '9px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 13, flexShrink: 0 }} aria-hidden="true">🕐</span>
           <span style={{ fontSize: 12, color: p.text, lineHeight: 1.5 }}>
@@ -105,7 +119,7 @@ export default function AddMedicineModal({ night, onSave, onClose, recentMedicin
       </div>
 
       <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
-        Log medicine
+        {editing ? 'Save changes' : 'Log medicine'}
       </button>
     </ModalShell>
   )
