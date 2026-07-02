@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { logError } from '../lib/logError.js'
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -12,6 +13,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('Navaya render error:', error, info.componentStack)
+    logError('render', error)
   }
 
   render() {

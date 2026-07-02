@@ -12,6 +12,7 @@ import {
 } from './db.js'
 import { isSupabaseConfigured } from './supabase.js'
 import { getOutbox, saveOutbox, enqueue } from './outbox.js'
+import { logError } from './logError.js'
 
 const MAX_ATTEMPTS = 8
 
@@ -91,6 +92,7 @@ async function drain() {
 
     if (isPermanent(error) || (countsTowardCap(error) && (head.attempts || 0) + 1 >= MAX_ATTEMPTS)) {
       console.error('Dropping unsyncable change:', head.type, error)
+      logError(`sync.drop:${head.type}`, error)
       saveOutbox(getOutbox().slice(1))
       continue
     }
@@ -119,6 +121,7 @@ export async function syncWrite(type, payload) {
 
   if (isPermanent(error)) {
     console.error('Write rejected by server:', type, error)
+    logError(`sync.reject:${type}`, error)
     return { ok: false, queued: false, error }
   }
 
