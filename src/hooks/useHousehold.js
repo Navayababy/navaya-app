@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { ensureSessionUuids, ensureNappyUuids, ensureMedicineUuids, ensureSleepUuids, setHouseholdLinked } from '../lib/storage.js'
-import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, getRecentSleepLogs, migrateLocalNappies, migrateLocalMedicines, migrateLocalSleeps, userHasDataInHousehold } from '../lib/db.js'
+import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, getRecentSleepLogs, migrateLocalNappies, migrateLocalMedicines, migrateLocalSleeps } from '../lib/db.js'
 import { flushOutbox } from '../lib/sync.js'
 import { logError } from '../lib/logError.js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js'
@@ -63,25 +63,24 @@ export function useHousehold() {
       setHouseholdMembers(null)
       setHouseholdMembersError(null)
       loadHouseholdMembers()
-      // One-time migration: upload local data only if this user has no records in Supabase yet.
-      // Flag is only set on full success so a failed migration can be retried on next login.
+      // One-time upload of this device's local data into the household. The
+      // flag is only written on full success, so a failure retries on the
+      // next profile load. Every row carries a stable client UUID (see
+      // ensure*Uuids) and is upserted with ignoreDuplicates, so the retry
+      // simply re-sends everything: rows that already landed are no-ops,
+      // rows that didn't get another chance. There is deliberately NO
+      // "does the user already have data?" short-circuit — after a partial
+      // failure (feeds landed, nappies didn't) any such check reads as
+      // "already migrated", writes the flag, and strands the remaining rows
+      // forever. Idempotent re-upload is the mechanism that replaces it —
+      // the same design the sleeps migration below has always used.
       const migrationKey = `navaya_migrated_${data.household_id}`
       let migrationFailed = false
       if (!localStorage.getItem(migrationKey)) {
         try {
-          // The already-synced check lives inside the try: if it throws, that
-          // is a failed migration attempt (no flag, retry next profile load),
-          // not a licence to skip or to re-run blind.
-          const alreadySynced = await userHasDataInHousehold(data.household_id, userId)
-          if (!alreadySynced) {
-            // ensure*Uuids assigns (and persists) stable UUIDs to legacy
-            // entries first, so a retry after a partial failure upserts the
-            // same rows again instead of inserting duplicates of the ones
-            // that already landed.
-            await migrateLocalSessions(data.household_id, userId, ensureSessionUuids())
-            await migrateLocalNappies(data.household_id, userId, ensureNappyUuids())
-            await migrateLocalMedicines(data.household_id, userId, ensureMedicineUuids())
-          }
+          await migrateLocalSessions(data.household_id, userId, ensureSessionUuids())
+          await migrateLocalNappies(data.household_id, userId, ensureNappyUuids())
+          await migrateLocalMedicines(data.household_id, userId, ensureMedicineUuids())
           localStorage.setItem(migrationKey, '1')
         } catch (err) {
           console.error('Migration failed, will retry next login:', err)

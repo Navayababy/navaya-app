@@ -204,19 +204,6 @@ export async function deleteMedicineLog(id) {
 
 // ── Migrations ────────────────────────────────────────────────────────────────
 
-export async function userHasDataInHousehold(householdId, userId) {
-  const { data, error } = await supabase
-    .from('feed_sessions')
-    .select('id')
-    .eq('household_id', householdId)
-    .eq('logged_by', userId)
-    .limit(1)
-  // A failed check must not be read as "no data yet" — that would let the
-  // migration proceed (and its flag be written) on the strength of an error.
-  if (error) throw error
-  return !!(data?.length)
-}
-
 // Every row is upserted by its client UUID (ignore duplicates), so re-running
 // a partially failed migration is idempotent — callers upgrade legacy entries
 // to stable UUIDs first (see ensure*Uuids in storage.js). Rows that still
