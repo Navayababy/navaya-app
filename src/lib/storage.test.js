@@ -9,7 +9,9 @@ import {
   getHiddenDefaults, saveHiddenDefaults,
   getNightMode, setNightMode, getUserName, setUserName, getBabyName, setBabyName,
   getActiveTimer, setActiveTimer, clearActiveTimer,
+  ensureSessionUuids, ensureNappyUuids,
 } from './storage.js'
+import { isUuid } from './id.js'
 
 beforeEach(() => localStorage.clear())
 
@@ -191,5 +193,44 @@ describe('bottle feed sessions', () => {
     expect(s.milkType).toBe('expressed')
     expect(s.durationSecs).toBe(900)
     expect(s.feedType).toBe('bottle')
+  })
+})
+
+describe('ensure*Uuids (migration id upgrade)', () => {
+  const UUID = '123e4567-e89b-42d3-a456-426614174000'
+
+  it('assigns and persists UUIDs for legacy entries, leaving UUID entries untouched', () => {
+    addSession(session('legacy-1', { mood: 3 }))
+    addSession(session(UUID))
+    const upgraded = ensureSessionUuids()
+    expect(upgraded).toHaveLength(2)
+    // Newest first: the UUID entry keeps its id exactly
+    expect(upgraded[0].id).toBe(UUID)
+    // The legacy entry gets a real UUID and keeps every other field
+    expect(upgraded[1].id).not.toBe('legacy-1')
+    expect(isUuid(upgraded[1].id)).toBe(true)
+    expect(upgraded[1]).toMatchObject({ side: 'L', durationSecs: 900, mood: 3 })
+    // Persisted back to storage, not just returned
+    expect(getSessions()).toEqual(upgraded)
+  })
+
+  it('returns the SAME ids on a second call — the retry-idempotency guarantee', () => {
+    addSession(session('legacy-1'))
+    const first  = ensureSessionUuids()
+    const second = ensureSessionUuids()
+    expect(second).toEqual(first)
+  })
+
+  it('assigns ids to entries with no id at all', () => {
+    addNappy({ type: 'wet', loggedAt: '2026-06-01T10:00:00.000Z' })
+    const [n] = ensureNappyUuids()
+    expect(isUuid(n.id)).toBe(true)
+    expect(n.type).toBe('wet')
+  })
+
+  it('returns [] for corrupt storage without writing', () => {
+    localStorage.setItem('navaya_sessions', '{not json')
+    expect(ensureSessionUuids()).toEqual([])
+    expect(localStorage.getItem('navaya_sessions')).toBe('{not json')
   })
 })
