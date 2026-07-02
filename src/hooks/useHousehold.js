@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { getSessions, getNappies, getMedicines, getSleeps } from '../lib/storage.js'
+import { getSessions, getNappies, getMedicines, getSleeps, setHouseholdLinked } from '../lib/storage.js'
 import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, getRecentSleepLogs, migrateLocalNappies, migrateLocalMedicines, migrateLocalSleeps, userHasDataInHousehold } from '../lib/db.js'
 import { flushOutbox } from '../lib/sync.js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js'
@@ -54,6 +54,7 @@ export function useHousehold() {
     if (!data) return
     setProfile(data)
     if (data.household_id) {
+      setHouseholdLinked()
       setHouseholdMembers(null)
       setHouseholdMembersError(null)
       loadHouseholdMembers()

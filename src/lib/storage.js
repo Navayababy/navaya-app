@@ -21,6 +21,7 @@ const KEYS = {
   dismissedAnnouncements: 'navaya_dismissed_announcements',
   lastOpenedAt:   'navaya_last_opened_at',
   installBannerDismissed: 'navaya_install_banner_dismissed',
+  householdLinked: 'navaya_household_linked',
 };
 
 // ── Sessions ────────────────────────────────────────────────────────────────
@@ -323,6 +324,20 @@ export function getInstallBannerDismissed() {
 
 export function dismissInstallBanner() {
   localStorage.setItem(KEYS.installBannerDismissed, '1');
+}
+
+// ── Household link ───────────────────────────────────────────────────────────
+
+// Remembers, per device, that this browser was once signed in to a shared
+// household — so if a session later expires (or the app is opened signed
+// out) we can still warn "you're not signed in" instead of staying quiet,
+// even though the profile/auth state itself has already been cleared.
+export function getHouseholdLinked() {
+  return localStorage.getItem(KEYS.householdLinked) === '1';
+}
+
+export function setHouseholdLinked() {
+  localStorage.setItem(KEYS.householdLinked, '1');
 }
 
 // ── Active timer ─────────────────────────────────────────────────────────────
