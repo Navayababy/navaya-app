@@ -6,7 +6,7 @@ vi.mock('./supabase.js', () => ({
 }))
 
 import { supabase } from './supabase.js'
-import { migrateLocalNappies, migrateLocalSessions, userHasDataInHousehold } from './db.js'
+import { migrateLocalNappies, migrateLocalSessions } from './db.js'
 
 const UUID = '123e4567-e89b-42d3-a456-426614174000'
 const ISO  = '2026-01-01T00:00:00.000Z'
@@ -52,26 +52,25 @@ describe('migration batch error handling', () => {
   })
 })
 
-describe('userHasDataInHousehold', () => {
-  const queryResult = (result) => ({
-    select: vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue(result),
-        }),
-      }),
-    }),
-  })
-
-  it('throws on a failed check rather than reporting "no data yet"', async () => {
-    supabase.from.mockReturnValue(queryResult({ data: null, error: { message: 'boom' } }))
-    await expect(userHasDataInHousehold('h1', 'u1')).rejects.toMatchObject({ message: 'boom' })
-  })
-
-  it('returns true when rows exist and false when none do', async () => {
-    supabase.from.mockReturnValue(queryResult({ data: [{ id: 'x' }], error: null }))
-    await expect(userHasDataInHousehold('h1', 'u1')).resolves.toBe(true)
-    supabase.from.mockReturnValue(queryResult({ data: [], error: null }))
-    await expect(userHasDataInHousehold('h1', 'u1')).resolves.toBe(false)
+// A "does the user already have data?" sentinel used to guard the migration
+// and was removed on purpose: after a partial failure it reads as "already
+// migrated" and strands the remaining rows. Retry safety comes from the
+// idempotent upsert path above — this test pins the property that makes
+// running the migration twice harmless.
+describe('migration retry idempotency', () => {
+  it('re-sends every row through the ignore-duplicates upsert path on a retry', async () => {
+    const upsert = vi.fn().mockResolvedValue({ error: null })
+    const insert = vi.fn().mockResolvedValue({ error: null })
+    supabase.from.mockReturnValue({ upsert, insert })
+    const rows = [{ id: UUID, type: 'wet', loggedAt: ISO }]
+    await migrateLocalNappies('h1', 'u1', rows)
+    await migrateLocalNappies('h1', 'u1', rows)
+    expect(upsert).toHaveBeenCalledTimes(2)
+    expect(upsert).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ id: UUID })],
+      { onConflict: 'id', ignoreDuplicates: true },
+    )
+    // The non-idempotent plain-insert path never fires for UUID rows
+    expect(insert).not.toHaveBeenCalled()
   })
 })
