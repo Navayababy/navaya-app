@@ -375,7 +375,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
       {showAmount && (
         <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, padding: '16px' }}>
           <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>How much did {babyDisplayName()} take?</span>
-          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>This gets saved to your logbook.</span>
+          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Your feed is already saved — this just adds extra detail.</span>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             {[60, 90, 120, 150].map(ml => (
               <button key={ml} onClick={() => setAmountInput(String(ml))}
@@ -417,7 +417,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
       {showMood && (
         <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, padding: '16px' }}>
           <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>How did that feed go?</span>
-          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>This gets saved to your logbook.</span>
+          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Your feed is already saved — this just adds extra detail.</span>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             {[
               { emoji: '😔', label: 'Tough'   },

@@ -6,6 +6,7 @@ import { normalizeSleep } from '../lib/normalize.js'
 import { sleepSecsOnDay } from '../lib/stats.js'
 import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO, nearestDateForTime } from '../utils/time.js'
 import { newId } from '../lib/id.js'
+import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
 
 // h:mm:ss for long-running sleeps, mm:ss under an hour
 function fmtClock(secs) {
@@ -25,6 +26,11 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
   const [sleeps,     setSleeps]     = useState(() => getSleeps())
   const [addingPast, setAddingPast] = useState(false)
+  // One-time note for shared households: sleep timers behave differently
+  // from feed timers (live sync vs sync-on-save), and nothing in the UI
+  // makes that visible until it surprises someone.
+  const [sleepSyncHintUnseen, dismissSleepSyncHint] = useOneTimeHint('sleep_sync_hint_seen')
+  const showSleepSyncHint = sleepSyncHintUnseen && !!(authUser && profile?.household_id)
   const [logDate,    setLogDate]    = useState(() => dateStr())
   const [startTime,  setStartTime]  = useState('13:00')
   const [endTime,    setEndTime]    = useState('14:00')
@@ -256,6 +262,19 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
           </div>
         ))}
       </div>
+
+      {/* ── One-time shared-household note, same pattern as Home's guest note ── */}
+      {showSleepSyncHint && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 16px 16px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14 }}>
+          <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
+            Sleep timers sync live — your partner sees this timer running and either of you can end it. Feed timers stay on the device that started them until the feed is saved.
+          </span>
+          <button onClick={dismissSleepSyncHint} aria-label="Dismiss"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: p.sub, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+            ×
+          </button>
+        </div>
+      )}
 
       {sleepActive ? (
         /* ── Live timer ── */
