@@ -263,9 +263,16 @@ async function insertMigratedRows(table, rows) {
 
 export async function migrateLocalSessions(householdId, userId, localSessions) {
   if (!localSessions?.length) return
+  // `side` is part of the signature: left and right feeds logged for the
+  // same interval are two real entries, and a bottle (side null) is distinct
+  // from a breast feed at the same time. Only `side` is selected as the
+  // discriminator — feed_type/amount_ml may be absent on a database that
+  // hasn't run the bottle-feeds migration, and selecting a missing column
+  // would fail the whole migration.
+  const feedSig = (startedAt, endedAt, side) => `${timeSig(startedAt, endedAt)}|${side || ''}`
   const existing = await fetchExistingSigs('feed_sessions', householdId, userId,
-    'started_at', 'started_at,ended_at', r => timeSig(r.started_at, r.ended_at))
-  const rows = localSessions.filter(s => !existing.has(timeSig(s.startedAt, s.endedAt))).map(s => ({
+    'started_at', 'started_at,ended_at,side', r => feedSig(r.started_at, r.ended_at, r.side))
+  const rows = localSessions.filter(s => !existing.has(feedSig(s.startedAt, s.endedAt, s.feedType === 'bottle' ? null : s.side))).map(s => ({
     id:            isUuid(s.id) ? s.id : null,
     household_id:  householdId,
     baby_id:       null,

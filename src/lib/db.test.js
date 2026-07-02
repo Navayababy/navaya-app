@@ -80,7 +80,7 @@ describe('migration content dedupe', () => {
   it('skips rows whose content already exists on the server, across timestamp formats', async () => {
     const { upsert, insert } = mockTable({
       // Postgres-style '+00:00' offset for the same instants as the local Z strings
-      existing: [{ started_at: '2026-01-01T10:00:00+00:00', ended_at: '2026-01-01T10:15:00+00:00' }],
+      existing: [{ started_at: '2026-01-01T10:00:00+00:00', ended_at: '2026-01-01T10:15:00+00:00', side: 'L' }],
     })
     await migrateLocalSessions('h1', 'u1', [
       { id: UUID, startedAt: '2026-01-01T10:00:00.000Z', endedAt: '2026-01-01T10:15:00.000Z', durationSecs: 900, side: 'L' },
@@ -91,7 +91,7 @@ describe('migration content dedupe', () => {
 
   it('uploads only the rows that are missing from the server', async () => {
     const { upsert } = mockTable({
-      existing: [{ started_at: ISO, ended_at: ISO }],
+      existing: [{ started_at: ISO, ended_at: ISO, side: 'L' }],
     })
     await migrateLocalSessions('h1', 'u1', [
       { id: UUID,  startedAt: ISO,  endedAt: ISO,  durationSecs: 60, side: 'L' },
@@ -101,6 +101,32 @@ describe('migration content dedupe', () => {
     const uploaded = upsert.mock.calls[0][0]
     expect(uploaded).toHaveLength(1)
     expect(uploaded[0].id).toBe(UUID2)
+  })
+
+  it('treats same-interval feeds on different sides as distinct entries', async () => {
+    const { upsert } = mockTable({
+      existing: [{ started_at: ISO, ended_at: ISO, side: 'L' }],
+    })
+    await migrateLocalSessions('h1', 'u1', [
+      { id: UUID,  startedAt: ISO, endedAt: ISO, durationSecs: 60, side: 'L' },  // already on server → skipped
+      { id: UUID2, startedAt: ISO, endedAt: ISO, durationSecs: 60, side: 'R' },  // same times, other side → uploaded
+    ])
+    const uploaded = upsert.mock.calls[0][0]
+    expect(uploaded).toHaveLength(1)
+    expect(uploaded[0].side).toBe('R')
+  })
+
+  it('treats a same-interval bottle feed as distinct from a breast feed', async () => {
+    const { upsert } = mockTable({
+      existing: [{ started_at: ISO, ended_at: ISO, side: 'L' }],
+    })
+    await migrateLocalSessions('h1', 'u1', [
+      // Bottle feeds carry side null on the server — must not collide with the L breast feed
+      { id: UUID2, startedAt: ISO, endedAt: ISO, durationSecs: 60, side: null, feedType: 'bottle', amountMl: 120 },
+    ])
+    const uploaded = upsert.mock.calls[0][0]
+    expect(uploaded).toHaveLength(1)
+    expect(uploaded[0].feed_type).toBe('bottle')
   })
 
   it('treats same-time nappies of different types as distinct entries', async () => {
@@ -119,8 +145,8 @@ describe('migration content dedupe', () => {
   it('re-running a fully landed migration uploads nothing (retry is a no-op)', async () => {
     const { upsert, insert } = mockTable({
       existing: [
-        { started_at: ISO,  ended_at: ISO },
-        { started_at: ISO2, ended_at: ISO2 },
+        { started_at: ISO,  ended_at: ISO,  side: 'L' },
+        { started_at: ISO2, ended_at: ISO2, side: 'R' },
       ],
     })
     await migrateLocalSessions('h1', 'u1', [
