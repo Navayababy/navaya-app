@@ -3,6 +3,8 @@
 // This means it works on one device without any backend.
 // Partner sync can be added later via Supabase.
 
+import { isUuid, newId } from './id.js';
+
 const KEYS = {
   sessions:       'navaya_sessions',
   checklist:      'navaya_checklist',
@@ -158,6 +160,35 @@ export function updateSleep(id, changes) {
   localStorage.setItem(KEYS.sleeps, JSON.stringify(sleeps));
   return sleeps;
 }
+
+// ── Migration id upgrade ─────────────────────────────────────────────────────
+
+// Entries created before UUID ids shipped carry legacy ids that can't be
+// upserted idempotently. Assigning them a stable UUID *before* upload — and
+// persisting it — means a retried migration re-sends the same rows (upsert,
+// ignore duplicates) instead of plain-inserting fresh copies of rows that
+// already landed on an earlier, partially failed attempt.
+function ensureUuidIds(key) {
+  let items;
+  try {
+    items = JSON.parse(localStorage.getItem(key) || '[]');
+  } catch {
+    return [];
+  }
+  let changed = false;
+  const upgraded = items.map(item => {
+    if (isUuid(item?.id)) return item;
+    changed = true;
+    return { ...item, id: newId() };
+  });
+  if (changed) localStorage.setItem(key, JSON.stringify(upgraded));
+  return upgraded;
+}
+
+export function ensureSessionUuids()  { return ensureUuidIds(KEYS.sessions); }
+export function ensureNappyUuids()    { return ensureUuidIds(KEYS.nappies); }
+export function ensureMedicineUuids() { return ensureUuidIds(KEYS.medicines); }
+export function ensureSleepUuids()    { return ensureUuidIds(KEYS.sleeps); }
 
 // ── Active sleep ──────────────────────────────────────────────────────────────
 

@@ -217,13 +217,15 @@ export async function userHasDataInHousehold(householdId, userId) {
   return !!(data?.length)
 }
 
-// Rows that carry a client UUID are upserted (ignore duplicates), making a
-// re-run of the migration idempotent. Legacy rows without a UUID id fall back
-// to plain inserts; the migration flag is only set on full success, so they
-// are uploaded at most once. Supabase reports rejections (RLS, constraints)
-// via the returned `error` rather than by throwing, so each batch must be
-// checked and re-thrown — otherwise a rejected batch counts as success, the
-// flag gets written, and the entries are never retried.
+// Every row is upserted by its client UUID (ignore duplicates), so re-running
+// a partially failed migration is idempotent — callers upgrade legacy entries
+// to stable UUIDs first (see ensure*Uuids in storage.js). Rows that still
+// arrive without an id fall back to plain inserts; that path is NOT
+// retry-safe (a retry duplicates them under fresh ids), which is exactly why
+// the id upgrade happens before rows reach here. Supabase reports rejections
+// (RLS, constraints) via the returned `error` rather than by throwing, so
+// each batch must be checked and re-thrown — otherwise a rejected batch
+// counts as success, the flag gets written, and the entries never retry.
 async function insertMigratedRows(table, rows) {
   const BATCH = 50
   const withId    = rows.filter(r => r.id)

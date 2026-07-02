@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { getSessions, getNappies, getMedicines, getSleeps, setHouseholdLinked } from '../lib/storage.js'
+import { ensureSessionUuids, ensureNappyUuids, ensureMedicineUuids, ensureSleepUuids, setHouseholdLinked } from '../lib/storage.js'
 import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, getRecentSleepLogs, migrateLocalNappies, migrateLocalMedicines, migrateLocalSleeps, userHasDataInHousehold } from '../lib/db.js'
 import { flushOutbox } from '../lib/sync.js'
 import { logError } from '../lib/logError.js'
@@ -74,9 +74,13 @@ export function useHousehold() {
           // not a licence to skip or to re-run blind.
           const alreadySynced = await userHasDataInHousehold(data.household_id, userId)
           if (!alreadySynced) {
-            await migrateLocalSessions(data.household_id, userId, getSessions())
-            await migrateLocalNappies(data.household_id, userId, getNappies())
-            await migrateLocalMedicines(data.household_id, userId, getMedicines())
+            // ensure*Uuids assigns (and persists) stable UUIDs to legacy
+            // entries first, so a retry after a partial failure upserts the
+            // same rows again instead of inserting duplicates of the ones
+            // that already landed.
+            await migrateLocalSessions(data.household_id, userId, ensureSessionUuids())
+            await migrateLocalNappies(data.household_id, userId, ensureNappyUuids())
+            await migrateLocalMedicines(data.household_id, userId, ensureMedicineUuids())
           }
           localStorage.setItem(migrationKey, '1')
         } catch (err) {
@@ -90,7 +94,7 @@ export function useHousehold() {
       const sleepMigrationKey = `navaya_migrated_sleeps_${data.household_id}`
       if (!localStorage.getItem(sleepMigrationKey)) {
         try {
-          await migrateLocalSleeps(data.household_id, userId, getSleeps())
+          await migrateLocalSleeps(data.household_id, userId, ensureSleepUuids())
           localStorage.setItem(sleepMigrationKey, '1')
         } catch (err) {
           console.error('Sleep migration failed, will retry next login:', err)
