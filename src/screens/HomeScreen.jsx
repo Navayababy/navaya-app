@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
-import { getUserName, getChecked, getCustomItems, getHiddenDefaults, getLastOpenedAt, setLastOpenedAt } from '../lib/storage.js'
+import { getUserName, getChecked, getCustomItems, getHiddenDefaults, getLastOpenedAt, setLastOpenedAt, getHouseholdLinked } from '../lib/storage.js'
+import { isSupabaseConfigured } from '../lib/supabase.js'
 import { PREPARE_DEFAULT_ITEMS } from '../lib/constants.js'
 
 function greeting() {
@@ -35,10 +36,17 @@ function PillIcon({ color, size = 22 }) {
 // The launch screen: answers "what do you want to do" and nothing else.
 // Feed, Nappy, Sleep and Sage each own their real logging UI on their own
 // tab — this screen only routes to them, it never re-implements them.
-export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine, profile }) {
+export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine, authUser, profile }) {
   const p = palette(night)
 
   const [userName] = useState(() => getUserName() || '')
+
+  // This device has synced to a shared household before, but the current
+  // session isn't signed in — logs made now stay local-only and won't reach
+  // the rest of the household until they sign back in. The name shown above
+  // still comes from local storage regardless of auth state, so without this
+  // it looks like everything's working as normal.
+  const signedOutOfHousehold = isSupabaseConfigured && !authUser && getHouseholdLinked()
 
   // "Welcome back" replaces the time-of-day greeting once a day or more has
   // passed since the app was last opened — otherwise it's just "Good
@@ -88,8 +96,8 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
       {/* Settings — pinned to the corner, out of the main flow so it doesn't
           claim one of the evenly-spread content slots below */}
       <button onClick={() => setScreen('settings')}
-        style={{ position: 'absolute', top: 16, right: 16, zIndex: 1, background: 'none', border: `1px solid ${p.border}`, borderRadius: 20, padding: '6px 13px', cursor: 'pointer', color: profile?.household_id ? brand.green : p.sub, fontSize: 12 }}>
-        {profile?.household_id ? '● Sharing' : '⚙ Settings'}
+        style={{ position: 'absolute', top: 16, right: 16, zIndex: 1, background: 'none', border: `1px solid ${signedOutOfHousehold ? brand.rose : p.border}`, borderRadius: 20, padding: '6px 13px', cursor: 'pointer', color: signedOutOfHousehold ? brand.rose : profile?.household_id ? brand.green : p.sub, fontSize: 12 }}>
+        {signedOutOfHousehold ? '⚠ Sign in to sync' : profile?.household_id ? '● Sharing' : '⚙ Settings'}
       </button>
 
       <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '48px 0 16px' }}>
