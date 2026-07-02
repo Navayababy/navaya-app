@@ -77,7 +77,7 @@ export default function App() {
   const timerProps = useFeedTimer()
   const sleepTimerProps = useSleepTimer()
   const {
-    authUser, profile, householdMembers, householdMembersError,
+    authUser, profile, householdMembers, householdMembersError, migrationError,
     sharedSessions, sharedNappies, sharedMedicines, sharedSleeps,
     loadHouseholdMembers, refreshProfile,
     refreshSharedSessions, refreshSharedNappies, refreshSharedMedicines, refreshSharedSleeps,
@@ -141,7 +141,7 @@ export default function App() {
         {screen === 'history' && <HistoryScreen night={night} authUser={authUser} profile={profile} sharedSessions={sharedSessions} sharedNappies={sharedNappies} sharedMedicines={sharedMedicines} sharedSleeps={sharedSleeps} onRefreshSessions={refreshSharedSessions} onRefreshNappies={refreshSharedNappies} onRefreshMedicines={refreshSharedMedicines} onRefreshSleeps={refreshSharedSleeps} openAddMedicine={openAddMedicine} onAddMedicineConsumed={() => setOpenAddMedicine(false)} />}
         {screen === 'chat'    && <ChatScreen    night={night} messages={chatMessages} setMessages={setChatMessages} seed={chatSeed} onSeedConsumed={() => setChatSeed('')} />}
         {screen === 'prepare' && <PrepareScreen night={night} setScreen={setScreen} />}
-        {screen === 'settings' && <SettingsScreen night={night} onNightToggle={toggleNight} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
+        {screen === 'settings' && <SettingsScreen night={night} onNightToggle={toggleNight} authUser={authUser} profile={profile} householdMembers={householdMembers} householdMembersError={householdMembersError} migrationError={migrationError} onProfileUpdate={refreshProfile} onRefreshHouseholdMembers={loadHouseholdMembers} onResync={resyncAll} />}
       </div>
       <NavBar screen={screen} setScreen={setScreen} night={night} feedActive={timerProps.feedActive} sleepActive={sleepTimerProps.sleepActive} />
     </div>

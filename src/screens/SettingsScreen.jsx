@@ -15,7 +15,7 @@ function Card({ children, p }) {
   )
 }
 
-export default function SettingsScreen({ night, onNightToggle, authUser, profile, householdMembers = [], householdMembersError, onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
+export default function SettingsScreen({ night, onNightToggle, authUser, profile, householdMembers = [], householdMembersError, migrationError, onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
   const p = palette(night)
   const householdMembersReady = Array.isArray(householdMembers)
   const memberList = householdMembersReady ? householdMembers : []
@@ -368,6 +368,14 @@ export default function SettingsScreen({ night, onNightToggle, authUser, profile
           <button onClick={handleSignOut} style={{ ...secondaryBtn, marginTop: 0, color: '#c0392b', borderColor: '#c0392b22' }}>
             Sign out
           </button>
+          {/* Deletion itself is handled by support for now — but the way to
+              ask for it belongs here in the app, not only in a policy PDF. */}
+          <a
+            href={`mailto:support@navayababy.co.uk?subject=${encodeURIComponent('Delete my account')}&body=${encodeURIComponent(`Please delete my Navaya account (${authUser.email}) and all data associated with it.`)}`}
+            style={{ display: 'block', textAlign: 'center', fontSize: 11, color: p.sub, textDecoration: 'underline', marginTop: 12 }}
+          >
+            Delete my account and data
+          </a>
         </Card>
       )}
 
@@ -465,6 +473,15 @@ export default function SettingsScreen({ night, onNightToggle, authUser, profile
                   )
                 })}
               </div>
+              {/* There is no self-service leave/remove flow yet — keep the
+                  support path visible right where someone would look for it. */}
+              {hasConnectedFamily && (
+                <span style={{ display: 'block', fontSize: 11, color: p.sub, lineHeight: 1.5, marginTop: 10 }}>
+                  Need to leave this household or remove someone? Email{' '}
+                  <a href="mailto:support@navayababy.co.uk?subject=Household%20change%20request" style={{ color: p.sub }}>support@navayababy.co.uk</a>
+                  {' '}and we&apos;ll sort it for you.
+                </span>
+              )}
             </div>
           )}
 
@@ -528,6 +545,11 @@ export default function SettingsScreen({ night, onNightToggle, authUser, profile
             {pendingSync > 0 && (
               <span style={{ display: 'block', fontSize: 11, color: brand.accent, lineHeight: 1.5, marginBottom: 10 }}>
                 {pendingSync} change{pendingSync !== 1 ? 's' : ''} from this device waiting to sync — they'll retry automatically, or tap Sync now.
+              </span>
+            )}
+            {migrationError && (
+              <span style={{ display: 'block', fontSize: 11, color: brand.accent, lineHeight: 1.5, marginBottom: 10 }}>
+                Some entries logged on this device before you joined the household haven&apos;t copied to the shared logbook yet. Nothing is lost — they&apos;re still on this device, and copying retries automatically next time the app loads your account.
               </span>
             )}
             <button

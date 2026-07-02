@@ -181,8 +181,17 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
         <div ref={bottomRef} style={{ height: 4 }} />
       </div>
 
+      {/* Always-visible safety line — the empty-state disclaimer disappears
+          once a conversation starts, and this is the one message that must
+          stay on screen for a safety-sensitive feature. */}
+      <div style={{ padding: '7px 14px 0', background: p.bg, borderTop: `1px solid ${p.border}`, flexShrink: 0 }}>
+        <span style={{ display: 'block', fontSize: 10, color: p.sub, textAlign: 'center', lineHeight: 1.4 }}>
+          Sage is AI support, not medical advice — if something feels urgent, contact your GP, midwife or 111.
+        </span>
+      </div>
+
       {/* Input bar */}
-      <div style={{ padding: '8px 14px 12px', background: p.bg, borderTop: `1px solid ${p.border}`, flexShrink: 0, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+      <div style={{ padding: '8px 14px 12px', background: p.bg, flexShrink: 0, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
         <textarea
           ref={textareaRef}
           value={input}
