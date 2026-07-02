@@ -11,6 +11,7 @@ import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
 import AddMedicineModal from '../components/modals/AddMedicineModal.jsx'
 import AddSleepModal from '../components/modals/AddSleepModal.jsx'
+import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
 
 
 function getEntryCreatorId(entry) {
@@ -59,6 +60,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
   const [addMode,     setAddMode]     = useState(null)   // null | 'picker' | 'feed' | 'nappy' | 'medicine'
   const [confirmDel,  setConfirmDel]  = useState(null)   // { id, type }
   const [showInsights, setShowInsights] = useState(false)
+  // One-time note for shared households: only your own entries carry an edit
+  // affordance here, and without an explanation a partner's uneditable row
+  // reads as a bug rather than a rule.
+  const [logbookHintUnseen, dismissLogbookHint] = useOneTimeHint('logbook_edit_hint_seen')
+  const showLogbookHint = logbookHintUnseen && sharedMode
 
   // Arriving here from Home's "Medicine" card — open the modal directly.
   useEffect(() => {
@@ -354,6 +360,19 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
           </div>
         )}
       </div>
+
+      {/* ── One-time shared-household note, same pattern as the timer hints ── */}
+      {showLogbookHint && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 14px 12px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14 }}>
+          <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
+            You can edit or delete anything you logged yourself — entries your partner logged are view-only on your device, so ask them to make the change.
+          </span>
+          <button onClick={dismissLogbookHint} aria-label="Dismiss"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: p.sub, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+            ×
+          </button>
+        </div>
+      )}
 
       {/* ── Today stats ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, padding: '0 14px 8px' }}>

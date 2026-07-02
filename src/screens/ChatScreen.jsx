@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { brand, palette } from '../theme.js'
+import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
 
 const SUGGESTIONS = [
   "My latch feels painful — is this normal?",
@@ -17,6 +18,9 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
   const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
+  // One-time privacy note: chats clearing on exit is by design (and
+  // reassuring), but surprising for anyone coming back to re-read advice.
+  const [privacyHintUnseen, dismissPrivacyHint] = useOneTimeHint('chat_privacy_hint_seen')
 
   // A seeded question from a Home nudge is prefilled (not auto-sent) so the
   // parent decides whether to ask it. Consumed once on open.
@@ -123,6 +127,19 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your breastfeeding companion</span>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 400, color: p.heading, marginTop: 4 }}>Sage</span>
       </div>
+
+      {/* ── One-time privacy note, same pattern as the logging-screen hints ── */}
+      {privacyHintUnseen && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 14px 12px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14, flexShrink: 0 }}>
+          <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
+            Chats with Sage aren&apos;t saved — the conversation clears when you leave the app, and it&apos;s never visible to anyone else in your household.
+          </span>
+          <button onClick={dismissPrivacyHint} aria-label="Dismiss"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: p.sub, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div role="log" aria-live="polite" aria-label="Conversation with Sage" style={{ flex: 1, overflowY: 'auto', padding: '0 14px' }}>

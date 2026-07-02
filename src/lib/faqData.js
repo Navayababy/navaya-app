@@ -188,7 +188,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: 'Can I edit a medicine entry after I\'ve logged it?',
-        a: 'Not currently — you can delete it and log it again with the right details.',
+        a: 'Yes — tap the entry in your Logbook to edit or delete it. If you\'re sharing a household, you can change the entries you logged yourself; ask your partner to change one of theirs.',
       },
       {
         q: 'Is the "usually every 4–6 hours" note medical advice from Navaya?',

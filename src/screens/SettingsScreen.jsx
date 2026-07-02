@@ -4,8 +4,7 @@ import { signIn, signUp, signOut, createHousehold, createInviteCode, acceptInvit
 import { isSupabaseConfigured } from '../lib/supabase.js'
 import { outboxSize } from '../lib/outbox.js'
 import { getUserName, setUserName, getBabyName, setBabyName } from '../lib/storage.js'
-
-const APP_URL = 'https://www.navayababy.co.uk'
+import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
 
 function Card({ children, p }) {
   return (
@@ -15,7 +14,7 @@ function Card({ children, p }) {
   )
 }
 
-export default function SettingsScreen({ night, setScreen, onNightToggle, authUser, profile, householdMembers = [], householdMembersError, migrationError, onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
+export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authUser, profile, householdMembers = [], householdMembersError, migrationError, onProfileUpdate, onRefreshHouseholdMembers, onResync }) {
   const p = palette(night)
   const householdMembersReady = Array.isArray(householdMembers)
   const memberList = householdMembersReady ? householdMembers : []
@@ -42,26 +41,18 @@ export default function SettingsScreen({ night, setScreen, onNightToggle, authUs
   const [syncDone,         setSyncDone]         = useState(false)
   const [pendingSync,      setPendingSync]      = useState(() => outboxSize())
 
-  // ── Names & sharing ────────────────────────────────────────────────────────
+  // ── Names ──────────────────────────────────────────────────────────────────
   const [parentName, setParentNameVal] = useState(() => getUserName())
   const [babyNameVal, setBabyNameVal]  = useState(() => getBabyName())
-  const [shareMsg,    setShareMsg]     = useState(null)
 
   const handleParentName = (v) => { setParentNameVal(v); setUserName(v.trim()) }
   const handleBabyName   = (v) => { setBabyNameVal(v); setBabyName(v.trim()) }
 
-  const handleShareApp = async () => {
-    const shareData = { title: 'Navaya', text: 'Track feeds, nappies and sleep with Navaya.', url: APP_URL }
-    if (navigator.share) {
-      try { await navigator.share(shareData) } catch { /* user cancelled */ }
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(APP_URL)
-      setShareMsg('Link copied')
-      setTimeout(() => setShareMsg(null), 2000)
-    } catch { /* clipboard unavailable */ }
-  }
+  // One-time note once a household exists: pre-join local entries copy up to
+  // the shared logbook automatically. Only the failure case (migrationError)
+  // had a message before, leaving "did my old logs make it?" unanswered.
+  const [migrationHintUnseen, dismissMigrationHint] = useOneTimeHint('household_migration_hint_seen')
+  const showMigrationHint = migrationHintUnseen && !!(authUser && profile?.household_id) && !migrationError
 
   const inputStyle = {
     width: '100%', background: p.bg, border: `1px solid ${p.border}`,
@@ -225,32 +216,6 @@ export default function SettingsScreen({ night, setScreen, onNightToggle, authUs
             <span aria-hidden="true">{night ? '☀' : '☽'}</span>{night ? 'Day' : 'Night'}
           </button>
         </div>
-      </Card>
-
-      {/* ── Share & follow ── */}
-      <Card p={p}>
-        <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 10 }}>
-          Spread the word
-        </span>
-        {shareMsg && (
-          <div style={{ fontSize: 12, color: brand.green, marginBottom: 10 }}>{shareMsg}</div>
-        )}
-        <button onClick={handleShareApp} style={secondaryBtn}>
-          Share Navaya
-        </button>
-        <a
-          href="https://www.instagram.com/navaya.life"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12, color: p.sub, textDecoration: 'none' }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-            <circle cx="12" cy="12" r="4"/>
-            <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/>
-          </svg>
-          @navaya.life
-        </a>
       </Card>
 
       {/* ── Auth card ── */}
@@ -542,6 +507,17 @@ export default function SettingsScreen({ night, setScreen, onNightToggle, authUs
             <span style={{ display: 'block', fontSize: 12, color: p.sub, lineHeight: 1.5, marginBottom: 10 }}>
               Pull the latest feeds, nappies, sleeps and medicines from the shared logbook.
             </span>
+            {showMigrationHint && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: p.bg, border: `1px solid ${p.border}`, borderRadius: 12, padding: '10px 12px', marginBottom: 10 }}>
+                <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
+                  Anything logged on this device before you joined the household is copied into the shared logbook automatically — your history comes with you.
+                </span>
+                <button onClick={dismissMigrationHint} aria-label="Dismiss"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: p.sub, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+                  ×
+                </button>
+              </div>
+            )}
             {pendingSync > 0 && (
               <span style={{ display: 'block', fontSize: 11, color: brand.accent, lineHeight: 1.5, marginBottom: 10 }}>
                 {pendingSync} change{pendingSync !== 1 ? 's' : ''} from this device waiting to sync — they'll retry automatically, or tap Sync now.
@@ -587,7 +563,7 @@ export default function SettingsScreen({ night, setScreen, onNightToggle, authUs
         <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.6, marginBottom: 14 }}>
           If something isn't working or you have a question about the app, we're here.
         </span>
-        <button onClick={() => setScreen?.('help')} style={{ ...secondaryBtn, marginTop: 0, marginBottom: 8 }}>
+        <button onClick={() => onOpenHelp?.()} style={{ ...secondaryBtn, marginTop: 0, marginBottom: 8 }}>
           Help &amp; FAQ
         </button>
         <a
