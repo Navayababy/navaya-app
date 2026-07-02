@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { brand, palette } from '../theme.js'
-import { getUserName, getChecked, getCustomItems, getHiddenDefaults, getLastOpenedAt, setLastOpenedAt, getHouseholdLinked, getGuestNoticeDismissed, dismissGuestNotice } from '../lib/storage.js'
+import { getUserName, getChecked, getCustomItems, getHiddenDefaults, getLastOpenedAt, setLastOpenedAt, getHouseholdLinked } from '../lib/storage.js'
 import { isSupabaseConfigured } from '../lib/supabase.js'
+import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
 import { PREPARE_DEFAULT_ITEMS } from '../lib/constants.js'
 
 function greeting() {
@@ -51,9 +52,8 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
   // One-time guest-mode note: no account needed, but data lives on this
   // device only. Never shown to devices that have synced before (they get
   // the signed-out warning above instead), and gone forever once dismissed.
-  const [guestNotice, setGuestNotice] = useState(() =>
-    isSupabaseConfigured && !getHouseholdLinked() && !getGuestNoticeDismissed()
-  )
+  const [guestHintUnseen, dismissGuestHint] = useOneTimeHint('guest_notice_dismissed')
+  const guestNotice = guestHintUnseen && isSupabaseConfigured && !getHouseholdLinked()
 
   // "Welcome back" replaces the time-of-day greeting once a day or more has
   // passed since the app was last opened — otherwise it's just "Good
@@ -177,7 +177,7 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
           <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
             No account needed — everything is saved on this device only. If the device is lost or reset, so is your logbook. Sign in from Settings any time to back it up and share with a partner.
           </span>
-          <button onClick={() => { dismissGuestNotice(); setGuestNotice(false) }} aria-label="Dismiss"
+          <button onClick={dismissGuestHint} aria-label="Dismiss"
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: p.sub, lineHeight: 1, padding: 0, flexShrink: 0 }}>
             ×
           </button>
