@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { brand, palette } from '../theme.js'
-import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
 
 const SUGGESTIONS = [
-  "My latch feels painful — is this normal?",
-  "How do I know if my baby is getting enough milk?",
-  "Can I take ibuprofen while breastfeeding?",
-  "How do I manage a clogged duct?",
-  "When should I introduce a bottle?",
-  "My milk supply feels low — what can I do?",
+  { label: 'Painful latch',     q: "My latch feels painful — is this normal?" },
+  { label: 'Enough milk?',      q: "How do I know if my baby is getting enough milk?" },
+  { label: 'Medication safety', q: "Can I take ibuprofen while breastfeeding?" },
+  { label: 'Clogged duct',      q: "How do I manage a clogged duct?" },
+  { label: 'Bottle timing',     q: "When should I introduce a bottle?" },
+  { label: 'Low supply',        q: "My milk supply feels low — what can I do?" },
 ]
 
 export default function ChatScreen({ night, messages, setMessages, seed = '', onSeedConsumed }) {
@@ -18,9 +17,6 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
   const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
-  // One-time privacy note: chats clearing on exit is by design (and
-  // reassuring), but surprising for anyone coming back to re-read advice.
-  const [privacyHintUnseen, dismissPrivacyHint] = useOneTimeHint('chat_privacy_hint_seen')
 
   // A seeded question from a Home nudge is prefilled (not auto-sent) so the
   // parent decides whether to ask it. Consumed once on open.
@@ -128,42 +124,32 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 400, color: p.heading, marginTop: 4 }}>Sage</span>
       </div>
 
-      {/* ── One-time privacy note, same pattern as the logging-screen hints ── */}
-      {privacyHintUnseen && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 14px 12px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14, flexShrink: 0 }}>
-          <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
-            Chats with Sage aren&apos;t saved — the conversation clears when you leave the app, and it&apos;s never visible to anyone else in your household.
-          </span>
-          <button onClick={dismissPrivacyHint} aria-label="Dismiss"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: p.sub, lineHeight: 1, padding: 0, flexShrink: 0 }}>
-            ×
-          </button>
-        </div>
-      )}
-
       {/* Messages */}
-      <div role="log" aria-live="polite" aria-label="Conversation with Sage" style={{ flex: 1, overflowY: 'auto', padding: '0 14px' }}>
+      <div role="log" aria-live="polite" aria-label="Conversation with Sage" style={{ flex: 1, overflowY: 'auto', padding: '0 14px', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Empty state */}
+        {/* Empty state — a short greeting plus a scrollable row of shortcuts
+            sitting right above the input, instead of a stacked intro card
+            and six full-width questions dominating the screen. */}
         {messages.length === 0 && (
-          <div className="fade-up">
-            <div style={{ background: brand.bark, borderRadius: 14, padding: '14px', marginBottom: 14 }}>
-              <span style={{ display: 'block', fontSize: 13, color: brand.parchment, lineHeight: 1.6 }}>
-                Hi, I'm Sage — think of me as a knowledgeable friend who's always awake. Ask me anything about breastfeeding and I'll give you honest, practical answers grounded in NHS, WHO, NICE and IBCLC guidance.
-              </span>
-              <span style={{ display: 'block', fontSize: 10, color: brand.sand, marginTop: 8, lineHeight: 1.5 }}>
-                For anything that feels medical or urgent, always follow up with your GP, midwife or health visitor.
-              </span>
-            </div>
+          <div className="fade-up" style={{ marginTop: 'auto' }}>
+            <p style={{ textAlign: 'center', fontSize: 13, color: p.sub, lineHeight: 1.6, margin: '0 auto 16px', maxWidth: 280 }}>
+              Hi, I&apos;m <span style={{ color: p.heading, fontWeight: 500 }}>Sage</span>. Ask anything about breastfeeding — grounded in NHS, WHO and IBCLC guidance.
+            </p>
 
-            <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>What's on your mind?</span>
-            {SUGGESTIONS.map((s) => (
-              <button key={s} onClick={() => send(s)}
-                style={{ width: '100%', textAlign: 'left', background: p.card, border: `1px solid ${p.border}`, borderRadius: 12, padding: '11px 12px', marginBottom: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: brand.sand, fontSize: 12, flexShrink: 0 }}>✦</span>
-                <span style={{ fontSize: 12, color: p.text, lineHeight: 1.4 }}>{s}</span>
-              </button>
-            ))}
+            <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 8, marginLeft: 2 }}>Try asking</span>
+            <div style={{
+              display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4,
+              WebkitMaskImage: 'linear-gradient(to right, black 0%, black 88%, transparent 100%)',
+              maskImage: 'linear-gradient(to right, black 0%, black 88%, transparent 100%)',
+            }}>
+              {SUGGESTIONS.map((s) => (
+                <button key={s.label} onClick={() => send(s.q)} aria-label={s.q}
+                  style={{ flexShrink: 0, whiteSpace: 'nowrap', background: p.card, border: `1px solid ${p.border}`, borderRadius: 999, padding: '9px 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: brand.sand, fontSize: 11 }}>✦</span>
+                  <span style={{ fontSize: 12.5, color: p.text }}>{s.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -198,58 +184,71 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
         <div ref={bottomRef} style={{ height: 4 }} />
       </div>
 
-      {/* Always-visible safety line — the empty-state disclaimer disappears
-          once a conversation starts, and this is the one message that must
-          stay on screen for a safety-sensitive feature. */}
-      <div style={{ padding: '7px 14px 0', background: p.bg, borderTop: `1px solid ${p.border}`, flexShrink: 0 }}>
-        <span style={{ display: 'block', fontSize: 10, color: p.sub, textAlign: 'center', lineHeight: 1.4 }}>
-          Sage is AI support, not medical advice — if something feels urgent, contact your GP, midwife or 111.
-        </span>
+      {/* Input — the biggest, clearest thing on screen: a sand-bordered
+          compose bar with an explicit label, instead of a slim textarea
+          easy to miss below a wall of suggestions. */}
+      <div style={{ padding: '10px 14px 4px', background: p.bg, flexShrink: 0 }}>
+        <span style={{ display: 'block', fontSize: 10, color: p.sub, letterSpacing: '.1em', textTransform: 'uppercase', marginBottom: 6, marginLeft: 2 }}>Type your question</span>
+        <div style={{
+          display:      'flex',
+          alignItems:   'flex-end',
+          gap:          8,
+          background:   p.card,
+          border:       `1.5px solid ${brand.sand}`,
+          borderRadius: 18,
+          padding:      '6px 6px 6px 15px',
+          boxShadow:    `0 0 0 4px ${brand.sand}1F`,
+        }}>
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Ask Sage anything…"
+            rows={1}
+            style={{
+              flex:        1,
+              background:  'transparent',
+              border:      'none',
+              padding:     '9px 0',
+              fontSize:    14.5,
+              color:       p.text,
+              fontFamily:  "'Jost', sans-serif",
+              resize:      'none',
+              outline:     'none',
+              lineHeight:  1.4,
+              maxHeight:   100,
+            }}
+          />
+          <button
+            onClick={() => send(input)}
+            disabled={!input.trim() || loading}
+            style={{
+              width:        42,
+              height:       42,
+              borderRadius: 14,
+              border:       'none',
+              cursor:       input.trim() && !loading ? 'pointer' : 'default',
+              background:   input.trim() && !loading ? brand.bark : p.border,
+              display:      'flex',
+              alignItems:   'center',
+              justifyContent: 'center',
+              flexShrink:   0,
+              transition:   'background .2s',
+            }}
+          >
+            <span style={{ color: input.trim() && !loading ? brand.sand : p.sub, fontSize: 17 }}>↑</span>
+          </button>
+        </div>
       </div>
 
-      {/* Input bar */}
-      <div style={{ padding: '8px 14px 12px', background: p.bg, flexShrink: 0, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder="Ask Sage anything…"
-          rows={1}
-          style={{
-            flex:        1,
-            background:  p.card,
-            border:      `1px solid ${p.border}`,
-            borderRadius: 12,
-            padding:     '10px 13px',
-            fontSize:    13,
-            color:       p.text,
-            fontFamily:  "'Jost', sans-serif",
-            resize:      'none',
-            outline:     'none',
-            lineHeight:  1.4,
-            maxHeight:   80,
-          }}
-        />
-        <button
-          onClick={() => send(input)}
-          disabled={!input.trim() || loading}
-          style={{
-            width:        38,
-            height:       38,
-            borderRadius: 11,
-            border:       'none',
-            cursor:       input.trim() && !loading ? 'pointer' : 'default',
-            background:   input.trim() && !loading ? brand.bark : p.border,
-            display:      'flex',
-            alignItems:   'center',
-            justifyContent: 'center',
-            flexShrink:   0,
-            transition:   'background .2s',
-          }}
-        >
-          <span style={{ color: input.trim() && !loading ? brand.sand : p.sub, fontSize: 16 }}>↑</span>
-        </button>
+      {/* Always-visible, single quiet line — folds the old dismissible
+          privacy note and the persistent medical disclaimer into one
+          sentence instead of two separate cards competing for attention. */}
+      <div style={{ padding: '6px 14px 12px', background: p.bg, flexShrink: 0 }}>
+        <span style={{ display: 'block', fontSize: 9.5, color: p.sub, opacity: .75, textAlign: 'center', lineHeight: 1.4 }}>
+          Private to you, not saved once you leave — and not a substitute for medical advice. For anything urgent, contact your GP, midwife or 111.
+        </span>
       </div>
     </div>
   )
