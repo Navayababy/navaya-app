@@ -140,6 +140,15 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
     setShowEndTimeConfirm(true)
   }
 
+  // Starting a timed feed while the bottle card is still open (unsaved)
+  // discards it — otherwise its stale inputs stay on screen through the
+  // whole timed feed and a later tap on its Save creates a second, bogus
+  // bottle entry alongside whatever the timer produces.
+  const startTimerFeed = (side) => {
+    setShowBottleLog(false)
+    startFeed(side)
+  }
+
   // Bottle quick log — opens the card; nothing is created until Save.
   const openBottleLog = () => {
     setAmountInput('')
@@ -154,15 +163,19 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
 
   // Saves the bottle feed in one go — unlike a timed feed there's no open
   // session to patch, so this is the moment it reaches the logbook (and the
-  // household, in a single insert). The entered time is re-dated against now
-  // so a just-before-midnight feed logged just after lands on the right day.
+  // household, in a single insert). The entered time is treated as when the
+  // feed ended (when you're logging it), not when it started — a duration
+  // then counts backward from there. Anchoring on the end instead of the
+  // start keeps endedAt from landing in the future, which would otherwise
+  // make the feed look not-yet-finished in "since last feed" stats that
+  // read lastSession.endedAt.
   const saveBottleLog = () => {
     const parsed = Math.round(Number(amountInput))
     const amountMl = parsed >= 1 ? Math.min(500, parsed) : null
     const mins = Math.round(Number(bottleDuration))
     const durationSecs = mins >= 1 ? Math.min(mins, 24 * 60) * 60 : 0
-    const startedAt = nearestDateForTime(new Date().toISOString(), bottleTime)
-    const endedAt = new Date(new Date(startedAt).getTime() + durationSecs * 1000).toISOString()
+    const endedAt = nearestDateForTime(new Date().toISOString(), bottleTime)
+    const startedAt = new Date(new Date(endedAt).getTime() - durationSecs * 1000).toISOString()
     const session = { id: newId(), startedAt, endedAt, durationSecs, side: null, feedType: 'bottle', amountMl, milkType: milkInput, mood: null }
     setSessions(sortByTime(addSession(session)))
 
@@ -337,7 +350,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
             {['L', 'R'].map(side => {
               const isNext = side === suggested
               return (
-                <button key={side} onClick={() => startFeed(side)}
+                <button key={side} onClick={() => startTimerFeed(side)}
                   style={{ flex: 1, minHeight: 84, borderRadius: 16, border: `1.5px solid ${isNext ? brand.sand : 'transparent'}`, cursor: 'pointer', background: isNext ? brand.bark : p.bg, transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
                   <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: isNext ? brand.sand : p.text }}>
                     {side === 'L' ? 'Left' : 'Right'}
