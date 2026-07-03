@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow } from '../theme.js'
 import { signIn, signUp, signOut, createHousehold, createInviteCode, acceptInvite } from '../lib/db.js'
 import { isSupabaseConfigured } from '../lib/supabase.js'
 import { outboxSize } from '../lib/outbox.js'
 import { getUserName, setUserName, getBabyName, setBabyName } from '../lib/storage.js'
 import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
 
-function Card({ children, p }) {
+function Card({ children, p, night }) {
   return (
-    <div style={{ margin: '0 14px 12px', background: p.card, borderRadius: 18, border: `1px solid ${p.border}`, padding: '16px 16px' }}>
+    <div style={{ margin: '0 14px 12px', background: p.card, borderRadius: 18, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), padding: '16px 16px' }}>
       {children}
     </div>
   )
@@ -67,7 +67,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
 
   const primaryBtn = {
     width: '100%', padding: '13px', borderRadius: 13, border: 'none',
-    background: brand.bark, color: brand.sand, cursor: 'pointer',
+    background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: 'pointer',
     fontSize: 14, fontWeight: 500, marginTop: 4,
   }
 
@@ -185,7 +185,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
       </div>
 
       {/* ── Names & appearance ── */}
-      <Card p={p}>
+      <Card p={p} night={night}>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 14 }}>
           Preferences
         </span>
@@ -220,7 +220,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
 
       {/* ── Auth card ── */}
       {!isSupabaseConfigured ? (
-        <Card p={p}>
+        <Card p={p} night={night}>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 10 }}>
             Sharing unavailable
           </span>
@@ -239,7 +239,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
           ))}
         </Card>
       ) : !authUser ? (
-        <Card p={p}>
+        <Card p={p} night={night}>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 12 }}>
             Sign in to start sharing
           </span>
@@ -300,7 +300,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
           </div>
 
           {authMsg && (
-            <div style={{ fontSize: 12, color: authMsg.isError ? '#c0392b' : brand.green, marginBottom: 10, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 12, color: authMsg.isError ? brand.danger : brand.green, marginBottom: 10, lineHeight: 1.4 }}>
               {authMsg.text}
             </div>
           )}
@@ -314,7 +314,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
           </button>
         </Card>
       ) : (
-        <Card p={p}>
+        <Card p={p} night={night}>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 10 }}>
             Account
           </span>
@@ -330,7 +330,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
               </span>
             </>
           )}
-          <button onClick={handleSignOut} style={{ ...secondaryBtn, marginTop: 0, color: '#c0392b', borderColor: '#c0392b22' }}>
+          <button onClick={handleSignOut} style={{ ...secondaryBtn, marginTop: 0, color: brand.danger, borderColor: `${brand.danger}22` }}>
             Sign out
           </button>
           {/* Deletion itself is handled by support for now — but the way to
@@ -346,7 +346,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
 
       {/* ── Household card (only when logged in) ── */}
       {authUser && !profile?.household_id && (
-        <Card p={p}>
+        <Card p={p} night={night}>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 10 }}>
             Set up sharing
           </span>
@@ -355,7 +355,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
           </span>
 
           {householdMsg && (
-            <div style={{ fontSize: 12, color: householdMsg.isError ? '#c0392b' : brand.green, marginBottom: 10, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 12, color: householdMsg.isError ? brand.danger : brand.green, marginBottom: 10, lineHeight: 1.4 }}>
               {householdMsg.text}
             </div>
           )}
@@ -381,7 +381,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
                 style={{ ...inputStyle, flex: 1, letterSpacing: '.1em', fontFamily: 'monospace', fontSize: 16 }}
               />
               <button onClick={handleJoin} disabled={householdLoading || !joinCode.trim()}
-                style={{ padding: '0 16px', borderRadius: 11, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500, opacity: (!joinCode.trim() || householdLoading) ? 0.5 : 1 }}>
+                style={{ padding: '0 16px', borderRadius: 11, border: 'none', background: brand.barkGradient, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500, opacity: (!joinCode.trim() || householdLoading) ? 0.5 : 1 }}>
                 Join
               </button>
             </div>
@@ -391,7 +391,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
 
       {/* ── Invite code card (when household exists) ── */}
       {authUser && profile?.household_id && (
-        <Card p={p}>
+        <Card p={p} night={night}>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 10 }}>
             Shared logbook
           </span>
@@ -457,7 +457,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
               </span>
 
               {householdMsg && (
-                <div style={{ fontSize: 12, color: householdMsg.isError ? '#c0392b' : brand.green, marginBottom: 10, lineHeight: 1.4 }}>
+                <div style={{ fontSize: 12, color: householdMsg.isError ? brand.danger : brand.green, marginBottom: 10, lineHeight: 1.4 }}>
                   {householdMsg.text}
                 </div>
               )}
@@ -472,7 +472,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
                       {inviteCode}
                     </div>
                     <button onClick={handleCopy}
-                      style={{ padding: '12px 14px', borderRadius: 12, border: 'none', background: copied ? brand.green : brand.bark, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500, flexShrink: 0, transition: 'background .3s' }}>
+                      style={{ padding: '12px 14px', borderRadius: 12, border: 'none', background: copied ? brand.green : brand.barkGradient, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500, flexShrink: 0, transition: 'background .3s' }}>
                       {copied ? '✓ Copied' : 'Copy'}
                     </button>
                   </div>
@@ -548,7 +548,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
 
       {/* ── Local-only notice when not logged in ── */}
       {!authUser && (
-        <div style={{ margin: '0 14px 20px', padding: '12px 14px', borderRadius: 12, background: p.card, border: `1px solid ${p.border}` }}>
+        <div style={{ margin: '0 14px 20px', padding: '12px 14px', borderRadius: 12, background: p.card, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1) }}>
           <span style={{ fontSize: 12, color: p.sub, lineHeight: 1.5 }}>
             Without an account, all data is saved locally on this device only. Signing in is optional — the app works fully without it.
           </span>
@@ -556,7 +556,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
       )}
 
       {/* ── Support ── */}
-      <Card p={p}>
+      <Card p={p} night={night}>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 6 }}>
           Need help?
         </span>
@@ -574,7 +574,7 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
             padding: '13px',
             borderRadius: 13,
             border: 'none',
-            background: brand.bark,
+            background: brand.barkGradient,
             color: brand.sand,
             fontSize: 14,
             fontFamily: "'Jost', sans-serif",

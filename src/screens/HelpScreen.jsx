@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow, iconWellBg } from '../theme.js'
 import { FAQ_CATEGORIES } from '../lib/faqData.js'
 
 const SUPPORT_EMAIL = 'support@navayababy.co.uk'
@@ -65,7 +65,7 @@ export default function HelpScreen({ night, setScreen, backTo = 'settings' }) {
 
       {/* Header — centred, matching Feed/Nappy/Sleep/Logbook/Prepare */}
       <div style={{ padding: '20px 16px 12px', textAlign: 'center' }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.sand}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: iconWellBg(brand.sand), boxShadow: shadow(night, 1), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
           <span style={{ fontSize: 24, color: brand.sand, lineHeight: 1 }}>?</span>
         </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>We&apos;re here to help</span>
@@ -84,6 +84,7 @@ export default function HelpScreen({ night, setScreen, backTo = 'settings' }) {
             width: '100%', background: p.card, border: `1px solid ${p.border}`,
             borderRadius: 12, padding: '11px 13px', fontSize: 14, color: p.text,
             fontFamily: "'Jost', sans-serif", outline: 'none', boxSizing: 'border-box',
+            boxShadow: shadow(night, 1),
           }}
         />
       </div>
@@ -92,7 +93,7 @@ export default function HelpScreen({ night, setScreen, backTo = 'settings' }) {
       {visibleCategories.map(cat => {
         const catOpen = searching || openCategory === cat.id
         return (
-          <div key={cat.id} style={{ margin: '0 14px 10px', background: p.card, borderRadius: 18, border: `1px solid ${p.border}`, overflow: 'hidden' }}>
+          <div key={cat.id} style={{ margin: '0 14px 10px', background: p.card, borderRadius: 18, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), overflow: 'hidden' }}>
             <button onClick={() => toggleCategory(cat.id)} disabled={searching} aria-expanded={catOpen}
               style={{ display: 'flex', alignItems: 'center', width: '100%', background: 'none', border: 'none', cursor: searching ? 'default' : 'pointer', padding: '15px 16px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' }}>
               <span style={{ flex: 1, fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading }}>
@@ -130,7 +131,7 @@ export default function HelpScreen({ night, setScreen, backTo = 'settings' }) {
 
       {/* No matches — keep the way to a human visible right where the search failed */}
       {searching && visibleCategories.length === 0 && (
-        <div style={{ margin: '0 14px 12px', padding: '16px', background: p.card, borderRadius: 18, border: `1px solid ${p.border}`, textAlign: 'center' }}>
+        <div style={{ margin: '0 14px 12px', padding: '16px', background: p.card, borderRadius: 18, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), textAlign: 'center' }}>
           <span style={{ display: 'block', fontSize: 13, color: p.text, marginBottom: 6 }}>
             No answers match &ldquo;{query.trim()}&rdquo;
           </span>

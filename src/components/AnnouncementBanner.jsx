@@ -1,13 +1,14 @@
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow } from '../theme.js'
+import { LeafIcon, SparkleIcon, GiftIcon } from './icons.jsx'
 
 // Owner-published broadcast banner. Content is rendered as plain text (never
 // HTML) plus one optional link, so a published message can carry no markup or
 // script. Styling follows the app's editorial card language: a soft tinted
 // badge, an eyebrow label, a Cormorant Garamond title and a Jost body.
 const TYPE_META = {
-  info:    { eyebrow: 'Update',      icon: '🌿', accent: brand.sand },
-  feature: { eyebrow: 'New',         icon: '✨', accent: brand.green },
-  sale:    { eyebrow: 'Offer',       icon: '🎁', accent: brand.accent },
+  info:    { eyebrow: 'Update',      Icon: LeafIcon,    accent: brand.sand },
+  feature: { eyebrow: 'New',         Icon: SparkleIcon, accent: brand.green },
+  sale:    { eyebrow: 'Offer',       Icon: GiftIcon,    accent: brand.accent },
 }
 
 // Soft, mode-safe tint of an accent colour for badge/pill fills.
@@ -31,16 +32,16 @@ export default function AnnouncementBanner({ night, announcement, onDismiss }) {
       display: 'flex',
       alignItems: 'flex-start',
       gap: 12,
-      boxShadow: night ? 'none' : '0 6px 18px rgba(74,55,40,0.06)',
+      boxShadow: shadow(night, 1),
     }}>
       {/* Tinted badge — mirrors the mood chip elsewhere in the app */}
       <div style={{
         width: 36, height: 36, borderRadius: '50%',
         background: tint(meta.accent, night ? 0.22 : 0.14),
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 17, lineHeight: 1, flexShrink: 0, marginTop: 1,
+        lineHeight: 1, flexShrink: 0, marginTop: 1,
       }}>
-        {meta.icon}
+        <meta.Icon color={meta.accent} size={16} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>

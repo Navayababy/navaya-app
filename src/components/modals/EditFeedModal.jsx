@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { brand, palette } from '../../theme.js'
+import { brand, palette, shadow } from '../../theme.js'
 import { dateStr, timeStr, buildISO } from '../../utils/time.js'
 import { MOOD_EMOJI, MOOD_LABEL, MILK_TYPE_LABEL } from '../../lib/constants.js'
 import { feedTypeOf } from '../../lib/normalize.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
+import { BottleIcon } from '../icons.jsx'
 
 export default function EditFeedModal({ session, night, onSave, onDelete, onClose }) {
   const p = palette(night)
@@ -52,8 +53,9 @@ export default function EditFeedModal({ session, night, onSave, onDelete, onClos
     <ModalShell title="Edit feed" night={night} onClose={onClose}>
       <span style={labelStyle}>Type</span>
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-        {[['breast', 'Breast'], ['bottle', '🍼 Bottle']].map(([id, label]) => (
-          <button key={id} onClick={() => setFeedType(id)} style={toggleBtn(feedType === id)}>
+        {[['breast', 'Breast'], ['bottle', 'Bottle']].map(([id, label]) => (
+          <button key={id} onClick={() => setFeedType(id)} style={{ ...toggleBtn(feedType === id), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            {id === 'bottle' && <BottleIcon color={feedType === id ? brand.sand : p.sub} size={14} />}
             {label}
           </button>
         ))}
@@ -116,17 +118,17 @@ export default function EditFeedModal({ session, night, onSave, onDelete, onClos
         })}
       </div>
 
-      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500, marginBottom: 10 }}>
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500, marginBottom: 10 }}>
         Save changes
       </button>
 
       {confirmDel ? (
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setConfirmDel(false)} style={{ flex: 1, padding: '12px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13, color: p.sub }}>Cancel</button>
-          <button onClick={() => onDelete(session.id)} style={{ flex: 1, padding: '12px', borderRadius: 13, border: 'none', background: '#c0392b', cursor: 'pointer', fontSize: 13, color: '#fff', fontWeight: 500 }}>Confirm delete</button>
+          <button onClick={() => onDelete(session.id)} style={{ flex: 1, padding: '12px', borderRadius: 13, border: 'none', background: brand.danger, cursor: 'pointer', fontSize: 13, color: '#fff', fontWeight: 500 }}>Confirm delete</button>
         </div>
       ) : (
-        <button onClick={() => setConfirmDel(true)} style={{ width: '100%', padding: '12px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#c0392b' }}>
+        <button onClick={() => setConfirmDel(true)} style={{ width: '100%', padding: '12px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 13, color: brand.danger }}>
           Delete this feed
         </button>
       )}

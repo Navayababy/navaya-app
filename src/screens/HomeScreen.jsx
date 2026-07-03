@@ -1,37 +1,16 @@
 import { useState, useEffect } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow, iconWellBg } from '../theme.js'
 import { getUserName, getChecked, getCustomItems, getHiddenDefaults, getLastOpenedAt, setLastOpenedAt, getHouseholdLinked } from '../lib/storage.js'
 import { isSupabaseConfigured } from '../lib/supabase.js'
 import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
 import { PREPARE_DEFAULT_ITEMS } from '../lib/constants.js'
+import { BottleIcon, PillIcon } from '../components/icons.jsx'
 
 function greeting() {
   const h = new Date().getHours()
   if (h < 12) return 'morning'
   if (h < 18) return 'afternoon'
   return 'evening'
-}
-
-// Compact bottle glyph — matches the thin-stroke line-icon language used
-// elsewhere (Going Out's bag icon, the nav bar) rather than an emoji.
-function BottleIcon({ color, size = 26 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="9" y="2" width="6" height="3.5" rx="1" />
-      <path d="M9.5 5.5 8.3 8.6A3 3 0 0 0 7 11v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9a3 3 0 0 0-1.3-2.4L14.5 5.5" />
-      <path d="M7.3 13.5h9.4" />
-    </svg>
-  )
-}
-
-// A capsule/pill glyph, same thin-stroke style as the bottle icon.
-function PillIcon({ color, size = 22 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="4" y="8.5" width="16" height="7" rx="3.5" transform="rotate(-45 12 12)" />
-      <line x1="12" y1="8.5" x2="12" y2="15.5" transform="rotate(-45 12 12)" />
-    </svg>
-  )
 }
 
 // The launch screen: answers "what do you want to do" and nothing else.
@@ -79,8 +58,8 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
   // oversized" foundation) — each action's own accent only tints its
   // border and icon badge, so the four read as a family with a hero each,
   // not identical blocks distinguished by text alone.
-  const rowStyle = (accent) => ({ display: 'flex', alignItems: 'center', gap: 16, width: '100%', minHeight: 76, borderRadius: 20, border: `1.5px solid ${accent}`, background: brand.bark, cursor: 'pointer', padding: '0 20px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' })
-  const iconWrapStyle = (accent) => ({ width: 42, height: 42, borderRadius: '50%', background: `${accent}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 })
+  const rowStyle = (accent) => ({ display: 'flex', alignItems: 'center', gap: 16, width: '100%', minHeight: 76, borderRadius: 20, border: `1.5px solid ${accent}`, background: brand.barkGradient, boxShadow: shadow(night, 1), cursor: 'pointer', padding: '0 20px', textAlign: 'left', WebkitTapHighlightColor: 'transparent' })
+  const iconWrapStyle = (accent) => ({ width: 42, height: 42, borderRadius: '50%', background: iconWellBg(accent), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 })
   // Parchment (near-white) rather than sand for the label itself — sand's
   // tan-on-brown contrast (~5:1) reads as soft since both are the same warm
   // hue. Bold weight made it worse, not better: light text on a dark fill
@@ -96,7 +75,7 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
   // Secondary pair (Sage, Going out) sit side by side, together spanning the
   // same width as the four rows above — a matched, quieter pair rather than
   // two full-width rows adrift with space between them.
-  const secondaryCard = { flex: 1, minHeight: 76, borderRadius: 18, border: `1px solid ${p.border}`, background: p.card, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, WebkitTapHighlightColor: 'transparent' }
+  const secondaryCard = { flex: 1, minHeight: 76, borderRadius: 18, border: `1px solid ${p.border}`, background: p.card, boxShadow: shadow(night, 1), cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, WebkitTapHighlightColor: 'transparent' }
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg, position: 'relative' }}>

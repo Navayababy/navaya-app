@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { brand, palette } from '../../theme.js'
+import { brand, palette, shadow } from '../../theme.js'
 import { timeStr, buildISO, todayDateStr } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { MOOD_EMOJI, MOOD_LABEL, MILK_TYPE_LABEL } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
+import { BottleIcon } from '../icons.jsx'
 
 export default function AddFeedModal({ night, onSave, onClose }) {
   const p = palette(night)
@@ -51,8 +52,9 @@ export default function AddFeedModal({ night, onSave, onClose }) {
     <ModalShell title="Add feed" night={night} onClose={onClose}>
       <span style={labelStyle}>Type</span>
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-        {[['breast', 'Breast'], ['bottle', '🍼 Bottle']].map(([id, label]) => (
-          <button key={id} onClick={() => setFeedType(id)} style={toggleBtn(feedType === id)}>
+        {[['breast', 'Breast'], ['bottle', 'Bottle']].map(([id, label]) => (
+          <button key={id} onClick={() => setFeedType(id)} style={{ ...toggleBtn(feedType === id), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            {id === 'bottle' && <BottleIcon color={feedType === id ? brand.sand : p.sub} size={14} />}
             {label}
           </button>
         ))}
@@ -112,7 +114,7 @@ export default function AddFeedModal({ night, onSave, onClose }) {
         })}
       </div>
 
-      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
         Add feed
       </button>
     </ModalShell>

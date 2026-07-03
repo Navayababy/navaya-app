@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { brand, palette } from '../../theme.js'
+import { brand, palette, shadow } from '../../theme.js'
 import { timeStr, dateStr, todayDateStr, timeAgo } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { MEDICINE_OPTIONS } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
+import { ClockIcon } from '../icons.jsx'
 
 // `initial` switches the modal into edit mode: fields are pre-filled and the
 // title/button reflect editing. The caller decides how to persist the result.
@@ -87,7 +88,7 @@ export default function AddMedicineModal({ night, onSave, onClose, recentMedicin
 
       {!editing && lastDose && (
         <div style={{ background: p.bg, border: `1px solid ${p.border}`, borderRadius: 10, padding: '9px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13, flexShrink: 0 }} aria-hidden="true">🕐</span>
+          <ClockIcon color={p.sub} size={14} />
           <span style={{ fontSize: 12, color: p.text, lineHeight: 1.5 }}>
             Last logged: {lastDose.name}{lastDose.doseMl ? ` ${lastDose.doseMl}ml` : ''} · {timeAgo(lastDose.loggedAt)}
           </span>
@@ -107,7 +108,7 @@ export default function AddMedicineModal({ night, onSave, onClose, recentMedicin
       <textarea value={notes} maxLength={500} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Reason, temperature, or advice from clinician" style={{ ...inputStyle, resize: 'vertical', marginBottom: 16 }} />
 
       {error && (
-        <div style={{ fontSize: 12, color: '#c0392b', marginBottom: 12, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 12, color: brand.danger, marginBottom: 12, lineHeight: 1.4 }}>
           {error}
         </div>
       )}
@@ -118,7 +119,7 @@ export default function AddMedicineModal({ night, onSave, onClose, recentMedicin
         </span>
       </div>
 
-      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
         {editing ? 'Save changes' : 'Log medicine'}
       </button>
     </ModalShell>

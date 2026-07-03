@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow, iconWellBg } from '../theme.js'
 import { getInstallBannerDismissed, dismissInstallBanner } from '../lib/storage.js'
+import { PhoneIcon } from './icons.jsx'
 
 function isStandalone() {
   return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
@@ -56,11 +57,11 @@ export default function InstallBanner({ night }) {
 
   return (
     <div className="fade-up" style={{
-      margin: '8px 14px 0', background: p.card, border: `1px solid ${p.border}`,
+      margin: '8px 14px 0', background: p.card, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1),
       borderRadius: 16, padding: '13px 14px', display: 'flex', alignItems: 'center', gap: 12,
     }}>
-      <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${brand.sand}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>
-        📲
+      <div style={{ width: 36, height: 36, borderRadius: '50%', background: iconWellBg(brand.sand), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <PhoneIcon color={brand.sand} size={16} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: p.text }}>Add Navaya to your home screen</span>
@@ -71,7 +72,7 @@ export default function InstallBanner({ night }) {
         </span>
       </div>
       {deferredPrompt && (
-        <button onClick={handleInstall} style={{ background: brand.bark, border: 'none', borderRadius: 12, padding: '9px 14px', cursor: 'pointer', color: brand.sand, fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
+        <button onClick={handleInstall} style={{ background: brand.barkGradient, boxShadow: shadow(night, 1), border: 'none', borderRadius: 12, padding: '9px 14px', cursor: 'pointer', color: brand.sand, fontSize: 13, fontWeight: 600, flexShrink: 0 }}>
           Install
         </button>
       )}

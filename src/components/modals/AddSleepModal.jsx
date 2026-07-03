@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { brand, palette } from '../../theme.js'
+import { brand, palette, shadow } from '../../theme.js'
 import { timeStr, dateStr, buildISO } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { makeModalStyles } from './modalStyles.js'
@@ -50,7 +50,7 @@ export default function AddSleepModal({ night, onSave, onClose, initial = null }
         If the wake time is earlier than the start, we&apos;ll assume the sleep crossed midnight.
       </span>
 
-      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
         {editing ? 'Save changes' : 'Add sleep'}
       </button>
     </ModalShell>

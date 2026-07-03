@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow, iconWellBg } from '../theme.js'
 import { getNappies, addNappy } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { dateStr, timeStr } from '../utils/time.js'
 import { POO_COLORS } from '../lib/constants.js'
 import { newId } from '../lib/id.js'
+import { DropletIcon, PooIcon, ClockIcon } from '../components/icons.jsx'
 
 function timeSinceShort(iso) {
   if (!iso) return '—'
@@ -86,9 +87,9 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
 
   // Colour and label for each nappy type
   const TYPE_META = {
-    wet:  { bg: brand.sand,   fg: brand.bark,  emoji: '💧', label: 'Wee'  },
-    poo:  { bg: brand.bark,   fg: brand.sand,  emoji: '💩', label: 'Poo'  },
-    both: { bg: brand.accent, fg: '#fff',       emoji: '💧💩', label: 'Both' },
+    wet:  { bg: brand.sand,   fg: brand.bark,  label: 'Wee'  },
+    poo:  { bg: brand.bark,   fg: brand.sand,  label: 'Poo'  },
+    both: { bg: brand.accent, fg: '#fff',       label: 'Both' },
   }
 
   const btnStyle = (t) => ({
@@ -113,7 +114,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
 
       {/* Header */}
       <div style={{ padding: '8px 16px 16px', textAlign: 'center' }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.mist}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: iconWellBg(brand.mist), boxShadow: shadow(night, 1), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
           <span style={{ fontSize: 24, color: brand.mist, lineHeight: 1 }}>◈</span>
         </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Keep track</span>
@@ -127,7 +128,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
           [wetToday.toString(),                  'wees today' ],
           [pooToday.toString(),                  'poos today' ],
         ].map(([val, lbl]) => (
-          <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 16, padding: '18px 8px', border: `1px solid ${p.border}`, textAlign: 'center' }}>
+          <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 16, padding: '18px 8px', border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), textAlign: 'center' }}>
             <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: val.length > 5 ? 20 : 28, color: p.heading, lineHeight: 1.2 }}>{val}</span>
             <span style={{ display: 'block', fontSize: 11, color: p.sub, lineHeight: 1.3, marginTop: 5 }}>{lbl}</span>
           </div>
@@ -135,7 +136,7 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
       </div>
 
       {/* Log card */}
-      <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, padding: '18px 16px' }}>
+      <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, boxShadow: shadow(night, 2), padding: '18px 16px' }}>
 
         <span style={{ display: 'block', fontSize: 12, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 14 }}>Log a change</span>
 
@@ -143,7 +144,14 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
         <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
           {['wet', 'poo', 'both'].map(t => (
             <button key={t} style={btnStyle(t)} onClick={() => setType(t)}>
-              <span style={{ fontSize: t === 'both' ? 22 : 26, lineHeight: 1 }}>{TYPE_META[t].emoji}</span>
+              {t === 'wet' && <DropletIcon color={type === t ? TYPE_META[t].fg : p.sub} size={24} />}
+              {t === 'poo' && <PooIcon color={type === t ? TYPE_META[t].fg : p.sub} size={24} />}
+              {t === 'both' && (
+                <span style={{ display: 'flex', gap: 2 }}>
+                  <DropletIcon color={type === t ? TYPE_META[t].fg : p.sub} size={19} />
+                  <PooIcon color={type === t ? TYPE_META[t].fg : p.sub} size={19} />
+                </span>
+              )}
               <span style={{ fontSize: 14, fontWeight: 600, fontFamily: "'Jost', sans-serif" }}>{TYPE_META[t].label}</span>
             </button>
           ))}
@@ -190,7 +198,10 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
                   width: '100%', ...inputStyle, cursor: 'pointer',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 }}>
-                  <span>🕐 {logTime} · {logDate === dateStr() ? 'Now' : logDate}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <ClockIcon color={p.sub} />
+                    {logTime} · {logDate === dateStr() ? 'Now' : logDate}
+                  </span>
                   <span style={{ fontSize: 12, opacity: 0.45 }}>edit</span>
                 </button>
               )}
@@ -198,13 +209,14 @@ export default function NappyScreen({ night, authUser, profile, sharedNappies, o
 
             {/* Log button / confirmation */}
             {justLogged ? (
-              <div style={{ padding: '16px', borderRadius: 14, background: brand.green, textAlign: 'center' }}>
+              <div style={{ padding: '16px', borderRadius: 14, background: brand.green, boxShadow: shadow(night, 1), textAlign: 'center' }}>
                 <span style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>✓ Logged</span>
               </div>
             ) : (
               <button onClick={handleLog} style={{
                 width: '100%', padding: '16px', borderRadius: 14, border: 'none',
-                background: brand.bark,
+                background: brand.barkGradient,
+                boxShadow:  shadow(night, 1),
                 color:      brand.sand,
                 cursor:     'pointer',
                 fontSize: 15, fontWeight: 600,
