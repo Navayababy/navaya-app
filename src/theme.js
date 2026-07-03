@@ -26,15 +26,25 @@ export const dark = {
   navActive: '#E0CFBC',   // warm off-white — 10:1 on dark nav bg
 };
 
+// The four category accents (Feed/Nappy/Sleep/Medicine) sat too close in hue
+// and saturation before — competitor trackers (Huckleberry, Nara, Glow) are
+// consistently praised for colour-coding each activity clearly enough to
+// read at a glance, which matters most exactly when it's needed least: a
+// tired parent logging one-handed at 3am. Each hue below is pushed further
+// from its neighbours while staying inside the same warm, muted family as
+// the cream/parchment base — 2025 colour research favours calm, soothing
+// tones (sage, dusty rose, blue-grey) over saturated brights for this
+// category, so the brightening stops well short of Glow's poster-yellow or
+// Huckleberry's candy pastels.
 export const brand = {
   bark:    '#4A3728',
   sand:    '#C4A882',
   parchment: '#EDE5D8',
   cream:   '#F5F0EB',
-  green:   '#6B8F71',
-  accent:  '#D4956A',
-  mist:    '#7FA3B5',   // cool counterpoint used only to tell the four Home actions apart
-  rose:    '#C46B6B',   // medicine's accent in the same Home action family
+  green:   '#5B8C68',   // Sleep — deepened sage; blue and sage both read as "calm" in colour research, so it's pushed further from mist rather than toward it
+  accent:  '#E0824C',   // Feed — warmer, more saturated terracotta so it reads as the "active/nourishing" action first
+  mist:    '#4F96AC',   // Nappy — clearer teal-blue (water/clean) instead of the previous grey-blue, which read too close to a neutral
+  rose:    '#C15C69',   // Medicine — clearer warm rose-pink, less brown than before, so it doesn't fade toward bark/sand
   danger:  '#B5544B',   // warm-toned red for delete/destructive actions — sits with the palette instead of a cold generic red
   // A slightly richer, two-stop version of bark for primary buttons and hero
   // rows — same colour at a glance, but with the soft light-to-dark taper
