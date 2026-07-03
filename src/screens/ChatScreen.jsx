@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow, iconWellBg } from '../theme.js'
 
 const SUGGESTIONS = [
   { label: 'Painful latch',     q: "My latch feels painful — is this normal?" },
@@ -117,7 +117,7 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
 
       {/* Header — centred, matching Feed/Nappy/Sleep/Logbook/Prepare */}
       <div style={{ padding: '20px 16px 12px', flexShrink: 0, textAlign: 'center' }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.sand}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: iconWellBg(brand.sand), boxShadow: shadow(night, 1), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
           <span style={{ fontSize: 24, color: brand.sand, lineHeight: 1 }}>✦</span>
         </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Your breastfeeding companion</span>
@@ -157,11 +157,11 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
         {messages.map((m) => (
           <div key={m.id} className="fade-up" style={{ marginBottom: 10, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
             {m.role === 'user' ? (
-              <div style={{ background: brand.bark, borderRadius: '14px 14px 4px 14px', padding: '10px 13px', maxWidth: '84%' }}>
+              <div style={{ background: brand.barkGradient, boxShadow: shadow(night, 1), borderRadius: '14px 14px 4px 14px', padding: '10px 13px', maxWidth: '84%' }}>
                 <span style={{ fontSize: 13, color: brand.parchment, lineHeight: 1.5 }}>{m.content}</span>
               </div>
             ) : (
-              <div style={{ background: p.card, border: `1px solid ${m.error ? '#C0392B' : p.border}`, borderRadius: '14px 14px 14px 4px', padding: '12px 13px', maxWidth: '92%' }}>
+              <div style={{ background: p.card, border: `1px solid ${m.error ? brand.danger : p.border}`, boxShadow: shadow(night, 1), borderRadius: '14px 14px 14px 4px', padding: '12px 13px', maxWidth: '92%' }}>
                 <span style={{ display: 'block', fontSize: 9, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>✦ Sage</span>
                 <span style={{ fontSize: 13, color: p.text, lineHeight: 1.65 }}>{m.content}</span>
               </div>
@@ -172,7 +172,7 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
         {/* Loading dots — only while waiting for the first words */}
         {loading && !streaming && (
           <div className="fade-up" style={{ marginBottom: 10 }}>
-            <div style={{ background: p.card, border: `1px solid ${p.border}`, borderRadius: '14px 14px 14px 4px', padding: '13px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ background: p.card, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), borderRadius: '14px 14px 14px 4px', padding: '13px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 9, color: brand.sand }}>✦</span>
               <span className="dot-1" style={{ width: 5, height: 5, borderRadius: '50%', background: brand.sand, display: 'inline-block' }} />
               <span className="dot-2" style={{ width: 5, height: 5, borderRadius: '50%', background: brand.sand, display: 'inline-block' }} />
@@ -197,7 +197,7 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
           border:       `1.5px solid ${brand.sand}`,
           borderRadius: 18,
           padding:      '6px 6px 6px 15px',
-          boxShadow:    `0 0 0 4px ${brand.sand}1F`,
+          boxShadow:    `0 0 0 4px ${brand.sand}1F, ${shadow(night, 1)}`,
         }}>
           <textarea
             ref={textareaRef}
@@ -229,7 +229,7 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
               borderRadius: 14,
               border:       'none',
               cursor:       input.trim() && !loading ? 'pointer' : 'default',
-              background:   input.trim() && !loading ? brand.bark : p.border,
+              background:   input.trim() && !loading ? brand.barkGradient : p.border,
               display:      'flex',
               alignItems:   'center',
               justifyContent: 'center',

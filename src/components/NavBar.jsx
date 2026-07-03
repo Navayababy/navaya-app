@@ -1,16 +1,5 @@
 import { palette } from '../theme.js'
-
-// Compact bottle glyph, matching the thin-stroke line-icon language used
-// for the other tabs rather than an emoji.
-function BottleIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="9" y="2" width="6" height="3.5" rx="1" />
-      <path d="M9.5 5.5 8.3 8.6A3 3 0 0 0 7 11v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9a3 3 0 0 0-1.3-2.4L14.5 5.5" />
-      <path d="M7.3 13.5h9.4" />
-    </svg>
-  )
-}
+import { BottleIcon } from './icons.jsx'
 
 // Prepare is reached from the Home screen card rather than the nav bar —
 // it's a before-you-go-out task, not a many-times-a-day one like these six.
@@ -18,7 +7,7 @@ function BottleIcon() {
 // Sage and the Logbook (lookup, not logging) trailing at the end.
 const tabs = [
   { id: 'home',    icon: '⌂',              label: 'Home'    },
-  { id: 'feed',    icon: <BottleIcon />,    label: 'Feed'    },
+  { id: 'feed',    icon: <BottleIcon size={15} />, label: 'Feed'    },
   { id: 'nappy',   icon: '◈',              label: 'Nappy'   },
   { id: 'sleep',   icon: '☾',              label: 'Sleep'   },
   { id: 'chat',    icon: '✦',              label: 'Sage'    },
@@ -33,6 +22,7 @@ export default function NavBar({ screen, setScreen, night, feedActive, sleepActi
       display:       'flex',
       background:    p.navBg,
       borderTop:     `1px solid ${p.navBdr}`,
+      boxShadow:     night ? '0 -6px 18px rgba(0,0,0,0.22)' : '0 -6px 18px rgba(74,55,40,0.05)',
       paddingTop:    8,
       paddingBottom: 'env(safe-area-inset-bottom, 10px)',
       flexShrink:    0,
@@ -54,16 +44,30 @@ export default function NavBar({ screen, setScreen, night, feedActive, sleepActi
               flexDirection:  'column',
               alignItems:     'center',
               gap:            3,
-              padding:        '4px 0 6px',
+              padding:        '4px 0 2px',
               WebkitTapHighlightColor: 'transparent',
               position:       'relative',
             }}
           >
-            <span style={{ fontSize: 17, color: active ? p.navActive : p.sub, transition: 'color .2s', lineHeight: 1 }}>
-              {tab.icon}
-            </span>
-            <span style={{ fontSize: 9, fontWeight: active ? 600 : 400, color: active ? p.navActive : p.sub, letterSpacing: '.02em', fontFamily: "'Jost', sans-serif", lineHeight: 1 }}>
-              {tab.label}
+            {/* Filled pill behind the active tab, instead of colour alone,
+                so "which tab am I on" reads at a glance rather than needing
+                a close look at a subtle tint change. */}
+            <span style={{
+              display:      'flex',
+              flexDirection: 'column',
+              alignItems:   'center',
+              gap:          3,
+              padding:      '5px 14px 4px',
+              borderRadius: 14,
+              background:   active ? `${p.navActive}1C` : 'transparent',
+              transition:   'background .2s',
+            }}>
+              <span style={{ fontSize: 17, color: active ? p.navActive : p.sub, transition: 'color .2s', lineHeight: 1 }}>
+                {tab.icon}
+              </span>
+              <span style={{ fontSize: 9, fontWeight: active ? 600 : 400, color: active ? p.navActive : p.sub, letterSpacing: '.02em', fontFamily: "'Jost', sans-serif", lineHeight: 1 }}>
+                {tab.label}
+              </span>
             </span>
             {/* Live indicator dot — shows when a feed or sleep is running on another screen */}
             {showDot && (

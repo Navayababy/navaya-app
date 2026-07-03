@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow, iconWellBg } from '../theme.js'
 import { getSleeps, addSleep, babyDisplayName, getPendingSleep, savePendingSleep, clearPendingSleep } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
@@ -242,7 +242,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
       {/* Header */}
       <div style={{ padding: '8px 16px 16px', textAlign: 'center' }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.green}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: iconWellBg(brand.green), boxShadow: shadow(night, 1), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
           <span style={{ fontSize: 24, color: brand.green, lineHeight: 1 }}>☾</span>
         </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Rest &amp; recharge</span>
@@ -256,7 +256,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
           [lastSleep ? fmtMins(lastSleep.durationSecs || 0) : '—', 'last sleep'],
           [lastSleep && !sleepActive ? timeAgo(lastSleep.endedAt).replace(' ago', '') : sleepActive ? 'now' : '—', sleepActive ? 'sleeping' : 'awake for'],
         ].map(([val, lbl]) => (
-          <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 16, padding: '18px 8px', border: `1px solid ${p.border}`, textAlign: 'center' }}>
+          <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 16, padding: '18px 8px', border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), textAlign: 'center' }}>
             <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: String(val).length > 6 ? 20 : 28, color: p.heading, lineHeight: 1.2 }}>{val}</span>
             <span style={{ display: 'block', fontSize: 11, color: p.sub, lineHeight: 1.3, marginTop: 5 }}>{lbl}</span>
           </div>
@@ -265,7 +265,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
       {/* ── One-time shared-household note, same pattern as Home's guest note ── */}
       {showSleepSyncHint && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 16px 16px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 16px 16px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14, boxShadow: shadow(night, 1) }}>
           <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
             Sleep timers sync live — your partner sees this timer running and either of you can end it. Feed timers stay on the device that started them until the feed is saved.
           </span>
@@ -278,7 +278,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
       {sleepActive ? (
         /* ── Live timer ── */
-        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}` }}>
+        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, boxShadow: shadow(night, 2) }}>
           <div style={{ padding: '16px 18px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: brand.accent, flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: p.sub, letterSpacing: '.04em' }}>Sleeping</span>
@@ -300,7 +300,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
         </div>
       ) : pendingSleep ? (
         /* ── Confirm the start and end time before saving ── */
-        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, padding: '18px 16px' }}>
+        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), padding: '18px 16px' }}>
           <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>Did {babyDisplayName(true)} fall asleep and wake up around these times?</span>
           <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Adjust either if the timer was started or stopped a little late.</span>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
@@ -322,13 +322,13 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
             </div>
           </div>
           <button onClick={confirmSleep}
-            style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 15, color: brand.sand, fontWeight: 600 }}>
+            style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), cursor: 'pointer', fontSize: 15, color: brand.sand, fontWeight: 600 }}>
             Save
           </button>
         </div>
       ) : addingPast ? (
         /* ── Manual past entry ── */
-        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, padding: '18px 16px' }}>
+        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), padding: '18px 16px' }}>
           <span style={{ display: 'block', fontSize: 12, color: p.sub, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 12 }}>Add a sleep</span>
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
@@ -342,12 +342,12 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setAddingPast(false)} style={{ flex: 1, padding: '14px', borderRadius: 13, border: `1px solid ${p.border}`, background: 'transparent', cursor: 'pointer', fontSize: 14, color: p.sub }}>Cancel</button>
-            <button onClick={handleAddPast} style={{ flex: 1, padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>Save</button>
+            <button onClick={handleAddPast} style={{ flex: 1, padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>Save</button>
           </div>
         </div>
       ) : (
         /* ── Two simple choices ── */
-        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, padding: '16px' }}>
+        <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), padding: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: brand.sand, flexShrink: 0 }} />
             <span style={{ fontSize: 12, color: p.sub, letterSpacing: '.04em' }}>Ready to start</span>
@@ -357,7 +357,7 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={handleStart}
-              style={{ flex: 1, minHeight: 84, borderRadius: 16, border: 'none', cursor: 'pointer', background: brand.bark, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              style={{ flex: 1, minHeight: 84, borderRadius: 16, border: 'none', cursor: 'pointer', background: brand.barkGradient, boxShadow: shadow(night, 1), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               <span style={{ fontSize: 18, color: brand.sand, lineHeight: 1 }}>☾</span>
               <span style={{ fontSize: 13, fontWeight: 600, color: brand.sand }}>Start sleep timer</span>
             </button>

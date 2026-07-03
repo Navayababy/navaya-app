@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow, iconWellBg } from '../theme.js'
+import { BottleIcon, DropletIcon, PooIcon, MoonIcon, PillIcon } from '../components/icons.jsx'
 import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, updateSleep, deleteSleep, getBabyName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, dayShort, timeStr, todayDateStr } from '../utils/time.js'
@@ -334,13 +335,13 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     <div style={{ flex: 1, overflowY: 'auto', background: p.bg, position: 'relative' }}>
 
       <button onClick={() => setAddMode('picker')} aria-label="Add entry"
-        style={{ position: 'absolute', top: 16, right: 16, zIndex: 1, display: 'flex', alignItems: 'center', gap: 6, background: brand.bark, border: 'none', borderRadius: 20, padding: '8px 15px 8px 13px', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+        style={{ position: 'absolute', top: 16, right: 16, zIndex: 1, display: 'flex', alignItems: 'center', gap: 6, background: brand.barkGradient, boxShadow: shadow(night, 1), border: 'none', borderRadius: 20, padding: '8px 15px 8px 13px', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
         <span style={{ color: brand.sand, fontSize: 17, lineHeight: 1, marginTop: -1 }}>+</span>
         <span style={{ color: brand.sand, fontSize: 13, fontWeight: 500 }}>Add</span>
       </button>
 
       <div style={{ padding: '20px 16px 12px', textAlign: 'center' }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.sand}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: iconWellBg(brand.sand), boxShadow: shadow(night, 1), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
           <span style={{ fontSize: 22, color: brand.sand, lineHeight: 1 }}>≡</span>
         </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>
@@ -363,7 +364,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
       {/* ── One-time shared-household note, same pattern as the timer hints ── */}
       {showLogbookHint && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 14px 12px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 14px 12px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14, boxShadow: shadow(night, 1) }}>
           <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
             You can edit or delete anything you logged yourself — entries your partner logged are view-only on your device, so ask them to make the change.
           </span>
@@ -382,7 +383,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
           { val: dirtyToday.toString(),                        lbl: 'poos',   sub: null },
           { val: sleepTodaySecs > 0 ? fmtMins(sleepTodaySecs) : '—', lbl: 'sleep',  sub: null },
         ].map(({ val, lbl, sub }) => (
-          <div key={lbl} style={{ background: p.card, borderRadius: 13, padding: '12px 10px', border: `1px solid ${p.border}`, textAlign: 'left' }}>
+          <div key={lbl} style={{ background: p.card, borderRadius: 13, padding: '12px 10px', border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), textAlign: 'left' }}>
             <span style={{ display: 'block', fontSize: 10, color: p.sub, lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '.08em' }}>{lbl} today</span>
             <span style={{ display: 'flex', alignItems: 'flex-end', minHeight: 24, fontFamily: "'Cormorant Garamond', serif", fontSize: val.length > 3 ? 17 : 24, lineHeight: 1, color: p.heading, marginTop: 6 }}>{val}</span>
             {sub && <span style={{ display: 'block', fontSize: 10, color: p.sub, opacity: 0.85, marginTop: 6 }}>{sub}</span>}
@@ -474,7 +475,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
         grouped.map(group => {
           const isOpen = openDay === group.label
           return (
-            <div key={group.label} style={{ margin: '0 14px 10px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, overflow: 'hidden' }}>
+            <div key={group.label} style={{ margin: '0 14px 10px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), overflow: 'hidden' }}>
               <button onClick={() => setOpenDay(isOpen ? null : group.label)}
                 style={{ width: '100%', padding: '14px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, textAlign: 'left' }}>
@@ -508,7 +509,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
                             {isBottleFeed(entry)
-                              ? <span style={{ fontSize: 12 }}>🍼</span>
+                              ? <BottleIcon color={p.sub} size={13} />
                               : <span style={{ fontSize: 10, fontWeight: 600, color: p.sub }}>{entry.side}</span>}
                           </div>
                           <div style={{ flex: 1 }}>
@@ -527,7 +528,6 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
 
                     // ── Nappy row ─────────────────────────────────────────
                     if (entry._type === 'nappy') {
-                      const nappyEmoji = entry.type === 'wet' ? '💧' : entry.type === 'poo' ? '💩' : '💧💩'
                       const nappyLabel = entry.type === 'wet' ? 'Wee' : entry.type === 'poo' ? 'Poo' : 'Wee & Poo'
                       const isDel      = confirmDel?.id === entry.id
                       const creatorId  = getEntryCreatorId(entry)
@@ -538,8 +538,15 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           onClick={() => canEdit && !isDel && setEditNappy(entry)}>
                           <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.loggedAt)}</span>
-                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 13 }}>
-                            {nappyEmoji}
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
+                            {entry.type === 'wet' && <DropletIcon color={p.sub} size={13} />}
+                            {entry.type === 'poo' && <PooIcon color={p.sub} size={13} />}
+                            {entry.type === 'both' && (
+                              <span style={{ display: 'flex', gap: 0 }}>
+                                <DropletIcon color={p.sub} size={10} />
+                                <PooIcon color={p.sub} size={10} />
+                              </span>
+                            )}
                           </div>
                           <div style={{ flex: 1 }}>
                             <span style={{ display: 'block', fontSize: 12, color: p.text }}>{nappyLabel}</span>
@@ -556,7 +563,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           {canEdit && (isDel ? (
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                               <button onClick={(e) => { e.stopPropagation(); setConfirmDel(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'nappy' }) }} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'nappy' }) }} style={{ background: brand.danger, border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
                             </div>
                           ) : (
                             <button onClick={(e) => { e.stopPropagation(); setConfirmDel({ id: entry.id, type: 'nappy' }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
@@ -571,8 +578,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                         <div key={`${entry.id}-cont`} style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle }}>
                           <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>00:00</span>
-                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
-                            😴
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
+                            <MoonIcon color={p.sub} size={13} />
                           </div>
                           <div style={{ flex: 1 }}>
                             <span style={{ display: 'block', fontSize: 12, color: p.text }}>Sleep · until {timeStr(entry.endedAt)}</span>
@@ -593,8 +600,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           onClick={() => canEdit && !isDel && setEditSleep(entry)}>
                           <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.startedAt)}</span>
-                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
-                            😴
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
+                            <MoonIcon color={p.sub} size={13} />
                           </div>
                           <div style={{ flex: 1 }}>
                             <span style={{ display: 'block', fontSize: 12, color: p.text }}>Sleep · {fmtMins(entry.durationSecs || 0)}</span>
@@ -603,7 +610,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           {canEdit && (isDel ? (
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                               <button onClick={(e) => { e.stopPropagation(); setConfirmDel(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'sleep' }) }} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'sleep' }) }} style={{ background: brand.danger, border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
                             </div>
                           ) : (
                             <button onClick={(e) => { e.stopPropagation(); setConfirmDel({ id: entry.id, type: 'sleep' }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
@@ -622,8 +629,8 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           onClick={() => canEdit && !isDel && setEditMedicine(entry)}>
                           <PartnerAttributionIndicator entry={entry} sharedMode={sharedMode} authUser={authUser} />
                           <span style={{ fontSize: 11, color: p.sub, width: 42, flexShrink: 0 }}>{timeStr(entry.loggedAt)}</span>
-                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0, fontSize: 12 }}>
-                            💊
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: p.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 10px', flexShrink: 0 }}>
+                            <PillIcon color={p.sub} size={13} />
                           </div>
                           <div style={{ flex: 1 }}>
                             <span style={{ display: 'block', fontSize: 12, color: p.text }}>{entry.name}{entry.doseMl ? ` · ${entry.doseMl}ml` : ''}</span>
@@ -634,7 +641,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                           {canEdit && (isDel ? (
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                               <button onClick={(e) => { e.stopPropagation(); setConfirmDel(null) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: p.sub, padding: '2px 6px' }}>Cancel</button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'medicine' }) }} style={{ background: '#c0392b', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDelete({ id: entry.id, type: 'medicine' }) }} style={{ background: brand.danger, border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 11, color: '#fff', padding: '2px 8px', fontWeight: 500 }}>Delete</button>
                             </div>
                           ) : (
                             <button onClick={(e) => { e.stopPropagation(); setConfirmDel({ id: entry.id, type: 'medicine' }) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: p.sub, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}>×</button>
@@ -673,21 +680,21 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
       {/* ── Add type picker ── */}
       {addMode === 'picker' && (
         <div onClick={() => setAddMode(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 100, padding: '0 0 env(safe-area-inset-bottom, 0)' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: p.card, borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', border: `1px solid ${p.border}` }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: p.card, borderRadius: '20px 20px 0 0', padding: '20px 20px 32px', border: `1px solid ${p.border}`, boxShadow: shadow(night, 3) }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: p.heading }}>Add entry</span>
               <button onClick={() => setAddMode(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: p.sub }}>×</button>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               {[
-                { mode: 'feed',  icon: '🍼', label: 'Feed'  },
-                { mode: 'nappy', icon: '💧', label: 'Nappy' },
-                { mode: 'sleep', icon: '😴', label: 'Sleep' },
-                { mode: 'medicine', icon: '💊', label: 'Medicine' },
-              ].map(({ mode, icon, label }) => (
+                { mode: 'feed',  Icon: BottleIcon, label: 'Feed'  },
+                { mode: 'nappy', Icon: DropletIcon, label: 'Nappy' },
+                { mode: 'sleep', Icon: MoonIcon,   label: 'Sleep' },
+                { mode: 'medicine', Icon: PillIcon, label: 'Medicine' },
+              ].map(({ mode, Icon, label }) => (
                 <button key={mode} onClick={() => setAddMode(mode)}
                   style={{ flex: 1, padding: '18px 8px', borderRadius: 14, border: `1px solid ${p.border}`, background: p.bg, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, WebkitTapHighlightColor: 'transparent' }}>
-                  <span style={{ fontSize: 26, lineHeight: 1 }}>{icon}</span>
+                  <Icon color={p.heading} size={24} />
                   <span style={{ fontSize: 13, color: p.text, fontWeight: 500 }}>{label}</span>
                 </button>
               ))}

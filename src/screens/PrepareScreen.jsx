@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow, iconWellBg } from '../theme.js'
 import { getChecked, setChecked as saveChecked, getCustomItems, setCustomItems as saveCustomItems, getHiddenDefaults, saveHiddenDefaults } from '../lib/storage.js'
 import { PREPARE_DEFAULT_ITEMS as DEFAULT_ITEMS } from '../lib/constants.js'
 
@@ -71,7 +71,7 @@ export default function PrepareScreen({ night, setScreen }) {
 
       {/* Header — centred, matching Feed/Nappy/Sleep/Logbook */}
       <div style={{ padding: '20px 16px 12px', textAlign: 'center' }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.sand}29`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: iconWellBg(brand.sand), boxShadow: shadow(night, 1), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={brand.sand} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="3" y="3" width="18" height="18" rx="4" />
             <path d="M7 12l3 3 7-7" />
@@ -88,6 +88,7 @@ export default function PrepareScreen({ night, setScreen }) {
         background: ready ? '#2E3E2A' : p.card,
         borderRadius: 14,
         border:     `1px solid ${ready ? brand.green : p.border}`,
+        boxShadow:  shadow(night, 1),
         padding:    '13px 14px',
         transition: 'all .3s',
       }}>
@@ -123,6 +124,7 @@ export default function PrepareScreen({ night, setScreen }) {
                   background:  p.card,
                   borderRadius: 12,
                   border:      `1px solid ${checked[item.id] ? brand.sand : p.border}`,
+                  boxShadow:   shadow(night, 1),
                   padding:     '13px 14px',
                   cursor:      'pointer',
                   textAlign:   'left',
@@ -193,7 +195,7 @@ export default function PrepareScreen({ night, setScreen }) {
               padding:     '0 16px',
               borderRadius: 11,
               border:      'none',
-              background:  newItem.trim() ? brand.bark : p.border,
+              background:  newItem.trim() ? brand.barkGradient : p.border,
               color:       newItem.trim() ? brand.sand : p.sub,
               cursor:      newItem.trim() ? 'pointer' : 'default',
               fontSize:    20,

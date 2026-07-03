@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { brand, palette } from '../../theme.js'
+import { brand, palette, shadow } from '../../theme.js'
 import { timeStr, todayDateStr, dateStr } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { POO_COLORS } from '../../lib/constants.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
+import { DropletIcon, PooIcon } from '../icons.jsx'
 
 // `initial` switches the modal into edit mode: fields are pre-filled and the
 // title/button reflect editing. The caller decides how to persist the result.
@@ -32,13 +33,20 @@ export default function AddNappyModal({ night, onSave, onClose, initial = null }
       <span style={labelStyle}>Type</span>
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
         {[
-          { t: 'wet',  emoji: '💧',   label: 'Wee'  },
-          { t: 'poo',  emoji: '💩',   label: 'Poo'  },
-          { t: 'both', emoji: '💧💩', label: 'Both' },
-        ].map(({ t, emoji, label }) => (
+          { t: 'wet',  label: 'Wee'  },
+          { t: 'poo',  label: 'Poo'  },
+          { t: 'both', label: 'Both' },
+        ].map(({ t, label }) => (
           <button key={t} onClick={() => setType(t)}
             style={{ flex: 1, padding: '12px 6px', borderRadius: 11, border: `1.5px solid ${type === t ? brand.sand : p.border}`, background: type === t ? brand.bark : 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
+            {t === 'wet' && <DropletIcon color={type === t ? brand.sand : p.sub} size={18} />}
+            {t === 'poo' && <PooIcon color={type === t ? brand.sand : p.sub} size={18} />}
+            {t === 'both' && (
+              <span style={{ display: 'flex', gap: 1 }}>
+                <DropletIcon color={type === t ? brand.sand : p.sub} size={14} />
+                <PooIcon color={type === t ? brand.sand : p.sub} size={14} />
+              </span>
+            )}
             <span style={{ fontSize: 12, color: type === t ? brand.sand : p.sub, fontWeight: 500 }}>{label}</span>
           </button>
         ))}
@@ -70,7 +78,7 @@ export default function AddNappyModal({ night, onSave, onClose, initial = null }
         <input type="time" value={logTime} onChange={e => setLogTime(e.target.value)} style={{ ...inputStyle, flex: 1   }} />
       </div>
 
-      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
         {editing ? 'Save changes' : 'Log nappy'}
       </button>
     </ModalShell>

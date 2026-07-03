@@ -1,28 +1,17 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { brand, palette } from '../theme.js'
+import { brand, palette, shadow, iconWellBg } from '../theme.js'
 import { getSessions, addSession, updateSession, babyDisplayName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtSince, timeStr, nearestDateForTime } from '../utils/time.js'
 import { normalizeFeedSession, isBottleFeed, feedTypeOf } from '../lib/normalize.js'
 import { newId } from '../lib/id.js'
 import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
+import { BottleIcon } from '../components/icons.jsx'
 
 const sortByTime = arr => [...arr].sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
 
 function todayMidnight() {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime()
-}
-
-// Same glyph and accent as the "Feed" card on Home, so the icon carries
-// over from the tap that brought you here.
-function BottleIcon({ color, size = 26 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="9" y="2" width="6" height="3.5" rx="1" />
-      <path d="M9.5 5.5 8.3 8.6A3 3 0 0 0 7 11v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9a3 3 0 0 0-1.3-2.4L14.5 5.5" />
-      <path d="M7.3 13.5h9.4" />
-    </svg>
-  )
 }
 
 // Dedicated feed tab — the timer plus feed-only context. Nappy and sleep
@@ -289,7 +278,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
 
       {/* Header */}
       <div style={{ padding: '8px 16px 16px', textAlign: 'center' }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', background: `${brand.accent}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: iconWellBg(brand.accent), boxShadow: shadow(night, 1), display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
           <BottleIcon color={brand.accent} size={26} />
         </div>
         <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 12, color: brand.sand, letterSpacing: '.12em', textTransform: 'uppercase' }}>Nourish &amp; nurture</span>
@@ -303,7 +292,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
           [breastMinsToday > 0 ? `${breastMinsToday}m` : (bottleMlToday > 0 ? `${bottleMlToday}ml` : '—'), breastMinsToday > 0 ? 'breast today' : 'bottle today'],
           [timeSinceLast && timeSinceLast !== 'just now' ? timeSinceLast : (timeSinceLast === 'just now' ? 'now' : '—'), 'since last'],
         ].map(([val, lbl]) => (
-          <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 16, padding: '18px 8px', border: `1px solid ${p.border}`, textAlign: 'center' }}>
+          <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 16, padding: '18px 8px', border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), textAlign: 'center' }}>
             <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: String(val).length > 6 ? 20 : 28, color: p.heading, lineHeight: 1.2 }}>{val}</span>
             <span style={{ display: 'block', fontSize: 11, color: p.sub, lineHeight: 1.3, marginTop: 5 }}>{lbl}</span>
           </div>
@@ -312,7 +301,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
 
       {/* ── One-time shared-household note, same pattern as the sleep hint ── */}
       {showFeedSyncHint && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 16px 16px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '0 16px 16px', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14, boxShadow: shadow(night, 1) }}>
           <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
             A feed timer only shows on this phone while it&apos;s running — your partner sees the feed in the shared logbook once you finish it.
           </span>
@@ -324,7 +313,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
       )}
 
       {/* Feed timer card */}
-      <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}` }}>
+      <div style={{ margin: '0 16px 16px', background: p.card, borderRadius: 20, border: `1px solid ${p.border}`, boxShadow: shadow(night, 2) }}>
         <div style={{ padding: '16px 18px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: feedActive ? brand.accent : brand.sand, flexShrink: 0 }} />
           <span style={{ fontSize: 12, color: p.sub, letterSpacing: '.04em' }}>
@@ -351,7 +340,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
               const isNext = side === suggested
               return (
                 <button key={side} onClick={() => startTimerFeed(side)}
-                  style={{ flex: 1, minHeight: 84, borderRadius: 16, border: `1.5px solid ${isNext ? brand.sand : 'transparent'}`, cursor: 'pointer', background: isNext ? brand.bark : p.bg, transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                  style={{ flex: 1, minHeight: 84, borderRadius: 16, border: `1.5px solid ${isNext ? brand.sand : 'transparent'}`, cursor: 'pointer', background: isNext ? brand.barkGradient : p.bg, boxShadow: isNext ? shadow(night, 1) : 'none', transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
                   <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: isNext ? brand.sand : p.text }}>
                     {side === 'L' ? 'Left' : 'Right'}
                   </span>
@@ -364,9 +353,10 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
             {/* Bottles aren't timed — this opens the quick-log card below
                 rather than starting the timer */}
             <button onClick={openBottleLog}
-              style={{ flex: 1, minHeight: 84, borderRadius: 16, border: `1.5px solid ${showBottleLog ? brand.sand : 'transparent'}`, cursor: 'pointer', background: showBottleLog ? brand.bark : p.bg, transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+              style={{ flex: 1, minHeight: 84, borderRadius: 16, border: `1.5px solid ${showBottleLog ? brand.sand : 'transparent'}`, cursor: 'pointer', background: showBottleLog ? brand.barkGradient : p.bg, boxShadow: showBottleLog ? shadow(night, 1) : 'none', transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <BottleIcon color={showBottleLog ? brand.sand : p.text} size={18} />
               <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: showBottleLog ? brand.sand : p.text }}>
-                🍼 Bottle
+                Bottle
               </span>
             </button>
           </div>
@@ -378,7 +368,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
                   const isCurrent = side === feedSide
                   return (
                     <button key={side} onClick={() => switchSide(side)}
-                      style={{ flex: 1, minHeight: 64, borderRadius: 14, border: `1.5px solid ${isCurrent ? brand.sand : p.border}`, cursor: 'pointer', background: isCurrent ? brand.bark : 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, transition: 'all .2s' }}>
+                      style={{ flex: 1, minHeight: 64, borderRadius: 14, border: `1.5px solid ${isCurrent ? brand.sand : p.border}`, cursor: 'pointer', background: isCurrent ? brand.barkGradient : 'transparent', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, transition: 'all .2s' }}>
                       <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: isCurrent ? brand.sand : p.sub }}>
                         {side === 'L' ? 'Left' : 'Right'}
                       </span>
@@ -408,7 +398,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
           one most likely to be off, since the timer is often tapped on a
           little after the feed actually began. */}
       {showEndTimeConfirm && (
-        <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, padding: '16px' }}>
+        <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), padding: '16px' }}>
           <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>Did the feed start and end around these times?</span>
           <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Adjust either if the timer was started or stopped a little late.</span>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
@@ -430,7 +420,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
             </div>
           </div>
           <button onClick={confirmFeedEndTime}
-            style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>
+            style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>
             Confirm
           </button>
         </div>
@@ -439,7 +429,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
       {/* Bottle quick log — no timer: the quantity and milk type are what a
           bottle feed is about. Time defaults to now; duration is optional. */}
       {showBottleLog && (
-        <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, padding: '16px' }}>
+        <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), padding: '16px' }}>
           <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>How much did {babyDisplayName()} take?</span>
           <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Saved to your logbook when you tap Save.</span>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -489,7 +479,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
             </div>
           </div>
           <button onClick={saveBottleLog}
-            style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>
+            style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>
             Save
           </button>
           <button onClick={() => setShowBottleLog(false)}
@@ -501,7 +491,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
 
       {/* Mood check-in */}
       {showMood && (
-        <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, padding: '16px' }}>
+        <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), padding: '16px' }}>
           <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>How did that feed go?</span>
           <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Your feed is already saved — this just adds extra detail.</span>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
