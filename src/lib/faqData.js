@@ -74,15 +74,15 @@ export const FAQ_CATEGORIES = [
     items: [
       {
         q: 'How does the feed timer work?',
-        a: 'Tap Left or Right to start timing a breastfeed — switch sides mid-feed without losing your time — or tap Bottle to log a bottle feed. You can fine-tune the exact start/end time when you stop.',
+        a: 'Tap Left or Right to start timing a breastfeed — switch sides mid-feed without losing your time, and fine-tune the exact start/end time when you stop. Bottle feeds aren\'t timed — tapping Bottle logs one straight away instead.',
       },
       {
         q: 'How do I log a bottle feed as expressed milk or formula?',
-        a: 'Tap Bottle to start, and when you stop, you\'ll be asked how much and whether it was expressed milk or formula — both optional, and you can add details later.',
+        a: 'Tap Bottle and enter how much and whether it was expressed milk or formula. The time is set to now (adjust it if you\'re logging late), and adding how long the feed took is optional.',
       },
       {
-        q: 'If I close the app before finishing the mood or amount check-in, will I lose the feed?',
-        a: 'No — the feed is saved the moment you stop the timer. Those questions just add extra detail afterwards.',
+        q: 'If I close the app before finishing the mood check-in, will I lose the feed?',
+        a: 'No — a timed feed is saved the moment you stop the timer, and a bottle feed is saved as soon as you tap Save. The mood question afterwards just adds extra detail.',
       },
       {
         q: 'Can I log pumping or expressing separately?',

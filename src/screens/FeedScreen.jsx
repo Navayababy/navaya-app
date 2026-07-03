@@ -35,7 +35,12 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
 
   const [sessions, setSessions] = useState(() => sortByTime(getSessions()))
   const [showMood,       setShowMood]      = useState(false)
-  const [showAmount,     setShowAmount]    = useState(false)
+  // Bottles aren't timed — tapping Bottle opens this quick-log card instead
+  // (time defaulting to now, amount, milk type, optional duration). The
+  // duration of a bottle feed rarely matters; the quantity and method do.
+  const [showBottleLog,  setShowBottleLog] = useState(false)
+  const [bottleTime,     setBottleTime]    = useState('')
+  const [bottleDuration, setBottleDuration] = useState('')
   const [amountInput,    setAmountInput]   = useState('')
   const [milkInput,      setMilkInput]     = useState('expressed')
   const [pendingSession, setPending]       = useState(null)
@@ -43,8 +48,7 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
   // Confirm both the start and end time before moving on — the start is the
   // one most likely to be off (the timer is often tapped on a little after
   // the feed actually began), so the end time alone isn't enough to fix.
-  // Breast feeds get this as its own step before the mood check-in; bottle
-  // feeds fold the same fields into their single check-in card instead.
+  // Only breast feeds reach this step now — bottles aren't timed at all.
   const [showEndTimeConfirm, setShowEndTimeConfirm] = useState(false)
   const [confirmStartTime,   setConfirmStartTime]    = useState('')
   const [confirmEndTime,     setConfirmEndTime]      = useState('')
@@ -132,19 +136,64 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
     // save its answers onto the wrong session (or null the pending session
     // before this feed's own card could save at all).
     setShowMood(false)
-    // Bottles get one combined check-in (times + amount + milk type) rather
-    // than a separate time-confirmation step first — the amount and type are
-    // what a bottle feed is really about, and a time card in front of them
-    // read like the whole flow ended there.
-    if (session.feedType === 'bottle') {
-      setShowEndTimeConfirm(false)
-      setAmountInput('')
-      setMilkInput('expressed')
-      setShowAmount(true)
-    } else {
-      setShowAmount(false)
-      setShowEndTimeConfirm(true)
+    setShowBottleLog(false)
+    setShowEndTimeConfirm(true)
+  }
+
+  // Bottle quick log — opens the card; nothing is created until Save.
+  const openBottleLog = () => {
+    setAmountInput('')
+    setMilkInput('expressed')
+    setBottleTime(timeStr())
+    setBottleDuration('')
+    // Same stale-card rule as handleStop: one check-in on screen at a time.
+    setShowMood(false)
+    setShowEndTimeConfirm(false)
+    setShowBottleLog(true)
+  }
+
+  // Saves the bottle feed in one go — unlike a timed feed there's no open
+  // session to patch, so this is the moment it reaches the logbook (and the
+  // household, in a single insert). The entered time is re-dated against now
+  // so a just-before-midnight feed logged just after lands on the right day.
+  const saveBottleLog = () => {
+    const parsed = Math.round(Number(amountInput))
+    const amountMl = parsed >= 1 ? Math.min(500, parsed) : null
+    const mins = Math.round(Number(bottleDuration))
+    const durationSecs = mins >= 1 ? Math.min(mins, 24 * 60) * 60 : 0
+    const startedAt = nearestDateForTime(new Date().toISOString(), bottleTime)
+    const endedAt = new Date(new Date(startedAt).getTime() + durationSecs * 1000).toISOString()
+    const session = { id: newId(), startedAt, endedAt, durationSecs, side: null, feedType: 'bottle', amountMl, milkType: milkInput, mood: null }
+    setSessions(sortByTime(addSession(session)))
+
+    pendingRemoteRef.current = null
+    if (authUser && profile?.household_id) {
+      pendingRemoteRef.current = syncWrite('feed.insert', {
+        id:           session.id,
+        householdId:  profile.household_id,
+        babyId:       null,
+        loggedBy:     authUser.id,
+        startedAt,
+        endedAt,
+        durationSecs,
+        side:         null,
+        moodScore:    null,
+        feedType:     'bottle',
+        amountMl,
+        milkType:     milkInput,
+      }).then(({ ok }) => {
+        if (!ok) return ok // queued for retry — the flash would be a lie
+        onSessionSaved?.()
+        flashTimersRef.current.forEach(clearTimeout)
+        setPartnerFlash(true)
+        flashTimersRef.current = [setTimeout(() => setPartnerFlash(false), 3100)]
+        return ok
+      })
     }
+
+    setShowBottleLog(false)
+    setPending(session)
+    setShowMood(true)
   }
 
   useEffect(() => () => flashTimersRef.current.forEach(clearTimeout), [])
@@ -160,9 +209,11 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
     // the original, now-wrong date.
     const startedAt = nearestDateForTime(pendingSession.startedAt, confirmStartTime)
     let endedAt = nearestDateForTime(pendingSession.endedAt, confirmEndTime)
-    // Safety net for the (now rare) case both corrected times still end up
-    // out of order — never save a negative-duration feed.
-    if (new Date(endedAt) <= new Date(startedAt)) {
+    // Safety net for the (now rare) case the corrected times end up out of
+    // order — never save a negative-duration feed. Strictly earlier only:
+    // a feed shorter than a minute confirms with equal times, and treating
+    // that as midnight-crossing turned a 40-second latch into a 24-hour feed.
+    if (new Date(endedAt) < new Date(startedAt)) {
       const d = new Date(endedAt)
       d.setDate(d.getDate() + 1)
       endedAt = d.toISOString()
@@ -217,51 +268,6 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
   const skipMood = () => {
     setPending(null)
     setShowMood(false)
-  }
-
-  // The bottle card owns the time correction too (it replaced the separate
-  // time-confirmation step), so saving patches times, amount and milk type
-  // together. Time handling mirrors confirmFeedEndTime: each edited time is
-  // re-dated against its own original instant so midnight-crossing
-  // corrections land on the right day.
-  const saveAmount = () => {
-    if (!pendingSession) return
-    const parsed = Math.round(Number(amountInput))
-    const amountMl = parsed >= 1 ? Math.min(500, parsed) : null
-    const startedAt = nearestDateForTime(pendingSession.startedAt, confirmStartTime)
-    let endedAt = nearestDateForTime(pendingSession.endedAt, confirmEndTime)
-    if (new Date(endedAt) <= new Date(startedAt)) {
-      const d = new Date(endedAt)
-      d.setDate(d.getDate() + 1)
-      endedAt = d.toISOString()
-    }
-    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
-    const changes = { startedAt, endedAt, durationSecs, amountMl, milkType: milkInput }
-    setSessions(sortByTime(updateSession(pendingSession.id, changes)))
-    setPending(prev => (prev ? { ...prev, ...changes } : prev))
-    const remote = pendingRemoteRef.current
-    if (remote) {
-      remote.then(() => {
-        syncWrite('feed.update', {
-          id:           pendingSession.id,
-          side:         null,
-          startedAt,
-          endedAt,
-          durationSecs,
-          moodScore:    pendingSession.mood ?? null,
-          feedType:     'bottle',
-          amountMl,
-          milkType:     milkInput,
-        }).then(({ ok }) => { if (ok) onSessionSaved?.() })
-      })
-    }
-    setShowAmount(false)
-    setShowMood(true)
-  }
-
-  const skipAmount = () => {
-    setShowAmount(false)
-    setShowMood(true)
   }
 
   return (
@@ -342,9 +348,11 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
                 </button>
               )
             })}
-            <button onClick={() => startFeed(null, 'bottle')}
-              style={{ flex: 1, minHeight: 84, borderRadius: 16, border: '1.5px solid transparent', cursor: 'pointer', background: p.bg, transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-              <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: p.text }}>
+            {/* Bottles aren't timed — this opens the quick-log card below
+                rather than starting the timer */}
+            <button onClick={openBottleLog}
+              style={{ flex: 1, minHeight: 84, borderRadius: 16, border: `1.5px solid ${showBottleLog ? brand.sand : 'transparent'}`, cursor: 'pointer', background: showBottleLog ? brand.bark : p.bg, transition: 'all .2s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+              <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: showBottleLog ? brand.sand : p.text }}>
                 🍼 Bottle
               </span>
             </button>
@@ -415,13 +423,12 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
         </div>
       )}
 
-      {/* Bottle check-in — one card for everything: amount, milk type and
-          the start/end times (bottles skip the separate time-confirmation
-          step breast feeds get, so the times live here instead) */}
-      {showAmount && (
+      {/* Bottle quick log — no timer: the quantity and milk type are what a
+          bottle feed is about. Time defaults to now; duration is optional. */}
+      {showBottleLog && (
         <div className="fade-up" style={{ margin: '0 16px 16px', background: p.card, borderRadius: 16, border: `1px solid ${p.border}`, padding: '16px' }}>
           <span style={{ display: 'block', fontSize: 14, color: p.text, fontWeight: 500, marginBottom: 4 }}>How much did {babyDisplayName()} take?</span>
-          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Your feed is already saved — this just adds extra detail.</span>
+          <span style={{ display: 'block', fontSize: 12, color: p.sub, marginBottom: 14 }}>Saved to your logbook when you tap Save.</span>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             {[60, 90, 120, 150].map(ml => (
               <button key={ml} onClick={() => setAmountInput(String(ml))}
@@ -450,29 +457,31 @@ export default function FeedScreen({ night, timer, authUser, profile, sharedSess
           </div>
           <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
             <div style={{ flex: 1 }}>
-              <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase' }}>Started</span>
+              <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase' }}>Time</span>
               <input
-                type="time" value={confirmStartTime}
-                onChange={e => setConfirmStartTime(e.target.value)}
+                type="time" value={bottleTime}
+                onChange={e => setBottleTime(e.target.value)}
                 style={{ width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 12, padding: '12px 8px', fontSize: 15, textAlign: 'center', color: p.text, fontFamily: "'Jost', sans-serif", outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
             <div style={{ flex: 1 }}>
-              <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase' }}>Ended</span>
+              <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase' }}>Mins (optional)</span>
               <input
-                type="time" value={confirmEndTime}
-                onChange={e => setConfirmEndTime(e.target.value)}
+                type="number" inputMode="numeric" min="1" max="180"
+                value={bottleDuration}
+                onChange={e => setBottleDuration(e.target.value)}
+                placeholder="—"
                 style={{ width: '100%', background: p.bg, border: `1px solid ${p.border}`, borderRadius: 12, padding: '12px 8px', fontSize: 15, textAlign: 'center', color: p.text, fontFamily: "'Jost', sans-serif", outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
           </div>
-          <button onClick={saveAmount}
+          <button onClick={saveBottleLog}
             style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.bark, cursor: 'pointer', fontSize: 14, color: brand.sand, fontWeight: 600 }}>
             Save
           </button>
-          <button onClick={skipAmount}
+          <button onClick={() => setShowBottleLog(false)}
             style={{ fontSize: 12, color: p.sub, background: 'none', border: 'none', cursor: 'pointer', marginTop: 12, letterSpacing: '.04em' }}>
-            skip
+            cancel
           </button>
         </div>
       )}

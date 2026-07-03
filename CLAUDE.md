@@ -43,7 +43,7 @@ Navaya is a mobile-first React SPA (max-width 430px) for breastfeeding tracking.
 
 **Screens**
 - `HomeScreen` — launcher and greeting screen: four oversized logging rows (Feed, Nappy, Sleep, Medicine — Medicine jumps straight to the Logbook's Add Medicine modal), an Ask Sage / Going-out card pair (with prepare progress), and a settings/sharing-status button. It only routes; the real logging UIs live on their own tabs
-- `FeedScreen` — feed timer (breast Left/Right with a suggested side, or Bottle), start/end time confirmation after stopping, bottle amount check-in (ml + expressed/formula), post-feed mood check-in, today stats
+- `FeedScreen` — breast feed timer (Left/Right with a suggested side) with start/end time confirmation after stopping; Bottle is a timerless quick log (ml + expressed/formula, time defaulting to now, optional duration); post-feed mood check-in, today stats
 - `NappyScreen` — wee/poo logging with poo-colour notes, today stats
 - `SleepScreen` — sleep timer, time-since-last-sleep, today/last-sleep stats, manual backfill
 - `HistoryScreen` — the Logbook: merged feed/nappy/sleep/medicine timeline grouped by day, today stats, last-7-days summary and weekly insights panel, add/edit modals
