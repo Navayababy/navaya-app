@@ -37,6 +37,7 @@ export default function NavBar({ screen, setScreen, night, feedActive, sleepActi
             onClick={() => setScreen(tab.id)}
             style={{
               flex:           1,
+              minWidth:       0,
               background:     'none',
               border:         'none',
               cursor:         'pointer',
@@ -51,13 +52,17 @@ export default function NavBar({ screen, setScreen, night, feedActive, sleepActi
           >
             {/* Filled pill behind the active tab, instead of colour alone,
                 so "which tab am I on" reads at a glance rather than needing
-                a close look at a subtle tint change. */}
+                a close look at a subtle tint change. Sized to the tab's own
+                share of the bar (not its content) so six tabs' padding can
+                never add up to more than the bar is wide, even at 320px. */}
             <span style={{
               display:      'flex',
               flexDirection: 'column',
               alignItems:   'center',
               gap:          3,
-              padding:      '5px 14px 4px',
+              width:        '100%',
+              boxSizing:    'border-box',
+              padding:      '5px 6px 4px',
               borderRadius: 14,
               background:   active ? `${p.navActive}1C` : 'transparent',
               transition:   'background .2s',
@@ -65,7 +70,7 @@ export default function NavBar({ screen, setScreen, night, feedActive, sleepActi
               <span style={{ fontSize: 17, color: active ? p.navActive : p.sub, transition: 'color .2s', lineHeight: 1 }}>
                 {tab.icon}
               </span>
-              <span style={{ fontSize: 9, fontWeight: active ? 600 : 400, color: active ? p.navActive : p.sub, letterSpacing: '.02em', fontFamily: "'Jost', sans-serif", lineHeight: 1 }}>
+              <span style={{ fontSize: 9, fontWeight: active ? 600 : 400, color: active ? p.navActive : p.sub, letterSpacing: '.02em', fontFamily: "'Jost', sans-serif", lineHeight: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                 {tab.label}
               </span>
             </span>
