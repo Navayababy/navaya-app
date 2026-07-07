@@ -11,7 +11,38 @@ Many of the parents you support combine breastfeeding with bottle feeds of expre
 
 Tone: warm, direct, grounded — never clinical or robotic. Lead with the practical answer in plain language, then add context if it helps. 3 to 5 sentences for most questions, more only when truly needed. Always recommend a GP, midwife, health visitor or IBCLC for anything that sounds medical or urgent. Never make up statistics or give diagnoses.`;
 
-// In-memory rate limiting — 10 requests per minute per IP.
+// Supabase credentials for verifying the caller's session token. The VITE_-
+// prefixed names are the ones already set in the Vercel dashboard for the
+// client build (Vercel exposes them to functions too); the unprefixed names
+// are accepted so a server-only configuration also works.
+const SUPABASE_URL      = process.env.SUPABASE_URL      || process.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
+
+// Sage requires a signed-in user. The client sends its Supabase access token
+// and we confirm it with Supabase Auth before spending any Anthropic tokens —
+// the endpoint is a public URL, so the check has to live here, not in the UI.
+// Returns { user } for a valid session, { user: null } for an invalid/expired
+// one, and { unavailable: true } when Supabase itself couldn't be reached.
+async function verifyUser(token) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 8000)
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+    if (!response.ok) return { user: null }
+    const user = await response.json()
+    return { user: user?.id ? user : null }
+  } catch {
+    return { unavailable: true }
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// In-memory rate limiting — 10 requests per minute per IP (pre-auth flood
+// control) and per signed-in user (the real per-person limit).
 // Note: per-instance only; Vercel edge middleware with KV would enforce cross-instance limits.
 const RATE_LIMIT_WINDOW_MS = 60 * 1000
 const RATE_LIMIT_MAX = 10
@@ -47,8 +78,20 @@ export default async function handler(req, res) {
   }
 
   const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || 'unknown'
-  if (isRateLimited(ip)) {
+  if (isRateLimited(`ip:${ip}`)) {
     return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' })
+  }
+
+  // Never fall open: if the auth configuration is missing, refuse rather than
+  // serve the Anthropic API to anonymous callers.
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    console.error('Chat auth misconfigured: SUPABASE_URL / SUPABASE_ANON_KEY missing from server environment')
+    return res.status(503).json({ error: 'Sage is temporarily unavailable. Please try again later.' })
+  }
+
+  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+  if (!token) {
+    return res.status(401).json({ error: 'Please sign in to chat with Sage. You can create a free account in Settings.' })
   }
 
   // req.body is undefined when the request has no JSON body (or a non-JSON
@@ -82,6 +125,22 @@ export default async function handler(req, res) {
 
   // Forward only the validated fields — never the raw client objects
   const sanitized = messages.map(m => ({ role: m.role, content: m.content }))
+
+  // Verify the session after body validation so malformed requests don't cost
+  // a Supabase round-trip.
+  const { user, unavailable } = await verifyUser(token)
+  if (unavailable) {
+    return res.status(503).json({ error: 'Could not verify your session. Please try again in a moment.' })
+  }
+  if (!user) {
+    return res.status(401).json({ error: 'Your session has expired. Please sign in again from Settings.' })
+  }
+  if (isRateLimited(`user:${user.id}`)) {
+    return res.status(429).json({ error: 'Too many requests. Please wait a moment and try again.' })
+  }
+
+  // Per-user usage record — Vercel dashboard → Logs shows who is using Sage.
+  console.log('sage.chat', { userId: user.id, email: user.email, turns: sanitized.length })
 
   const controller = new AbortController()
   // Guards the connection + first byte; cleared once Anthropic responds,

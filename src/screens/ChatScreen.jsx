@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { brand, palette, shadow, iconWellBg } from '../theme.js'
+import { supabase } from '../lib/supabase.js'
 
 const SUGGESTIONS = [
   { label: 'Painful latch',     q: "My latch feels painful — is this normal?" },
@@ -10,13 +11,17 @@ const SUGGESTIONS = [
   { label: 'Low supply',        q: "My milk supply feels low — what can I do?" },
 ]
 
-export default function ChatScreen({ night, messages, setMessages, seed = '', onSeedConsumed }) {
+export default function ChatScreen({ night, messages, setMessages, seed = '', onSeedConsumed, authUser, setScreen }) {
   const p = palette(night)
   const [input,     setInput]     = useState('')
   const [loading,   setLoading]   = useState(false)
   const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
+
+  // Sage needs an account: /api/chat verifies the session token server-side,
+  // so without one the composer is disabled and a sign-in invitation shown.
+  const signedIn = !!authUser
 
   // A seeded question from a Home nudge is prefilled (not auto-sent) so the
   // parent decides whether to ask it. Consumed once on open.
@@ -35,13 +40,26 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
 
   const send = async (text) => {
     const q = text.trim()
-    if (!q || loading) return
+    if (!q || loading || !signedIn) return
 
     const userMsg = { id: `${Date.now()}-user`, role: 'user', content: q }
     const history = [...messages, userMsg]
     setMessages(history)
     setInput('')
     setLoading(true)
+
+    // The server verifies this token before answering — getSession() reads it
+    // locally (refreshing only if expired), so it doesn't add a round-trip.
+    let token = null
+    if (supabase) {
+      const { data } = await supabase.auth.getSession().catch(() => ({ data: {} }))
+      token = data?.session?.access_token || null
+    }
+    if (!token) {
+      setMessages(h => [...h, { id: `${Date.now()}-error`, role: 'assistant', content: 'Your session has expired. Please sign in again from Settings to keep chatting.', error: true }])
+      setLoading(false)
+      return
+    }
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 20000)
@@ -54,7 +72,7 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
     try {
       const res = await fetch('/api/chat', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body:    JSON.stringify({
           messages: recent.map(m => ({ role: m.role, content: m.content }))
         }),
@@ -127,10 +145,31 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
       {/* Messages */}
       <div role="log" aria-live="polite" aria-label="Conversation with Sage" style={{ flex: 1, overflowY: 'auto', padding: '0 14px', display: 'flex', flexDirection: 'column' }}>
 
+        {/* Signed-out gate — Sage is part of the free account, so instead of
+            suggestions the empty state invites sign-in. The server enforces
+            this too; the card is just the friendly face of it. */}
+        {!signedIn && messages.length === 0 && (
+          <div className="fade-up" style={{ marginTop: 'auto', marginBottom: 12 }}>
+            <div style={{ background: p.card, border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), borderRadius: 18, padding: '20px 18px', textAlign: 'center' }}>
+              <span style={{ color: brand.sand, fontSize: 20, display: 'block', marginBottom: 8 }}>✦</span>
+              <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 20, color: p.heading, marginBottom: 8 }}>
+                Sage comes with your free account
+              </span>
+              <p style={{ fontSize: 12.5, color: p.sub, lineHeight: 1.6, margin: '0 auto 14px', maxWidth: 280 }}>
+                Sign in to ask Sage anything about breastfeeding — and keep your logbook safely backed up beyond this device.
+              </p>
+              <button onClick={() => setScreen?.('settings')}
+                style={{ width: '100%', padding: '13px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+                Sign in or create account
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Empty state — a short greeting plus a scrollable row of shortcuts
             sitting right above the input, instead of a stacked intro card
             and six full-width questions dominating the screen. */}
-        {messages.length === 0 && (
+        {signedIn && messages.length === 0 && (
           <div className="fade-up" style={{ marginTop: 'auto' }}>
             <p style={{ textAlign: 'center', fontSize: 13, color: p.sub, lineHeight: 1.6, margin: '0 auto 16px', maxWidth: 280 }}>
               Hi, I&apos;m <span style={{ color: p.heading, fontWeight: 500 }}>Sage</span>. Ask anything about breastfeeding — grounded in NHS, WHO and IBCLC guidance.
@@ -194,17 +233,19 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
           alignItems:   'flex-end',
           gap:          8,
           background:   p.card,
-          border:       `1.5px solid ${brand.sand}`,
+          border:       `1.5px solid ${signedIn ? brand.sand : p.border}`,
           borderRadius: 18,
           padding:      '6px 6px 6px 15px',
-          boxShadow:    `0 0 0 4px ${brand.sand}1F, ${shadow(night, 1)}`,
+          boxShadow:    signedIn ? `0 0 0 4px ${brand.sand}1F, ${shadow(night, 1)}` : shadow(night, 1),
+          opacity:      signedIn ? 1 : 0.6,
         }}>
           <textarea
             ref={textareaRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder="Ask Sage anything…"
+            placeholder={signedIn ? 'Ask Sage anything…' : 'Sign in to ask Sage…'}
+            disabled={!signedIn}
             rows={1}
             style={{
               flex:        1,
@@ -222,14 +263,14 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
           />
           <button
             onClick={() => send(input)}
-            disabled={!input.trim() || loading}
+            disabled={!input.trim() || loading || !signedIn}
             style={{
               width:        42,
               height:       42,
               borderRadius: 14,
               border:       'none',
-              cursor:       input.trim() && !loading ? 'pointer' : 'default',
-              background:   input.trim() && !loading ? brand.barkGradient : p.border,
+              cursor:       input.trim() && !loading && signedIn ? 'pointer' : 'default',
+              background:   input.trim() && !loading && signedIn ? brand.barkGradient : p.border,
               display:      'flex',
               alignItems:   'center',
               justifyContent: 'center',
@@ -237,7 +278,7 @@ export default function ChatScreen({ night, messages, setMessages, seed = '', on
               transition:   'background .2s',
             }}
           >
-            <span style={{ color: input.trim() && !loading ? brand.sand : p.sub, fontSize: 17 }}>↑</span>
+            <span style={{ color: input.trim() && !loading && signedIn ? brand.sand : p.sub, fontSize: 17 }}>↑</span>
           </button>
         </div>
       </div>

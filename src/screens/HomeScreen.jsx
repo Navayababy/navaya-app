@@ -158,15 +158,22 @@ export default function HomeScreen({ night, setScreen, onAskSage, onLogMedicine,
         </button>
       </div>
 
-      {/* ── Guest-mode note — reassurance plus the honest caveat, once ── */}
+      {/* ── Account nudge — logging works without an account, but an account
+          is what keeps the data (and unlocks Sage). Dismissible, once. ── */}
       {guestNotice && !authUser && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '10px 16px 0', padding: '11px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14 }}>
-          <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
-            No account needed — everything is saved on this device only. If the device is lost or reset, so is your logbook. Sign in from Settings any time to back it up and share with a partner.
-          </span>
-          <button onClick={dismissGuestHint} aria-label="Dismiss"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: p.sub, lineHeight: 1, padding: 0, flexShrink: 0 }}>
-            ×
+        <div style={{ margin: '10px 16px 0', padding: '12px 13px', background: p.card, border: `1px solid ${p.border}`, borderRadius: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <span style={{ flex: 1, fontSize: 11, color: p.sub, lineHeight: 1.5 }}>
+              Right now your logbook lives on this device only — if it&apos;s lost or reset, so is your data. A free account keeps hold of your data safely, lets you share with a partner, and unlocks Sage.
+            </span>
+            <button onClick={dismissGuestHint} aria-label="Dismiss"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: p.sub, lineHeight: 1, padding: 0, flexShrink: 0 }}>
+              ×
+            </button>
+          </div>
+          <button onClick={() => setScreen('settings')}
+            style={{ marginTop: 10, width: '100%', padding: '10px', borderRadius: 11, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: 'pointer', fontSize: 12.5, fontWeight: 500 }}>
+            Create your free account
           </button>
         </div>
       )}
