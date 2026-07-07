@@ -31,7 +31,11 @@ async function verifyUser(token) {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })
-    if (!response.ok) return { user: null }
+    // Only an explicit rejection invalidates the caller — a Supabase outage
+    // or throttle (5xx/429) must read as "unavailable", not "signed out",
+    // or valid users get told to sign in again during a blip.
+    if (response.status === 401 || response.status === 403) return { user: null }
+    if (!response.ok) return { unavailable: true }
     const user = await response.json()
     return { user: user?.id ? user : null }
   } catch {
