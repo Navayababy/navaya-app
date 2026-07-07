@@ -241,10 +241,10 @@ export default function SettingsScreen({ night, onOpenHelp, onNightToggle, authU
       ) : !authUser ? (
         <Card p={p} night={night}>
           <span style={{ display: 'block', fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: p.heading, marginBottom: 12 }}>
-            Sign in to start sharing
+            Your free account
           </span>
           <span style={{ display: 'block', fontSize: 13, color: p.sub, lineHeight: 1.5, marginBottom: 14 }}>
-            Create a free account so both parents can log feeds, nappies and sleeps in a shared logbook.
+            An account keeps hold of your data safely beyond this device, lets both parents log to a shared logbook, and unlocks Sage — your breastfeeding companion.
           </span>
 
           {/* Tab toggle */}

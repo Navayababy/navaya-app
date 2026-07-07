@@ -21,7 +21,7 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
 
-The Vercel serverless function (`api/chat.js`) reads `ANTHROPIC_API_KEY` from the server environment (set in Vercel dashboard).
+The Vercel serverless function (`api/chat.js`) reads `ANTHROPIC_API_KEY` from the server environment (set in Vercel dashboard). It also needs the Supabase URL and anon key to verify signed-in callers — it accepts the `VITE_`-prefixed names above (Vercel exposes dashboard env vars to functions too) or unprefixed `SUPABASE_URL`/`SUPABASE_ANON_KEY`, and fails closed (503) if they're missing.
 
 ## Architecture
 
@@ -33,7 +33,7 @@ Navaya is a mobile-first React SPA (max-width 430px) for breastfeeding tracking.
 
 **Data layer** — user data is persisted to `localStorage` via `src/lib/storage.js`, with optional household sharing through Supabase (`src/lib/db.js`, `src/lib/sync.js`, `src/lib/outbox.js`, `useHousehold`). Writes go to localStorage first, then sync to the shared household; offline writes queue in the outbox. Pure stats live in `src/lib/stats.js` and are unit-tested.
 
-**AI chat** — `ChatScreen` POSTs conversation history to `/api/chat`, a Vercel serverless function that streams from the Anthropic API (claude-sonnet-4-6) keeping the API key server-side.
+**AI chat** — `ChatScreen` POSTs conversation history to `/api/chat`, a Vercel serverless function that streams from the Anthropic API (claude-sonnet-4-6) keeping the API key server-side. Sage requires a signed-in user: the client sends its Supabase access token in the `Authorization` header, and `api/chat.js` verifies it with Supabase Auth before answering (per-user + per-IP rate limits; each request logs the user id to the function log for usage tracking). Signed-out users see a sign-in invitation instead of the composer.
 
 **Error reporting** — `src/lib/logError.js` fire-and-forgets client errors to `/api/log`, a Vercel function that writes them to the function log (Vercel dashboard → Logs). Wired into `ErrorBoundary`, the global `error`/`unhandledrejection` listeners in `main.jsx`, and the sync layer's dropped-write paths. It is a no-op in dev builds and must never be awaited by callers.
 
@@ -47,7 +47,7 @@ Navaya is a mobile-first React SPA (max-width 430px) for breastfeeding tracking.
 - `NappyScreen` — wee/poo logging with poo-colour notes, today stats
 - `SleepScreen` — sleep timer, time-since-last-sleep, today/last-sleep stats, manual backfill
 - `HistoryScreen` — the Logbook: merged feed/nappy/sleep/medicine timeline grouped by day, today stats, last-7-days summary and weekly insights panel, add/edit modals
-- `ChatScreen` — Sage, the AI breastfeeding advisor, with suggestion chips on empty state
+- `ChatScreen` — Sage, the AI breastfeeding advisor, with suggestion chips on empty state (account required — signed-out users get a sign-in card and a disabled composer)
 - `PrepareScreen` — pre-outing checklist with progress bar, custom items (reached from the Home card, not the nav bar)
 - `SettingsScreen` — parent/baby names, night-mode toggle, account, household sharing/invites, manual sync, support/legal links
 - `HelpScreen` — in-app Help & FAQ: search plus category/question accordion over `src/lib/faqData.js` (reached from Home's "? Help" button and Settings, not the nav bar)
