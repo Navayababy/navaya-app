@@ -1,21 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
 import { brand } from '../theme.js'
 
-// Warm, general-parenting quotes — about savouring the moment, not surviving
-// it. Relatable whether the day was about feeds, nappies, sleep or none of
-// the above. Shown once, briefly, while the app loads — just the quote, on
-// its own; the brand mark and any greeting live elsewhere (the native launch
-// splash, and Home's own "Good afternoon" / "Welcome back"). Picked at
-// random each time the app opens.
+// Uplifting, positive quotes about children and parenthood, each with its
+// attribution. Shown once, briefly, while the app loads — the brand mark and
+// any greeting live elsewhere (the native launch splash, and Home's own
+// "Good afternoon" / "Welcome back"). Picked at random each time the app
+// opens.
 const QUOTES = [
-  "Blink and this stage will be gone — so notice it, today, while it's still here.",
-  "One day this will simply be a memory. Right now, it's still happening. Enjoy it.",
-  "This is their childhood. Quietly, it's also one of the best chapters of yours.",
-  "The ordinary days are the ones they'll remember as magic.",
-  "They will only be this little once. You get to be here for all of it.",
-  "Years from now, this is the story you'll tell — the early, tender, unrepeatable start.",
-  "An ordinary day like today is quietly becoming one of their favourite memories.",
-  "This little stretch of time is fleeting, and irreplaceable. Savour it.",
+  { text: 'Every child is an artist.', by: 'Pablo Picasso' },
+  { text: 'Children learn more from what you are than what you teach.', by: 'W. E. B. Du Bois' },
+  { text: 'The soul is healed by being with children.', by: 'Fyodor Dostoevsky' },
+  { text: 'There are no seven wonders of the world in the eyes of a child. There are seven million.', by: 'Walt Streightiff' },
+  { text: 'A baby fills a place in your heart you never knew was empty.', by: 'Anonymous' },
+  { text: "Children are the world's most valuable resource.", by: 'Herbert Hoover' },
+  { text: 'It is easier to build strong children than to repair broken men.', by: 'Frederick Douglass' },
+  { text: 'Every child begins the world again.', by: 'Henry David Thoreau' },
+  { text: 'Children see magic because they look for it.', by: 'Christopher Moore' },
+  { text: 'A child can teach an adult three things: to be happy, to be curious, and to love without limits.', by: 'Anonymous' },
+  { text: 'Children are not things to be moulded, but people to be unfolded.', by: 'Jess Lair' },
+  { text: 'The best inheritance a parent can give is a little of their time each day.', by: 'Orlando Aloysius Battista' },
+  { text: 'Too much love never spoils children.', by: 'Anthony Witham' },
+  { text: 'Children are great imitators. So give them something great to imitate.', by: 'Anonymous' },
+  { text: 'Play is the highest form of research.', by: 'Albert Einstein' },
+  { text: "A person's a person, no matter how small.", by: 'Dr. Seuss' },
+  { text: 'The way we talk to our children becomes their inner voice.', by: "Peggy O'Mara" },
+  { text: 'Every baby is a fresh beginning.', by: 'Anonymous' },
+  { text: 'Children make your life important.', by: 'Erma Bombeck' },
+  { text: 'Sometimes the smallest things take up the most room in your heart.', by: 'A. A. Milne' },
 ]
 
 export default function SplashScreen({ onDone }) {
@@ -84,9 +95,17 @@ export default function SplashScreen({ onDone }) {
       </div>
 
       {fontsReady && (
-        <p className="fade-up" style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: 26, color: brand.parchment, opacity: 0.85, textAlign: 'center', lineHeight: 1.5, margin: 0 }}>
-          "{quote}"
-        </p>
+        <div className="fade-up" style={{ textAlign: 'center' }}>
+          <p style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: 'italic', fontSize: 26, color: brand.parchment, opacity: 0.85, lineHeight: 1.5, margin: 0 }}>
+            "{quote.text}"
+          </p>
+          {/* Attribution in the brand's small-caps sand lettering — a
+              deliberate contrast with the italic serif above so the name
+              reads as a signature, not a continuation of the quote. */}
+          <span style={{ display: 'block', marginTop: 16, fontFamily: "'Jost', sans-serif", fontSize: 12.5, fontWeight: 500, color: brand.sand, letterSpacing: '.18em', textTransform: 'uppercase' }}>
+            — {quote.by}
+          </span>
+        </div>
       )}
     </div>
   )
