@@ -219,12 +219,22 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     setSleeps(addSleep(sleep))
     // A sleep whose whole timer ran signed out never opened a shared row, so
     // there is nothing to patch — insert the completed record instead. The
-    // sharedSleeps check rescues pending records saved before the shared
-    // flag existed, whose row does exist.
-    if (pendingSleep.shared || sharedSleeps?.some(s => s.id === sleep.id)) {
-      shareSleepUpdate(sleep)
-    } else {
+    // two paths fail very differently when chosen wrongly: an insert over an
+    // existing row is rejected as a duplicate and dropped, stranding the row
+    // open for the whole household, while a patch of a missing row is
+    // dropped and the sleep still self-heals through the next
+    // reconciliation. So insert only when the row provably doesn't exist:
+    // shared === false is authoritative (the flag is written with the
+    // timer), but a pending record from before the flag existed (undefined)
+    // needs the loaded shared list to prove absence — and when the list
+    // hasn't loaded, the recoverable patch path wins.
+    const inSharedList = sharedSleeps?.some(s => s.id === sleep.id) === true
+    const rowNeverSent = pendingSleep.shared === false ||
+      (pendingSleep.shared === undefined && !!sharedSleeps)
+    if (!inSharedList && rowNeverSent) {
       shareSleep(sleep)
+    } else {
+      shareSleepUpdate(sleep)
     }
     clearPendingSleep()
     setPendingSleep(null)
