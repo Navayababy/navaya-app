@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getNightMode, setNightMode, hasNightPref, getNightHintSeen, setNightHintSeen, getDismissedAnnouncements, dismissAnnouncement } from './lib/storage.js'
 import { getActiveAnnouncement } from './lib/db.js'
+import { syncWrite } from './lib/sync.js'
 import { isSupabaseConfigured } from './lib/supabase.js'
 import { useViewportHeight } from './hooks/useViewportHeight.js'
 import { useFeedTimer } from './hooks/useFeedTimer.js'
@@ -84,6 +85,38 @@ export default function App() {
     refreshSharedSessions, refreshSharedNappies, refreshSharedMedicines, refreshSharedSleeps,
     resyncAll,
   } = useHousehold()
+
+  // A sleep timer started while signed out never opened its shared household
+  // row, so partners see nothing and can start a second timer — and nothing
+  // else ever re-sends it (session reconciliation only uploads *completed*
+  // sleeps). The moment a signed-in household context appears, open the row
+  // retroactively. Lives here rather than SleepScreen so it also runs when
+  // the sign-in happens on another screen while the timer ticks away.
+  // Waits for the shared list so it can defer to a sleep the household is
+  // already tracking (the adopt flow on SleepScreen owns that case) instead
+  // of blindly creating a competing open row.
+  const { sleepActive, sleepShared, sleepId, sleepStartedAt, markSleepShared } = sleepTimerProps
+  useEffect(() => {
+    if (!sleepActive || sleepShared || !authUser || !profile?.household_id) return
+    if (!sharedSleeps) return
+    const openRow = sharedSleeps.find(s => s.ended_at == null)
+    if (openRow && openRow.id !== sleepId) return
+    // Mark before writing so a re-render can't queue the insert twice;
+    // syncWrite guarantees delivery (or outbox retry) once handed off.
+    markSleepShared()
+    // openRow matching sleepId means the row already exists — a timer
+    // persisted before the shared flag was recorded. Nothing to insert.
+    if (!openRow) {
+      syncWrite('sleep.insert', {
+        id:           sleepId,
+        householdId:  profile.household_id,
+        loggedBy:     authUser.id,
+        startedAt:    new Date(sleepStartedAt).toISOString(),
+        endedAt:      null,
+        durationSecs: null,
+      }).then(({ ok }) => { if (ok) refreshSharedSleeps() })
+    }
+  }, [sleepActive, sleepShared, sleepId, sleepStartedAt, markSleepShared, authUser, profile, sharedSleeps, refreshSharedSleeps])
 
   const toggleNight = () => {
     setNight(n => { setNightMode(!n); return !n })
