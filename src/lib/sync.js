@@ -10,7 +10,7 @@ import {
   insertMedicineLog, deleteMedicineLog,
   insertSleepLog, updateSleepLog, deleteSleepLog,
 } from './db.js'
-import { isSupabaseConfigured } from './supabase.js'
+import { supabase, isSupabaseConfigured } from './supabase.js'
 import { getOutbox, saveOutbox, enqueue } from './outbox.js'
 import { logError } from './logError.js'
 
@@ -74,6 +74,14 @@ async function drain() {
   // event triggers the next flush.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     return { flushed, pending: getOutbox().length }
+  }
+  // Same for a signed-out device: RLS rejects everything with a coded error,
+  // which would burn the retry cap and drop writes that will succeed the
+  // moment the user signs back in (e.g. closing a shared sleep after the
+  // session expired mid-nap). Hold the queue; sign-in triggers a flush.
+  if (supabase?.auth && getOutbox().length) {
+    const { data } = await supabase.auth.getSession()
+    if (!data?.session) return { flushed, pending: getOutbox().length }
   }
 
   // Head-of-line: stop at the first transient failure so later writes can

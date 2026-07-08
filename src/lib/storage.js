@@ -199,8 +199,12 @@ export function getActiveSleep() {
   }
 }
 
-export function setActiveSleep(id, startedAt) {
-  localStorage.setItem(KEYS.activeSleep, JSON.stringify({ id, startedAt }));
+// `shared` records whether the household row for this sleep has been handed
+// to the sync layer. A timer started while signed out has no row — stop and
+// confirm must insert rather than patch — and only the device knows which,
+// so the answer has to survive reloads alongside the timer itself.
+export function setActiveSleep(id, startedAt, shared = false) {
+  localStorage.setItem(KEYS.activeSleep, JSON.stringify({ id, startedAt, shared }));
 }
 
 export function clearActiveSleep() {

@@ -158,9 +158,11 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
   // Patches the open row — used both for the immediate raw stop time (so a
   // partner's device drops out of "active" right away) and for the
-  // corrected times once confirmed.
+  // corrected times once confirmed. Deliberately not gated on auth: callers
+  // only invoke it for sleeps whose shared row exists, and if the device got
+  // signed out mid-sleep the patch must still queue (it delivers on the
+  // sign-in flush) — otherwise the household row stays open forever.
   const shareSleepUpdate = (sleep) => {
-    if (!authUser || !profile?.household_id) return
     syncWrite('sleep.update', {
       id:           sleep.id,
       startedAt:    sleep.startedAt,
@@ -170,8 +172,13 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   }
 
   const handleStart = () => {
-    const { id, startedAt } = startSleep()
-    shareSleepStart(id, new Date(startedAt).toISOString())
+    // Whether the shared row can be opened right now is recorded with the
+    // timer: a start made while signed out has no row, and stop/confirm must
+    // insert instead of patch. (App.jsx backfills the row if the user signs
+    // in while the timer is still running.)
+    const canShare = !!(authUser && profile?.household_id)
+    const { id, startedAt } = startSleep(canShare)
+    if (canShare) shareSleepStart(id, new Date(startedAt).toISOString())
   }
 
   const handleStop = () => {
@@ -183,8 +190,10 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     setConfirmStartTime(initialConfirmStartTime)
     setConfirmEndTime(initialConfirmEndTime)
     // Raw stop time, ahead of whatever adjustment happens on confirm — this
-    // is what lets a household member's device see it end immediately.
-    shareSleepUpdate(sleepData)
+    // is what lets a household member's device see it end immediately. Only
+    // when the shared row exists; an unshared sleep is inserted whole at
+    // confirm instead.
+    if (sleepData.shared) shareSleepUpdate(sleepData)
   }
 
   // The row was already opened on start (see handleStart) and closed with a
@@ -208,7 +217,15 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
     const sleep = { id: pendingSleep.id || newId(), startedAt, endedAt, durationSecs }
     setSleeps(addSleep(sleep))
-    shareSleepUpdate(sleep)
+    // A sleep whose whole timer ran signed out never opened a shared row, so
+    // there is nothing to patch — insert the completed record instead. The
+    // sharedSleeps check rescues pending records saved before the shared
+    // flag existed, whose row does exist.
+    if (pendingSleep.shared || sharedSleeps?.some(s => s.id === sleep.id)) {
+      shareSleepUpdate(sleep)
+    } else {
+      shareSleep(sleep)
+    }
     clearPendingSleep()
     setPendingSleep(null)
   }

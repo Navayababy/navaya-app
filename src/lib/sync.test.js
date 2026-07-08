@@ -13,10 +13,11 @@ vi.mock('./db.js', () => ({
 }))
 vi.mock('./supabase.js', () => ({
   isSupabaseConfigured: true,
-  supabase: {},
+  supabase: { auth: { getSession: vi.fn() } },
 }))
 
 import { insertFeedSession, updateFeedSession, deleteFeedSession } from './db.js'
+import { supabase } from './supabase.js'
 import { syncWrite, flushOutbox } from './sync.js'
 import { getOutbox, outboxSize, enqueue } from './outbox.js'
 
@@ -29,6 +30,8 @@ beforeEach(() => {
   localStorage.clear()
   vi.clearAllMocks()
   vi.spyOn(console, 'error').mockImplementation(() => {})
+  // Signed in by default — individual tests override to simulate sign-out
+  supabase.auth.getSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } })
 })
 
 describe('syncWrite', () => {
@@ -153,6 +156,25 @@ describe('flushOutbox', () => {
     expect(outboxSize()).toBe(1)
     await flushOutbox()
     expect(outboxSize()).toBe(0)
+  })
+
+  it('holds the queue while signed out instead of burning retries', async () => {
+    // Signed out, RLS would reject every attempt with a coded error — the
+    // queue must wait rather than count those toward the retry cap.
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } })
+    updateFeedSession.mockImplementation(rowNotFound)
+    enqueue('feed.update', { id: 'a', moodScore: 4 })
+
+    for (let i = 0; i < 30; i++) await flushOutbox()
+    expect(outboxSize()).toBe(1)
+    expect(getOutbox()[0].attempts || 0).toBe(0)
+    expect(updateFeedSession).not.toHaveBeenCalled()
+
+    // Signing back in delivers the held write
+    supabase.auth.getSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } })
+    updateFeedSession.mockImplementation(ok)
+    const result = await flushOutbox()
+    expect(result).toMatchObject({ flushed: 1, pending: 0 })
   })
 
   it('treats thrown errors (no network) as transient', async () => {
