@@ -8,7 +8,7 @@ import {
   insertFeedSession, updateFeedSession, deleteFeedSession,
   insertNappyLog, deleteNappyLog,
   insertMedicineLog, deleteMedicineLog,
-  insertSleepLog, updateSleepLog, deleteSleepLog,
+  insertSleepLog, updateSleepLog, upsertSleepLog, deleteSleepLog,
 } from './db.js'
 import { supabase, isSupabaseConfigured } from './supabase.js'
 import { getOutbox, saveOutbox, enqueue } from './outbox.js'
@@ -26,6 +26,7 @@ const HANDLERS = {
   'medicine.delete': (p) => deleteMedicineLog(p.id),
   'sleep.insert':    (p) => insertSleepLog(p),
   'sleep.update':    (p) => updateSleepLog(p.id, p),
+  'sleep.upsert':    (p) => upsertSleepLog(p),
   'sleep.delete':    (p) => deleteSleepLog(p.id),
 }
 

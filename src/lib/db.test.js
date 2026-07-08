@@ -6,7 +6,7 @@ vi.mock('./supabase.js', () => ({
 }))
 
 import { supabase } from './supabase.js'
-import { migrateLocalNappies, migrateLocalSessions } from './db.js'
+import { migrateLocalNappies, migrateLocalSessions, upsertSleepLog } from './db.js'
 
 const UUID  = '123e4567-e89b-42d3-a456-426614174000'
 const UUID2 = '223e4567-e89b-42d3-a456-426614174000'
@@ -33,6 +33,20 @@ const mockTable = ({ existing = [], selectError = null, upsertError = null, inse
   })
   supabase.from.mockReturnValue({ select, upsert, insert })
   return { upsert, insert, select }
+}
+
+// Mock table handle for upsertSleepLog's two queries: the patch
+// (update→eq→select→single, whose successive results come from
+// `updateResults`) and the fallback insert.
+const mockSleepTable = ({ updateResults, insertError = null }) => {
+  const single = vi.fn()
+  for (const result of updateResults) single.mockResolvedValueOnce(result)
+  const update = vi.fn().mockReturnValue({
+    eq: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ single }) }),
+  })
+  const insert = vi.fn().mockResolvedValue({ error: insertError })
+  supabase.from.mockReturnValue({ update, insert })
+  return { update, insert }
 }
 
 beforeEach(() => {
@@ -140,6 +154,47 @@ describe('migration content dedupe', () => {
     const uploaded = upsert.mock.calls[0][0]
     expect(uploaded).toHaveLength(1)
     expect(uploaded[0].type).toBe('poo')
+  })
+
+  it('upsertSleepLog patches when the row exists', async () => {
+    const { update, insert } = mockSleepTable({ updateResults: [{ data: { id: UUID }, error: null }] })
+    const { error } = await upsertSleepLog({ id: UUID, householdId: 'h1', loggedBy: 'u1', startedAt: ISO, endedAt: ISO2, durationSecs: 60 })
+    expect(error).toBeNull()
+    expect(update).toHaveBeenCalledTimes(1)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('upsertSleepLog inserts the whole row when the patch finds nothing', async () => {
+    const { insert } = mockSleepTable({ updateResults: [{ data: null, error: { code: 'PGRST116' } }] })
+    const { error } = await upsertSleepLog({ id: UUID, householdId: 'h1', loggedBy: 'u1', startedAt: ISO, endedAt: ISO2, durationSecs: 60 })
+    expect(error).toBeNull()
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      id: UUID, household_id: 'h1', logged_by: 'u1', started_at: ISO, ended_at: ISO2, duration_secs: 60,
+    }))
+  })
+
+  it('upsertSleepLog surfaces non-missing-row patch errors without inserting', async () => {
+    const { insert } = mockSleepTable({ updateResults: [{ data: null, error: rlsError }] })
+    const { error } = await upsertSleepLog({ id: UUID, householdId: 'h1', loggedBy: 'u1', startedAt: ISO, endedAt: ISO2, durationSecs: 60 })
+    expect(error).toMatchObject({ code: '42501' })
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('upsertSleepLog retries the patch when the insert loses a landing race', async () => {
+    // Row absent on first patch, someone (e.g. reconciliation) inserts it
+    // before ours lands — the duplicate rejection must resolve to a patch,
+    // not a dropped write.
+    const { update, insert } = mockSleepTable({
+      updateResults: [
+        { data: null, error: { code: 'PGRST116' } },
+        { data: { id: UUID }, error: null },
+      ],
+      insertError: { code: '23505', message: 'duplicate key' },
+    })
+    const { error } = await upsertSleepLog({ id: UUID, householdId: 'h1', loggedBy: 'u1', startedAt: ISO, endedAt: ISO2, durationSecs: 60 })
+    expect(error).toBeNull()
+    expect(insert).toHaveBeenCalledTimes(1)
+    expect(update).toHaveBeenCalledTimes(2)
   })
 
   it('re-running a fully landed migration uploads nothing (retry is a no-op)', async () => {
