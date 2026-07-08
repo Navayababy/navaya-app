@@ -27,14 +27,20 @@ export function useHousehold() {
   // Households already reconciled this session (cleared on sign-out, so a
   // sign-out → log → sign-in sequence still gets its entries uploaded).
   const reconciledHouseholds = useRef(new Set())
-  // Auth generation: bumped on every auth state change. A loadProfile run
-  // (or a retry it scheduled) belongs to the generation it started in; when
-  // the generations no longer match, the run is stale — the user signed out
-  // or changed, or a newer auth event started its own load — and it must
-  // stop before touching state or scheduling more retries. Without this, a
-  // profile fetch in flight at sign-out could re-seed cached household
-  // state, keep retrying while signed out, and clobber the next account.
+  // Auth generation: bumped only when the signed-in identity actually
+  // changes (sign-in, sign-out, account switch). A loadProfile run (or a
+  // retry it scheduled) belongs to the generation it started in; when the
+  // generations no longer match, the run is stale and must stop before
+  // touching state or scheduling more retries. Without this, a profile
+  // fetch in flight at sign-out could re-seed cached household state, keep
+  // retrying while signed out, and clobber the next account. Same-user
+  // events (INITIAL_SESSION, TOKEN_REFRESHED) deliberately do NOT bump it:
+  // invalidating a same-user load mid-reconciliation made the superseding
+  // load skip the already-claimed reconciliation and fetch the shared
+  // lists before the migrated rows landed, leaving fresh entries invisible
+  // until the next refresh.
   const authGen = useRef(0)
+  const authUserId = useRef(null)
 
   // ── Auth init (only when Supabase is configured) ───────────────────────────
   useEffect(() => {
@@ -45,14 +51,21 @@ export function useHousehold() {
       // is the authoritative one.
       if (authGen.current !== 0) return
       if (session?.user) {
+        // Record the identity so the imminent INITIAL_SESSION event for the
+        // same user reads as same-user (no bump) and can't invalidate the
+        // load this starts.
+        authUserId.current = session.user.id
         setAuthUser(session.user)
         loadProfile(session.user.id)
       }
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      authGen.current += 1
       const user = session?.user || null
+      if ((user?.id || null) !== authUserId.current) {
+        authGen.current += 1
+        authUserId.current = user?.id || null
+      }
       setAuthUser(user)
       if (user) {
         loadProfile(user.id)
