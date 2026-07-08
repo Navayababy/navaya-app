@@ -359,16 +359,32 @@ export function dismissInstallBanner() {
 
 // ── Household link ───────────────────────────────────────────────────────────
 
-// Remembers, per device, that this browser was once signed in to a shared
-// household — so if a session later expires (or the app is opened signed
-// out) we can still warn "you're not signed in" instead of staying quiet,
-// even though the profile/auth state itself has already been cleared.
+// Remembers, per device, the household this browser last synced to. It does
+// two jobs: the bare "was once linked" boolean drives the signed-out warning
+// on Home even after auth state has been cleared, and the stored
+// { userId, householdId, role } lets a signed-in session keep queueing
+// household writes when the profile fetch itself fails (offline launch,
+// Supabase blip) — see useHousehold. Older builds stored the marker '1';
+// that still counts as "linked" but carries no ids to fall back on.
 export function getHouseholdLinked() {
-  return localStorage.getItem(KEYS.householdLinked) === '1';
+  return localStorage.getItem(KEYS.householdLinked) !== null;
 }
 
-export function setHouseholdLinked() {
-  localStorage.setItem(KEYS.householdLinked, '1');
+export function getHouseholdLink() {
+  try {
+    const link = JSON.parse(localStorage.getItem(KEYS.householdLinked));
+    return link?.userId && link?.householdId ? link : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setHouseholdLink(userId, householdId, role) {
+  localStorage.setItem(KEYS.householdLinked, JSON.stringify({ userId, householdId, role: role || null }));
+}
+
+export function clearHouseholdLink() {
+  localStorage.removeItem(KEYS.householdLinked);
 }
 
 // ── Active timer ─────────────────────────────────────────────────────────────

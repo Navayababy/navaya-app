@@ -10,6 +10,7 @@ import {
   getNightMode, setNightMode, getUserName, setUserName, getBabyName, setBabyName,
   getActiveTimer, setActiveTimer, clearActiveTimer,
   ensureSessionUuids, ensureNappyUuids,
+  getHouseholdLinked, getHouseholdLink, setHouseholdLink, clearHouseholdLink,
 } from './storage.js'
 import { isUuid } from './id.js'
 
@@ -193,6 +194,43 @@ describe('bottle feed sessions', () => {
     expect(s.milkType).toBe('expressed')
     expect(s.durationSecs).toBe(900)
     expect(s.feedType).toBe('bottle')
+  })
+})
+
+describe('household link', () => {
+  it('is unlinked by default', () => {
+    expect(getHouseholdLinked()).toBe(false)
+    expect(getHouseholdLink()).toBeNull()
+  })
+
+  it('round-trips the link and reports linked', () => {
+    setHouseholdLink('user-1', 'house-1', 'primary')
+    expect(getHouseholdLinked()).toBe(true)
+    expect(getHouseholdLink()).toEqual({ userId: 'user-1', householdId: 'house-1', role: 'primary' })
+  })
+
+  it('stores a null role when none is known', () => {
+    setHouseholdLink('user-1', 'house-1')
+    expect(getHouseholdLink()).toEqual({ userId: 'user-1', householdId: 'house-1', role: null })
+  })
+
+  it("treats the legacy '1' marker as linked but with no link to fall back on", () => {
+    localStorage.setItem('navaya_household_linked', '1')
+    expect(getHouseholdLinked()).toBe(true)
+    expect(getHouseholdLink()).toBeNull()
+  })
+
+  it('returns null for corrupt JSON without reporting unlinked', () => {
+    localStorage.setItem('navaya_household_linked', '{bad')
+    expect(getHouseholdLink()).toBeNull()
+    expect(getHouseholdLinked()).toBe(true)
+  })
+
+  it('clears the link entirely', () => {
+    setHouseholdLink('user-1', 'house-1', 'partner')
+    clearHouseholdLink()
+    expect(getHouseholdLinked()).toBe(false)
+    expect(getHouseholdLink()).toBeNull()
   })
 })
 

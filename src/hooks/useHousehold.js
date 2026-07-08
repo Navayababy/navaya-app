@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { ensureSessionUuids, ensureNappyUuids, ensureMedicineUuids, ensureSleepUuids, setHouseholdLinked } from '../lib/storage.js'
+import { ensureSessionUuids, ensureNappyUuids, ensureMedicineUuids, ensureSleepUuids, getHouseholdLink, setHouseholdLink, clearHouseholdLink } from '../lib/storage.js'
 import { getSession, getProfile, getHouseholdMembers, subscribeToHousehold, getRecentSessions, migrateLocalSessions, getRecentNappyLogs, getRecentMedicineLogs, getRecentSleepLogs, migrateLocalNappies, migrateLocalMedicines, migrateLocalSleeps } from '../lib/db.js'
 import { flushOutbox } from '../lib/sync.js'
 import { logError } from '../lib/logError.js'
@@ -22,6 +22,8 @@ export function useHousehold() {
   // across yet (surfaced in Settings) rather than finding out from a partner.
   const [migrationError,  setMigrationError]  = useState(false)
   const realtimeUnsub = useRef(null)
+  // Pending retry of a failed profile load (timer id + next backoff delay).
+  const profileRetry = useRef({ timer: null, delay: 5000 })
 
   // ── Auth init (only when Supabase is configured) ───────────────────────────
   useEffect(() => {
@@ -40,6 +42,7 @@ export function useHousehold() {
       if (user) {
         loadProfile(user.id)
       } else {
+        clearProfileRetry()
         setProfile(null)
         setHouseholdMembers(null)
         setHouseholdMembersError(null)
@@ -51,15 +54,53 @@ export function useHousehold() {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      clearProfileRetry()
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const clearProfileRetry = () => {
+    if (profileRetry.current.timer) {
+      clearTimeout(profileRetry.current.timer)
+      profileRetry.current.timer = null
+    }
+  }
+
   const loadProfile = async (userId) => {
-    const { data } = await getProfile(userId)
-    if (!data) return
+    clearProfileRetry()
+    // Seed shared mode from the cached link straight away: a write made in
+    // the moment before the profile arrives — or while the fetch is failing —
+    // must queue into the household outbox, not fall through to local-only
+    // (nothing re-uploads those entries later).
+    const cached = getHouseholdLink()
+    if (cached?.userId === userId) {
+      setProfile(prev => prev || { id: userId, household_id: cached.householdId, role: cached.role || null })
+    }
+    const { data, error } = await getProfile(userId)
+    if (!data) {
+      if (error?.code === 'PGRST116') {
+        // Definitive answer: no profile row exists (normal for a fresh
+        // account before its first household). Any cached link is stale.
+        if (cached?.userId === userId) {
+          clearHouseholdLink()
+          setProfile(null)
+        }
+        return
+      }
+      // Transient failure (offline launch, token mid-refresh, Supabase
+      // blip). Giving up here used to leave a signed-in, linked device in
+      // local-only mode for the whole session; instead the cached link
+      // stays active and the load retries until the server answers.
+      logError('profile.load', error)
+      profileRetry.current.timer = setTimeout(() => loadProfile(userId), profileRetry.current.delay)
+      profileRetry.current.delay = Math.min(profileRetry.current.delay * 2, 60000)
+      return
+    }
+    profileRetry.current.delay = 5000
     setProfile(data)
     if (data.household_id) {
-      setHouseholdLinked()
+      setHouseholdLink(userId, data.household_id, data.role)
       setHouseholdMembers(null)
       setHouseholdMembersError(null)
       loadHouseholdMembers()
@@ -122,6 +163,10 @@ export function useHousehold() {
         sleeps:    listHandlers(setSharedSleeps),
       })
     } else {
+      // The server says this user has no household: a cached link for them
+      // is out of date and must not resurrect the old household on a later
+      // transient failure.
+      if (cached?.userId === userId) clearHouseholdLink()
       setHouseholdMembers([])
       setHouseholdMembersError(null)
     }
