@@ -3,7 +3,7 @@ import { brand, palette, shadow, iconWellBg } from '../theme.js'
 import { BottleIcon, DropletIcon, PooIcon, MoonIcon, PillIcon } from '../components/icons.jsx'
 import { getSessions, getNappies, getMedicines, getSleeps, updateSession, deleteSession, addSession, deleteNappy, addNappy, addMedicine, deleteMedicine, addSleep, updateSleep, deleteSleep, getBabyName } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
-import { fmt, fmtMins, dayLabel, dayShort, timeStr, todayDateStr } from '../utils/time.js'
+import { fmt, fmtMins, dayLabel, dayShort, timeStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep, isBottleFeed } from '../lib/normalize.js'
 import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL, bottleLabel } from '../lib/constants.js'
 import { averageFeedMood, computeWeeklyInsights, computeDayRhythm, sleepSecsOnDay } from '../lib/stats.js'
@@ -420,25 +420,6 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
             </div>
           </div>
 
-          <div style={{ position: 'relative', minHeight: 196, padding: '10px 4px 8px', borderRadius: 16, background: night ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.48)', border: `1px solid ${night ? 'rgba(237,229,216,0.06)' : 'rgba(237,229,216,0.65)'}` }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', alignItems: 'end', gap: 8, height: '100%' }}>
-              {insights.rows.map(r => {
-                const isToday = r.key === todayDateStr()
-                const barHeight = r.feeds ? 34 + (r.feeds / insights.peakFeeds) * 72 : 6
-                return (
-                  <div key={r.key} style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 }}>
-                    <span style={{ minHeight: 18, fontSize: 14, lineHeight: 1, marginBottom: 6 }}>{r.mood?.emoji || ''}</span>
-                    <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: 108 }}>
-                      <div style={{ width: isToday ? 30 : 22, height: barHeight, borderRadius: 999, background: r.feeds ? (isToday ? brand.bark : '#7A614E') : (night ? '#342B24' : '#E7DED3'), boxShadow: isToday && r.feeds ? '0 10px 22px rgba(74,55,40,0.18)' : 'none', opacity: r.feeds ? 1 : 0.9 }} />
-                    </div>
-                    <span style={{ display: 'block', fontSize: 10, color: isToday ? p.text : p.sub, fontWeight: isToday ? 700 : 500, marginTop: 8, lineHeight: 1.2 }}>{isToday ? 'Today' : r.label}</span>
-                    <span style={{ display: 'block', fontSize: 11, color: r.feeds ? p.text : p.sub, fontWeight: r.feeds ? 700 : 500, marginTop: 2 }}>{r.feeds}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
           {/* ── 24-hour rhythm: one column per day, midnight (top) to midnight
                  (bottom); sleep drawn as blocks, feed starts as dots. Sleep and
                  feed inks are chart-weight variants of brand.green/brand.accent —
@@ -446,11 +427,15 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                  contrast and greyness checks against each mode's card surface,
                  where the raw brand accents fail. The two series are also
                  shape-coded (block vs dot), so colour is never the only cue.
-                 No per-mark tooltips, deliberately: this is a touch-first UI
-                 with no hover idiom, and the logbook below is the readable
-                 per-entry record. ── */}
+                 This chart replaced the old per-day feed bar chart: the dots
+                 carry the same information plus timing, and the per-day count
+                 lives under each day label. Bark stays a UI ink — it fails
+                 both contrast and greyness checks as a data mark, especially
+                 in night mode. No per-mark tooltips, deliberately: this is a
+                 touch-first UI with no hover idiom, and the logbook below is
+                 the readable per-entry record. ── */}
           {rhythm.some(d => d.hasData) && (
-            <div style={{ marginTop: 12, padding: '12px 12px 10px', borderRadius: 16, background: night ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.48)', border: `1px solid ${night ? 'rgba(237,229,216,0.06)' : 'rgba(237,229,216,0.65)'}` }}>
+            <div style={{ padding: '12px 12px 10px', borderRadius: 16, background: night ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.48)', border: `1px solid ${night ? 'rgba(237,229,216,0.06)' : 'rgba(237,229,216,0.65)'}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
                 <span style={{ fontSize: 11, color: p.sub, textTransform: 'uppercase', letterSpacing: '.14em' }}>Day rhythm</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -474,7 +459,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                 <div style={{ position: 'relative', flex: 1, height: 168 }}>
                   {/* Faint gridlines at 06:00 / 12:00 / 18:00 */}
                   {[0.25, 0.5, 0.75].map(f => (
-                    <div key={f} style={{ position: 'absolute', top: `${f * 100}%`, left: 0, right: 0, height: 1, background: night ? 'rgba(237,229,216,0.07)' : 'rgba(74,55,40,0.07)' }} />
+                    <div key={f} style={{ position: 'absolute', top: `${f * 100}%`, left: 0, right: 0, height: 1, background: night ? 'rgba(237,229,216,0.1)' : 'rgba(74,55,40,0.1)' }} />
                   ))}
                   <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, height: '100%' }}>
                     {rhythm.map(day => (
@@ -483,7 +468,9 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                             that haven't happened yet don't read as awake time */}
                         <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 14, height: `${(day.nowFrac ?? 1) * 100}%`, borderRadius: 999, background: night ? 'rgba(237,229,216,0.09)' : '#E7DED3', opacity: night ? 1 : 0.6 }} />
                         {day.sleeps.map((seg, i) => (
-                          <div key={i} style={{ position: 'absolute', top: `${seg.from * 100}%`, left: '50%', transform: 'translateX(-50%)', width: 14, height: `max(${(seg.to - seg.from) * 100}%, 4px)`, borderRadius: 999, background: rhythmSleepInk }} />
+                          // 7px floor keeps the shortest nap a lozenge, never a
+                          // dot-alike — shape is what separates the two series.
+                          <div key={i} style={{ position: 'absolute', top: `${seg.from * 100}%`, left: '50%', transform: 'translateX(-50%)', width: 14, height: `max(${(seg.to - seg.from) * 100}%, 7px)`, borderRadius: 999, background: rhythmSleepInk }} />
                         ))}
                         {day.feeds.map((f, i) => (
                           <div key={i} style={{ position: 'absolute', top: `${f * 100}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 8, height: 8, borderRadius: '50%', background: rhythmFeedInk, boxShadow: `0 0 0 2px ${night ? '#251E18' : '#FBF7F2'}` }} />
@@ -497,9 +484,16 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                 <div style={{ width: 20, flexShrink: 0 }} />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, flex: 1 }}>
                   {rhythm.map(day => (
-                    <span key={day.key} style={{ textAlign: 'center', fontSize: 10, color: day.isToday ? p.text : p.sub, fontWeight: day.isToday ? 700 : 500, lineHeight: 1.2 }}>
-                      {day.isToday ? 'Today' : day.label}
-                    </span>
+                    <div key={day.key} style={{ textAlign: 'center', minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 10, color: day.isToday ? p.text : p.sub, fontWeight: day.isToday ? 700 : 500, lineHeight: 1.2 }}>
+                        {day.isToday ? 'Today' : day.label}
+                      </span>
+                      {/* Per-day feed count — carried over from the removed bar
+                          chart; dots show timing, the digit spares the counting */}
+                      <span style={{ display: 'block', fontSize: 11, color: day.feeds.length ? p.text : p.sub, fontWeight: day.feeds.length ? 700 : 500, marginTop: 2 }}>
+                        {day.feeds.length}
+                      </span>
+                    </div>
                   ))}
                 </div>
               </div>

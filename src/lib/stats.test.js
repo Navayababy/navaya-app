@@ -93,7 +93,6 @@ describe('computeWeeklyInsights', () => {
     expect(insights.totalFeeds).toBe(0)
     expect(insights.avgMood).toBeNull()
     expect(insights.avgGapMins).toBeNull()
-    expect(insights.peakFeeds).toBe(1) // floor of 1 so bar heights never divide by zero
   })
 
   it('buckets feeds, medicines and nappies by local day', () => {
@@ -120,7 +119,6 @@ describe('computeWeeklyInsights', () => {
     expect(insights.totalWet).toBe(2)
     expect(insights.totalDirty).toBe(2)
     expect(insights.totalMeds).toBe(1)
-    expect(insights.peakFeeds).toBe(2)
   })
 
   it('clamps sleep to day rows and averages over days with sleep logged', () => {

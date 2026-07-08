@@ -165,7 +165,6 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
   const ratedFeeds = rows.reduce((a, r) => a + r.moodCount, 0)
   const avgFeedMins = totalBreastFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalBreastFeeds) : 0
   const avgMood = ratedFeeds ? feedMoodMeta(rows.reduce((a, r) => a + r.moodTotal, 0) / ratedFeeds) : null
-  const peakFeeds = Math.max(1, ...rows.map(r => r.feeds))
   const nowTs = Date.now()
   const sortedFeeds = feeds
     .map(s => new Date(s.startedAt).getTime())
@@ -175,5 +174,5 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     ? Math.round(sortedFeeds.slice(1).reduce((acc, ts, idx) => acc + (ts - sortedFeeds[idx]), 0) / (sortedFeeds.length - 1) / 60000)
     : null
 
-  return { rows, totalFeeds, totalBreastFeeds, totalBottleFeeds, totalBottleMl, totalMeds, totalWet, totalDirty, avgSleepSecsPerDay, avgFeedMins, avgMood, ratedFeeds, peakFeeds, avgGapMins }
+  return { rows, totalFeeds, totalBreastFeeds, totalBottleFeeds, totalBottleMl, totalMeds, totalWet, totalDirty, avgSleepSecsPerDay, avgFeedMins, avgMood, ratedFeeds, avgGapMins }
 }
