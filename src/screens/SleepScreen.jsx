@@ -171,6 +171,22 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     }).then(({ ok }) => { if (ok) onSleepSaved?.() })
   }
 
+  // Patch-or-insert via the server (see upsertSleepLog) for a completed
+  // sleep whose row may or may not exist. Needs the signed-in household
+  // context for the insert half; when it's missing the entry stays
+  // local-only and the sign-in reconciliation uploads it.
+  const shareSleepUpsert = (sleep) => {
+    if (!authUser || !profile?.household_id) return
+    syncWrite('sleep.upsert', {
+      id:           sleep.id,
+      householdId:  profile.household_id,
+      loggedBy:     authUser.id,
+      startedAt:    sleep.startedAt,
+      endedAt:      sleep.endedAt,
+      durationSecs: sleep.durationSecs,
+    }).then(({ ok }) => { if (ok) onSleepSaved?.() })
+  }
+
   const handleStart = () => {
     // Whether the shared row can be opened right now is recorded with the
     // timer: a start made while signed out has no row, and stop/confirm must
@@ -218,23 +234,16 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     const sleep = { id: pendingSleep.id || newId(), startedAt, endedAt, durationSecs }
     setSleeps(addSleep(sleep))
     // A sleep whose whole timer ran signed out never opened a shared row, so
-    // there is nothing to patch — insert the completed record instead. The
-    // two paths fail very differently when chosen wrongly: an insert over an
-    // existing row is rejected as a duplicate and dropped, stranding the row
-    // open for the whole household, while a patch of a missing row is
-    // dropped and the sleep still self-heals through the next
-    // reconciliation. So insert only when the row provably doesn't exist:
-    // shared === false is authoritative (the flag is written with the
-    // timer), but a pending record from before the flag existed (undefined)
-    // needs the loaded shared list to prove absence — and when the list
-    // hasn't loaded, the recoverable patch path wins.
-    const inSharedList = sharedSleeps?.some(s => s.id === sleep.id) === true
-    const rowNeverSent = pendingSleep.shared === false ||
-      (pendingSleep.shared === undefined && !!sharedSleeps)
-    if (!inSharedList && rowNeverSent) {
-      shareSleep(sleep)
-    } else {
+    // there is nothing to patch. When the flag says the row exists, patch it
+    // as usual; every other case (flag false, or a record from before the
+    // flag existed whose row may or may not be on the server) goes through
+    // the upsert, which resolves the question against the server instead of
+    // guessing — a wrong guess either strands the row open (duplicate insert
+    // dropped) or burns the outbox retry cap (patching a missing row).
+    if (pendingSleep.shared === true || sharedSleeps?.some(s => s.id === sleep.id)) {
       shareSleepUpdate(sleep)
+    } else {
+      shareSleepUpsert(sleep)
     }
     clearPendingSleep()
     setPendingSleep(null)

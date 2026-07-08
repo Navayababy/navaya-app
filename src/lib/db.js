@@ -163,6 +163,28 @@ export async function updateSleepLog(id, { startedAt, endedAt, durationSecs }) {
   return { data, error }
 }
 
+// Patch-or-insert for a sleep this device's own timer produced, used when
+// the client can't prove whether the row exists (records persisted before
+// the shared flag, confirms racing the shared-list load). Guessing either
+// way fails badly — a wrong insert is dropped as a duplicate leaving the
+// row open forever, a wrong update burns the outbox retry cap — so this
+// resolves it against the server: patch first (also the safe choice for a
+// row a partner started, since it never touches logged_by), and only if
+// the row provably doesn't exist (PGRST116) insert it whole. The 23505
+// retry closes the race where the row lands between the two steps (e.g.
+// reconciliation inserting it mid-flight).
+export async function upsertSleepLog({ id, householdId, loggedBy, startedAt, endedAt, durationSecs }) {
+  const updated = await updateSleepLog(id, { startedAt, endedAt, durationSecs })
+  if (!updated.error) return { error: null }
+  if (updated.error.code !== 'PGRST116') return { error: updated.error }
+  const inserted = await insertSleepLog({ id, householdId, loggedBy, startedAt, endedAt, durationSecs })
+  if (String(inserted.error?.code) === '23505') {
+    const retried = await updateSleepLog(id, { startedAt, endedAt, durationSecs })
+    return { error: retried.error }
+  }
+  return { error: inserted.error }
+}
+
 export async function getRecentSleepLogs(householdId, limit = 200) {
   const { data, error } = await supabase
     .from('sleep_logs')
