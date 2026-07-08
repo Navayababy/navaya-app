@@ -62,7 +62,13 @@ export function useHousehold() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user || null
-      if ((user?.id || null) !== authUserId.current) {
+      // Only a same-signed-in-user event (INITIAL_SESSION, TOKEN_REFRESHED)
+      // leaves the generation alone. A null session ALWAYS advances it —
+      // even before any id has been recorded — because a sign-out from
+      // another tab or an expired session can land while the startup
+      // getSession() read is still pending, and that read must not go on
+      // to load the stale persisted user afterwards.
+      if (!user || user.id !== authUserId.current) {
         authGen.current += 1
         authUserId.current = user?.id || null
       }
