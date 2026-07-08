@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { brand, palette, shadow, iconWellBg } from '../theme.js'
-import { getSleeps, addSleep, babyDisplayName, getPendingSleep, savePendingSleep, clearPendingSleep } from '../lib/storage.js'
+import { getSleeps, addSleep, babyDisplayName, getPendingSleep, savePendingSleep, clearPendingSleep, getHouseholdLink } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
 import { sleepSecsOnDay } from '../lib/stats.js'
@@ -172,15 +172,25 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   }
 
   // Patch-or-insert via the server (see upsertSleepLog) for a completed
-  // sleep whose row may or may not exist. Needs the signed-in household
-  // context for the insert half; when it's missing the entry stays
-  // local-only and the sign-in reconciliation uploads it.
+  // sleep whose row may or may not exist. Unlike the plain insert, this
+  // must queue even while signed out: if the row does exist (a timer from
+  // before the shared flag, opened while signed in), nothing else will
+  // ever close it — reconciliation deliberately ignores duplicate ids — so
+  // dropping the op here would leave the household with a sleep that never
+  // ends. The cached household link supplies the identity for the insert
+  // half (ignored if it belongs to a different signed-in user); a device
+  // with no link ever recorded has no household to reach, and the entry
+  // stays local-only.
   const shareSleepUpsert = (sleep) => {
-    if (!authUser || !profile?.household_id) return
+    const link = getHouseholdLink()
+    const linkUsable = link && (!authUser || link.userId === authUser.id)
+    const loggedBy    = authUser?.id || (linkUsable ? link.userId : null)
+    const householdId = profile?.household_id || (linkUsable ? link.householdId : null)
+    if (!loggedBy || !householdId) return
     syncWrite('sleep.upsert', {
       id:           sleep.id,
-      householdId:  profile.household_id,
-      loggedBy:     authUser.id,
+      householdId,
+      loggedBy,
       startedAt:    sleep.startedAt,
       endedAt:      sleep.endedAt,
       durationSecs: sleep.durationSecs,
@@ -206,10 +216,13 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     setConfirmStartTime(initialConfirmStartTime)
     setConfirmEndTime(initialConfirmEndTime)
     // Raw stop time, ahead of whatever adjustment happens on confirm — this
-    // is what lets a household member's device see it end immediately. Only
-    // when the shared row exists; an unshared sleep is inserted whole at
-    // confirm instead.
+    // is what lets a household member's device see it end immediately. A
+    // provably unshared sleep (shared false) has no row to close and is
+    // inserted whole at confirm instead; a pre-flag record (undefined) goes
+    // through the upsert so an existing open row is closed right now, not
+    // only if and when the user confirms.
     if (sleepData.shared) shareSleepUpdate(sleepData)
+    else if (sleepData.shared === undefined) shareSleepUpsert(sleepData)
   }
 
   // The row was already opened on start (see handleStart) and closed with a
