@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { feedMoodMeta, averageFeedMood, computeWeeklyInsights, secsOverlappingDay, sleepSecsOnDay } from './stats.js'
+import { feedMoodMeta, averageFeedMood, computeWeeklyInsights, computeDayRhythm, secsOverlappingDay, sleepSecsOnDay } from './stats.js'
 
 // Fixed "now": Tuesday 9 June 2026, 14:30 local time
 const NOW = new Date(2026, 5, 9, 14, 30, 0)
@@ -195,5 +195,52 @@ describe('computeWeeklyInsights', () => {
     const feeds = [feed(0, 8), feed(0, 10), { ...feed(0, 23), id: 'future' }]
     const insights = computeWeeklyInsights(feeds, [], [])
     expect(insights.avgGapMins).toBe(120)
+  })
+})
+
+describe('computeDayRhythm', () => {
+  it('returns 7 days ending today, oldest first, with nowFrac only on today', () => {
+    const days = computeDayRhythm([], [])
+    expect(days).toHaveLength(7)
+    expect(days[6].isToday).toBe(true)
+    // Fixed clock is 14:30 → 14.5/24 of the day has passed
+    expect(days[6].nowFrac).toBeCloseTo(14.5 / 24, 5)
+    expect(days.slice(0, 6).every(d => d.nowFrac === null)).toBe(true)
+    expect(days.every(d => !d.hasData)).toBe(true)
+  })
+
+  it('places feeds on the right day at the right fraction', () => {
+    const days = computeDayRhythm([feed(0, 6), feed(1, 12), feed(9, 8)], [])
+    expect(days[6].feeds).toEqual([6 / 24])
+    expect(days[5].feeds).toEqual([12 / 24])
+    // The 9-days-ago feed is outside the window entirely
+    expect(days.reduce((a, d) => a + d.feeds.length, 0)).toBe(2)
+    expect(days[6].hasData).toBe(true)
+  })
+
+  it('splits an overnight sleep across both days it touches', () => {
+    const sleeps = [{ startedAt: at(1, 22), endedAt: at(0, 6) }]
+    const days = computeDayRhythm([], sleeps)
+    expect(days[5].sleeps).toEqual([{ from: 22 / 24, to: 1 }])
+    expect(days[6].sleeps).toEqual([{ from: 0, to: 6 / 24 }])
+  })
+
+  it('sorts sleep segments and feed marks within a day', () => {
+    const sleeps = [
+      { startedAt: at(0, 13), endedAt: at(0, 14) },
+      { startedAt: at(0, 9),  endedAt: at(0, 10) },
+    ]
+    const days = computeDayRhythm([feed(0, 11), feed(0, 8)], sleeps)
+    expect(days[6].sleeps.map(s => s.from)).toEqual([9 / 24, 13 / 24])
+    expect(days[6].feeds).toEqual([8 / 24, 11 / 24])
+  })
+
+  it('skips open-ended sleeps and unparseable timestamps', () => {
+    const sleeps = [
+      { startedAt: at(0, 13), endedAt: null },
+      { startedAt: 'garbage', endedAt: at(0, 14) },
+    ]
+    const days = computeDayRhythm([{ id: 'x', startedAt: 'garbage' }], sleeps)
+    expect(days.every(d => !d.hasData)).toBe(true)
   })
 })

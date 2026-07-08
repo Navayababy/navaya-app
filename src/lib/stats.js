@@ -35,6 +35,64 @@ export function sleepSecsOnDay(sleeps, day = new Date()) {
   return sleeps.reduce((a, s) => a + secsOverlappingDay(s.startedAt, s.endedAt, day), 0)
 }
 
+// Per-day 24-hour rhythm for the weekly summary chart: one entry per local
+// calendar day (oldest first), with that day's sleep intervals clamped to
+// its midnight boundaries and expressed as fractions of the day, plus each
+// feed start as a fraction. Fractions are of the day's real length — a DST
+// day is 23 or 25 hours and dividing by its actual span keeps marks at the
+// wall-clock position parents expect. `nowFrac` is set on today only, so
+// the chart can show where "now" is instead of letting the rest of today
+// read as hours of no sleep.
+export function computeDayRhythm(feeds, sleeps = [], dayCount = 7) {
+  const days = []
+  for (let i = dayCount - 1; i >= 0; i--) {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - i)
+    days.push(d)
+  }
+  const nowTs = Date.now()
+
+  return days.map(dayStart => {
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+    const startMs = dayStart.getTime()
+    const endMs   = dayEnd.getTime()
+    const dayMs   = endMs - startMs
+    const frac    = (ts) => (ts - startMs) / dayMs
+
+    const sleepSegs = []
+    sleeps.forEach(s => {
+      if (!s.startedAt || !s.endedAt) return
+      const a = new Date(s.startedAt).getTime()
+      const b = new Date(s.endedAt).getTime()
+      if (Number.isNaN(a) || Number.isNaN(b)) return
+      const from = Math.max(a, startMs)
+      const to   = Math.min(b, endMs)
+      if (to <= from) return
+      sleepSegs.push({ from: frac(from), to: frac(to) })
+    })
+    sleepSegs.sort((x, y) => x.from - y.from)
+
+    const feedMarks = feeds
+      .map(f => new Date(f.startedAt).getTime())
+      .filter(ts => !Number.isNaN(ts) && ts >= startMs && ts < endMs)
+      .map(frac)
+      .sort((a, b) => a - b)
+
+    const isToday = nowTs >= startMs && nowTs < endMs
+    return {
+      key: dateStr(dayStart.toISOString()),
+      label: dayStart.toLocaleDateString('en-GB', { weekday: 'short' }),
+      isToday,
+      nowFrac: isToday ? frac(nowTs) : null,
+      sleeps: sleepSegs,
+      feeds: feedMarks,
+      hasData: sleepSegs.length > 0 || feedMarks.length > 0,
+    }
+  })
+}
+
 // Last-7-days insight rows and totals for the weekly insights panel.
 export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
   const days = []

@@ -6,7 +6,7 @@ import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, dayShort, timeStr, todayDateStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep, isBottleFeed } from '../lib/normalize.js'
 import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL, bottleLabel } from '../lib/constants.js'
-import { averageFeedMood, computeWeeklyInsights, sleepSecsOnDay } from '../lib/stats.js'
+import { averageFeedMood, computeWeeklyInsights, computeDayRhythm, sleepSecsOnDay } from '../lib/stats.js'
 import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
@@ -150,6 +150,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     () => computeWeeklyInsights(feeds, nappyList, medicineList, sleepList),
     [feeds, nappyList, medicineList, sleepList]
   )
+
+  const rhythm = useMemo(() => computeDayRhythm(feeds, sleepList), [feeds, sleepList])
+  // Chart inks for the rhythm chart — see the comment on the chart itself.
+  const rhythmSleepInk = night ? '#529F69' : '#43905B'
+  const rhythmFeedInk  = night ? '#D07136' : '#C8682E'
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleSaveEdit = async (id, changes) => {
@@ -433,6 +438,73 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
               })}
             </div>
           </div>
+
+          {/* ── 24-hour rhythm: one column per day, midnight (top) to midnight
+                 (bottom); sleep drawn as blocks, feed starts as dots. Sleep and
+                 feed inks are chart-weight variants of brand.green/brand.accent —
+                 same hues, deepened (light) or brightened (dark) to pass the
+                 contrast and greyness checks against each mode's card surface,
+                 where the raw brand accents fail. The two series are also
+                 shape-coded (block vs dot), so colour is never the only cue.
+                 No per-mark tooltips, deliberately: this is a touch-first UI
+                 with no hover idiom, and the logbook below is the readable
+                 per-entry record. ── */}
+          {rhythm.some(d => d.hasData) && (
+            <div style={{ marginTop: 12, padding: '12px 12px 10px', borderRadius: 16, background: night ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.48)', border: `1px solid ${night ? 'rgba(237,229,216,0.06)' : 'rgba(237,229,216,0.65)'}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+                <span style={{ fontSize: 11, color: p.sub, textTransform: 'uppercase', letterSpacing: '.14em' }}>Day rhythm</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: p.sub }}>
+                    <span style={{ width: 5, height: 14, borderRadius: 999, background: rhythmSleepInk }} />
+                    Sleep
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: p.sub }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: rhythmFeedInk }} />
+                    Feeds
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {/* Hour rail: recessive, wall-clock anchors only */}
+                <div style={{ position: 'relative', width: 20, height: 168, flexShrink: 0 }}>
+                  {[[0, '00'], [0.25, '06'], [0.5, '12'], [0.75, '18'], [1, '00']].map(([f, lbl], i) => (
+                    <span key={i} style={{ position: 'absolute', top: `${f * 100}%`, right: 0, transform: 'translateY(-50%)', fontSize: 9, color: p.sub, opacity: 0.8, lineHeight: 1 }}>{lbl}</span>
+                  ))}
+                </div>
+                <div style={{ position: 'relative', flex: 1, height: 168 }}>
+                  {/* Faint gridlines at 06:00 / 12:00 / 18:00 */}
+                  {[0.25, 0.5, 0.75].map(f => (
+                    <div key={f} style={{ position: 'absolute', top: `${f * 100}%`, left: 0, right: 0, height: 1, background: night ? 'rgba(237,229,216,0.07)' : 'rgba(74,55,40,0.07)' }} />
+                  ))}
+                  <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, height: '100%' }}>
+                    {rhythm.map(day => (
+                      <div key={day.key} style={{ position: 'relative', minWidth: 0 }}>
+                        {/* The day track ends at "now" for today, so the hours
+                            that haven't happened yet don't read as awake time */}
+                        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 14, height: `${(day.nowFrac ?? 1) * 100}%`, borderRadius: 999, background: night ? 'rgba(237,229,216,0.09)' : '#E7DED3', opacity: night ? 1 : 0.6 }} />
+                        {day.sleeps.map((seg, i) => (
+                          <div key={i} style={{ position: 'absolute', top: `${seg.from * 100}%`, left: '50%', transform: 'translateX(-50%)', width: 14, height: `max(${(seg.to - seg.from) * 100}%, 4px)`, borderRadius: 999, background: rhythmSleepInk }} />
+                        ))}
+                        {day.feeds.map((f, i) => (
+                          <div key={i} style={{ position: 'absolute', top: `${f * 100}%`, left: '50%', transform: 'translate(-50%, -50%)', width: 8, height: 8, borderRadius: '50%', background: rhythmFeedInk, boxShadow: `0 0 0 2px ${night ? '#251E18' : '#FBF7F2'}` }} />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <div style={{ width: 20, flexShrink: 0 }} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 8, flex: 1 }}>
+                  {rhythm.map(day => (
+                    <span key={day.key} style={{ textAlign: 'center', fontSize: 10, color: day.isToday ? p.text : p.sub, fontWeight: day.isToday ? 700 : 500, lineHeight: 1.2 }}>
+                      {day.isToday ? 'Today' : day.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {insights.avgMood && (
             <div style={{ background: night ? '#2A231D' : '#F6EFE7', border: `1px solid ${p.border}`, borderRadius: 16, padding: '12px 13px', marginTop: 12, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
