@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getNightMode, setNightMode, hasNightPref, getNightHintSeen, setNightHintSeen, getDismissedAnnouncements, dismissAnnouncement } from './lib/storage.js'
+import { getNightMode, setNightMode, hasNightPref, getNightHintSeen, setNightHintSeen, getDismissedAnnouncements, dismissAnnouncement, getHouseholdLinked } from './lib/storage.js'
 import { getActiveAnnouncement } from './lib/db.js'
 import { syncWrite } from './lib/sync.js'
 import { isSupabaseConfigured } from './lib/supabase.js'
@@ -19,6 +19,7 @@ import HelpScreen    from './screens/HelpScreen.jsx'
 import NavBar        from './components/NavBar.jsx'
 import AnnouncementBanner from './components/AnnouncementBanner.jsx'
 import InstallBanner  from './components/InstallBanner.jsx'
+import SignedOutBanner from './components/SignedOutBanner.jsx'
 import SplashScreen   from './components/SplashScreen.jsx'
 import { brand, palette } from './theme.js'
 
@@ -79,7 +80,7 @@ export default function App() {
   const timerProps = useFeedTimer()
   const sleepTimerProps = useSleepTimer()
   const {
-    authUser, profile, householdMembers, householdMembersError, migrationError,
+    authUser, authReady, profile, householdMembers, householdMembersError, migrationError,
     sharedSessions, sharedNappies, sharedMedicines, sharedSleeps,
     loadHouseholdMembers, refreshProfile,
     refreshSharedSessions, refreshSharedNappies, refreshSharedMedicines, refreshSharedSleeps,
@@ -99,14 +100,15 @@ export default function App() {
   useEffect(() => {
     if (!sleepActive || sleepShared || !authUser || !profile?.household_id) return
     if (!sharedSleeps) return
-    const openRow = sharedSleeps.find(s => s.ended_at == null)
-    if (openRow && openRow.id !== sleepId) return
+    // Matched by id across the whole list, not just open rows: a timer from
+    // before the shared flag existed may have a row a partner has already
+    // closed, and re-inserting it would be rejected as a duplicate.
+    const ourRow = sharedSleeps.find(s => s.id === sleepId)
+    if (!ourRow && sharedSleeps.some(s => s.ended_at == null)) return
     // Mark before writing so a re-render can't queue the insert twice;
     // syncWrite guarantees delivery (or outbox retry) once handed off.
     markSleepShared()
-    // openRow matching sleepId means the row already exists — a timer
-    // persisted before the shared flag was recorded. Nothing to insert.
-    if (!openRow) {
+    if (!ourRow) {
       syncWrite('sleep.insert', {
         id:           sleepId,
         householdId:  profile.household_id,
@@ -155,6 +157,15 @@ export default function App() {
       paddingTop:    'env(safe-area-inset-top, 0px)',
     }}>
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      {/* Above the other banners: a signed-out household device is losing
+          sync with every entry, which outranks a broadcast or install nudge.
+          Gated on authReady so it can never flash during the auth read at
+          launch, and skipped on the settings screen — the user is already
+          where the button would send them, next to the real sign-in form. */}
+      <SignedOutBanner night={night}
+        signedOut={!!(isSupabaseConfigured && authReady && !authUser && getHouseholdLinked())}
+        hidden={screen === 'settings'}
+        onSignIn={() => setScreen('settings')} />
       {announcement && <AnnouncementBanner night={night} announcement={announcement} onDismiss={dismissBanner} />}
       <InstallBanner night={night} />
       {nightHint && (

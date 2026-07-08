@@ -10,6 +10,11 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase.js'
 // one-time local-data migration, and outbox flush triggers.
 export function useHousehold() {
   const [authUser,        setAuthUser]        = useState(null)
+  // False until the persisted session has been read once (or an auth event
+  // has fired). Signed-out UI must wait for this: authUser is always null
+  // for the first moments of a launch, and warning a signed-in user that
+  // they're signed out — even as a flash — reads as data loss.
+  const [authReady,       setAuthReady]       = useState(false)
   const [profile,         setProfile]         = useState(null)
   const [householdMembers, setHouseholdMembers] = useState(null)
   const [householdMembersError, setHouseholdMembersError] = useState(null)
@@ -47,6 +52,7 @@ export function useHousehold() {
     if (!isSupabaseConfigured) return
 
     getSession().then(session => {
+      setAuthReady(true)
       // An auth event may have raced this initial read; its own loadProfile
       // is the authoritative one.
       if (authGen.current !== 0) return
@@ -61,6 +67,7 @@ export function useHousehold() {
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthReady(true)
       const user = session?.user || null
       // Only a same-signed-in-user event (INITIAL_SESSION, TOKEN_REFRESHED)
       // leaves the generation alone. A null session ALWAYS advances it —
@@ -273,6 +280,7 @@ export function useHousehold() {
 
   return {
     authUser,
+    authReady,
     profile,
     householdMembers,
     householdMembersError,

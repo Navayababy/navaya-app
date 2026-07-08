@@ -18,9 +18,12 @@ export function useSleepTimer() {
   // Whether this sleep's household row has been handed to the sync layer.
   // False for timers started while signed out (there is no row to patch) —
   // App.jsx backfills those once a signed-in household context appears.
-  // Records persisted before this flag existed read as unshared; the
-  // backfill recognises their existing row instead of re-inserting.
-  const [sleepShared,    setSleepShared]    = useState(() => initialSleep.current?.shared === true)
+  // Deliberately tri-state: records persisted before this flag existed load
+  // as undefined ("unknown" — their row may well exist on the server), which
+  // consumers must treat differently from an authoritative false ("provably
+  // never sent"). Coercing undefined to false here would make confirm insert
+  // over an existing row, stranding it open for the whole household.
+  const [sleepShared,    setSleepShared]    = useState(() => initialSleep.current?.shared)
   const [sleepElapsed,   setSleepElapsed]   = useState(() => {
     const saved = initialSleep.current
     if (!saved) return 0
