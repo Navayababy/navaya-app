@@ -24,6 +24,9 @@ export function useHousehold() {
   const realtimeUnsub = useRef(null)
   // Pending retry of a failed profile load (timer id + next backoff delay).
   const profileRetry = useRef({ timer: null, delay: 5000 })
+  // Households already reconciled this session (cleared on sign-out, so a
+  // sign-out → log → sign-in sequence still gets its entries uploaded).
+  const reconciledHouseholds = useRef(new Set())
 
   // ── Auth init (only when Supabase is configured) ───────────────────────────
   useEffect(() => {
@@ -43,6 +46,7 @@ export function useHousehold() {
         loadProfile(user.id)
       } else {
         clearProfileRetry()
+        reconciledHouseholds.current.clear()
         setProfile(null)
         setHouseholdMembers(null)
         setHouseholdMembersError(null)
@@ -104,46 +108,37 @@ export function useHousehold() {
       setHouseholdMembers(null)
       setHouseholdMembersError(null)
       loadHouseholdMembers()
-      // One-time upload of this device's local data into the household. The
-      // flag is only written on full success, so a failure retries on the
-      // next profile load. Every row carries a stable client UUID (see
-      // ensure*Uuids) and is upserted with ignoreDuplicates, so the retry
-      // simply re-sends everything: rows that already landed are no-ops,
-      // rows that didn't get another chance. There is deliberately NO
-      // "does the user already have data?" short-circuit — after a partial
-      // failure (feeds landed, nappies didn't) any such check reads as
-      // "already migrated", writes the flag, and strands the remaining rows
-      // forever. Idempotent re-upload is the mechanism that replaces it —
-      // the same design the sleeps migration below has always used.
-      const migrationKey = `navaya_migrated_${data.household_id}`
-      let migrationFailed = false
-      if (!localStorage.getItem(migrationKey)) {
+      // Reconcile this device's local logbook into the household, once per
+      // household per app session (the claim is dropped on sign-out and on
+      // failure, so both get another pass). This used to be a one-time
+      // migration behind persistent `navaya_migrated_*` flags, which
+      // permanently stranded anything logged while the device was signed
+      // out or desynced: those writes never reach syncWrite, and with the
+      // flag already set nothing ever re-uploaded them — the household
+      // quietly diverged from the device. Re-upload is idempotent (stable
+      // client UUIDs upserted with ignoreDuplicates, content-signature
+      // dedupe for pre-UUID rows — see db.js), so re-running it every
+      // session is safe, recovers those entries, and there is deliberately
+      // NO "does the user already have data?" short-circuit — after a
+      // partial failure any such check reads as "already uploaded" and
+      // strands the remaining rows.
+      if (!reconciledHouseholds.current.has(data.household_id)) {
+        reconciledHouseholds.current.add(data.household_id)
+        let migrationFailed = false
         try {
           await migrateLocalSessions(data.household_id, userId, ensureSessionUuids())
           await migrateLocalNappies(data.household_id, userId, ensureNappyUuids())
           await migrateLocalMedicines(data.household_id, userId, ensureMedicineUuids())
-          localStorage.setItem(migrationKey, '1')
-        } catch (err) {
-          console.error('Migration failed, will retry next login:', err)
-          logError('migration.initial', err)
-          migrationFailed = true
-        }
-      }
-      // Sleep tracking shipped after the original migration, so it has its own
-      // one-time flag. Upserts with client UUIDs make a retry harmless.
-      const sleepMigrationKey = `navaya_migrated_sleeps_${data.household_id}`
-      if (!localStorage.getItem(sleepMigrationKey)) {
-        try {
           await migrateLocalSleeps(data.household_id, userId, ensureSleepUuids())
-          localStorage.setItem(sleepMigrationKey, '1')
         } catch (err) {
-          console.error('Sleep migration failed, will retry next login:', err)
-          logError('migration.sleeps', err)
+          console.error('Logbook reconciliation failed, will retry next load:', err)
+          logError('migration.reconcile', err)
+          reconciledHouseholds.current.delete(data.household_id)
           migrationFailed = true
         }
+        // Also clears a stale warning once a later retry has succeeded.
+        setMigrationError(migrationFailed)
       }
-      // Also clears a stale warning once a later retry has succeeded.
-      setMigrationError(migrationFailed)
       // Deliver any writes queued while offline before refreshing the lists
       await flushOutbox()
       loadSharedSessions(data.household_id)
