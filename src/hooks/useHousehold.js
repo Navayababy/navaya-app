@@ -27,12 +27,23 @@ export function useHousehold() {
   // Households already reconciled this session (cleared on sign-out, so a
   // sign-out → log → sign-in sequence still gets its entries uploaded).
   const reconciledHouseholds = useRef(new Set())
+  // Auth generation: bumped on every auth state change. A loadProfile run
+  // (or a retry it scheduled) belongs to the generation it started in; when
+  // the generations no longer match, the run is stale — the user signed out
+  // or changed, or a newer auth event started its own load — and it must
+  // stop before touching state or scheduling more retries. Without this, a
+  // profile fetch in flight at sign-out could re-seed cached household
+  // state, keep retrying while signed out, and clobber the next account.
+  const authGen = useRef(0)
 
   // ── Auth init (only when Supabase is configured) ───────────────────────────
   useEffect(() => {
     if (!isSupabaseConfigured) return
 
     getSession().then(session => {
+      // An auth event may have raced this initial read; its own loadProfile
+      // is the authoritative one.
+      if (authGen.current !== 0) return
       if (session?.user) {
         setAuthUser(session.user)
         loadProfile(session.user.id)
@@ -40,12 +51,14 @@ export function useHousehold() {
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      authGen.current += 1
       const user = session?.user || null
       setAuthUser(user)
       if (user) {
         loadProfile(user.id)
       } else {
         clearProfileRetry()
+        profileRetry.current.delay = 5000
         reconciledHouseholds.current.clear()
         setProfile(null)
         setHouseholdMembers(null)
@@ -72,6 +85,7 @@ export function useHousehold() {
   }
 
   const loadProfile = async (userId) => {
+    const gen = authGen.current
     clearProfileRetry()
     // Seed shared mode from the cached link straight away: a write made in
     // the moment before the profile arrives — or while the fetch is failing —
@@ -82,6 +96,7 @@ export function useHousehold() {
       setProfile(prev => prev || { id: userId, household_id: cached.householdId, role: cached.role || null })
     }
     const { data, error } = await getProfile(userId)
+    if (gen !== authGen.current) return
     if (!data) {
       if (error?.code === 'PGRST116') {
         // Definitive answer: no profile row exists (normal for a fresh
@@ -97,7 +112,9 @@ export function useHousehold() {
       // local-only mode for the whole session; instead the cached link
       // stays active and the load retries until the server answers.
       logError('profile.load', error)
-      profileRetry.current.timer = setTimeout(() => loadProfile(userId), profileRetry.current.delay)
+      profileRetry.current.timer = setTimeout(() => {
+        if (gen === authGen.current) loadProfile(userId)
+      }, profileRetry.current.delay)
       profileRetry.current.delay = Math.min(profileRetry.current.delay * 2, 60000)
       return
     }
@@ -141,6 +158,9 @@ export function useHousehold() {
       }
       // Deliver any writes queued while offline before refreshing the lists
       await flushOutbox()
+      // The awaits above are the other window where auth can change under
+      // us — don't repopulate lists or resubscribe realtime for a stale run.
+      if (gen !== authGen.current) return
       loadSharedSessions(data.household_id)
       loadSharedNappies(data.household_id)
       loadSharedMedicines(data.household_id)
