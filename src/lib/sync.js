@@ -15,7 +15,7 @@ import {
   insertSleepLog, updateSleepLog, upsertSleepLog, deleteSleepLog,
 } from './db.js'
 import { supabase, isSupabaseConfigured } from './supabase.js'
-import { getOutbox, saveOutbox, enqueue } from './outbox.js'
+import { getOutbox, saveOutbox, enqueue, recordDropOutcome, getDropOutcome, clearDropOutcome, withOutboxLock } from './outbox.js'
 import { logError } from './logError.js'
 
 const MAX_ATTEMPTS = 8
@@ -62,19 +62,6 @@ async function attempt(type, payload) {
   }
 }
 
-// Errors for items the drain dropped (permanent rejection or retry cap),
-// keyed by queue id, so the syncWrite awaiting that flush can report
-// { queued: false } with the cause instead of mistaking the drop for a
-// delivery. Each writer reads its entry once; entries nobody awaits
-// (drops during timer flushes) are cleared wholesale at a safety bound.
-const dropOutcomes = new Map()
-
-function recordDrop(item, error) {
-  if (!item.id) return
-  if (dropOutcomes.size > 100) dropOutcomes.clear()
-  dropOutcomes.set(item.id, error)
-}
-
 let inFlight = null
 
 // Every enqueue through syncWrite bumps enqueueSeq; drainSeenSeq is the
@@ -108,14 +95,12 @@ export function flushOutbox() {
 // tabs draining concurrently can both deliver the same head; the loser's
 // duplicate-key rejection then reads as "retried insert already landed"
 // and removes whatever item is at the head by then — silently destroying
-// an undelivered write. The Web Lock serialises drains across tabs (the
-// in-tab single-flight above handles everything else); browsers without
-// the API fall back to in-tab exclusivity, no worse than before.
+// an undelivered write. withOutboxLock serialises this against every other
+// tab's drain AND every tab's enqueue/drop-outcome access (see outbox.js
+// for why that has to be a blanket rule); the in-tab single-flight above
+// handles everything else.
 function runDrain() {
-  if (typeof navigator !== 'undefined' && navigator.locks?.request) {
-    return navigator.locks.request('navaya_outbox_drain', () => drain())
-  }
-  return drain()
+  return withOutboxLock(() => drain())
 }
 
 async function drain() {
@@ -166,7 +151,10 @@ async function drain() {
     if (isPermanent(error) || (countsTowardCap(error) && (head.attempts || 0) + 1 >= MAX_ATTEMPTS)) {
       console.error('Dropping unsyncable change:', head.type, error)
       logError(`sync.drop:${head.type}`, error)
-      recordDrop(head, error)
+      // Recorded before the removal below, and both are synchronous — see
+      // outbox.js for why that ordering is what makes this visible to
+      // whichever tab's syncWrite enqueued the item.
+      recordDropOutcome(head.id, error)
       saveOutbox(getOutbox().slice(1))
       continue
     }
@@ -186,11 +174,28 @@ async function drain() {
   return { flushed, pending: getOutbox().length }
 }
 
+// A bare read of a single localStorage key can't tear (each key's value is
+// set atomically by a single setItem call), so this needs no lock of its
+// own — only the compound read-modify-write operations on KEY/DROPS_KEY
+// do. If this happens to observe the item mid-flight (a concurrent
+// enqueue or drain elsewhere hasn't committed yet), the caller's while
+// loop below simply reads again later; nothing here needs a
+// point-in-time-consistent snapshot beyond "is it there right now."
 const stillQueued = (item) => getOutbox().some(queued => queued.id === item.id)
 
 export async function syncWrite(type, payload) {
-  const seq = ++enqueueSeq
-  const item = enqueue(type, payload)
+  // The seq bump and the actual queue write must land atomically with
+  // respect to every other tab's enqueue/drain — otherwise a drain
+  // elsewhere could read drainSeenSeq forward of this seq before this
+  // item is actually in the queue, and this call's own stillQueued check
+  // would then see "not queued" for an item that was never written at
+  // all, misreporting a lost write as delivered. withOutboxLock makes
+  // that one atomic unit, cross-tab.
+  const { seq, item } = await withOutboxLock(() => {
+    const seq = ++enqueueSeq
+    const item = enqueue(type, payload)
+    return { seq, item }
+  })
   await flushOutbox()
   // A drain already in flight re-reads the queue between items, so it
   // normally picks this write up — but it may have taken its final look a
@@ -209,10 +214,18 @@ export async function syncWrite(type, payload) {
   while (stillQueued(item) && drainSeenSeq < seq) await flushOutbox()
   if (stillQueued(item)) return { ok: false, queued: true }
 
-  if (dropOutcomes.has(item.id)) {
-    const error = dropOutcomes.get(item.id)
-    dropOutcomes.delete(item.id)
-    return { ok: false, queued: false, error }
-  }
+  // The drop record (if any) lives in localStorage precisely because the
+  // drain that removed this item may have run in a different tab — see
+  // outbox.js. Read-and-clear happens as one locked operation: two
+  // separate lock acquisitions here would leave a window where another
+  // tab's drain could write a DIFFERENT item's drop record in between,
+  // which this call has no business touching but a naively-timed clear
+  // could still clobber.
+  const error = await withOutboxLock(() => {
+    const err = getDropOutcome(item.id)
+    if (err) clearDropOutcome(item.id)
+    return err
+  })
+  if (error) return { ok: false, queued: false, error }
   return { ok: true }
 }
