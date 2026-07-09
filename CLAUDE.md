@@ -31,7 +31,7 @@ Navaya is a mobile-first React SPA (max-width 430px) for breastfeeding tracking.
 
 **Timer state** — the feed and sleep timers live in hooks consumed by `App.jsx` (`useFeedTimer`, `useSleepTimer`) so they survive tab changes. `App` passes the timer prop bundles down to `FeedScreen` and `SleepScreen`.
 
-**Data layer** — user data is persisted to `localStorage` via `src/lib/storage.js`, with optional household sharing through Supabase (`src/lib/db.js`, `src/lib/sync.js`, `src/lib/outbox.js`, `useHousehold`). Writes go to localStorage first, then sync to the shared household; offline writes queue in the outbox. Pure stats live in `src/lib/stats.js` and are unit-tested.
+**Data layer** — user data is persisted to `localStorage` via `src/lib/storage.js`, with optional household sharing through Supabase (`src/lib/db.js`, `src/lib/sync.js`, `src/lib/outbox.js`, `useHousehold`). Writes go to localStorage first, then sync to the shared household through the outbox — a single strictly-ordered queue that every household write joins (there is no direct-delivery path around it; offline or signed-out writes simply wait in the queue). Pure stats live in `src/lib/stats.js` and are unit-tested.
 
 **AI chat** — `ChatScreen` POSTs conversation history to `/api/chat`, a Vercel serverless function that streams from the Anthropic API (claude-sonnet-4-6) keeping the API key server-side. Sage requires a signed-in user: the client sends its Supabase access token in the `Authorization` header, and `api/chat.js` verifies it with Supabase Auth before answering (per-user + per-IP rate limits; each request logs the user id to the function log for usage tracking). Signed-out users see a sign-in invitation instead of the composer.
 
