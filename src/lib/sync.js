@@ -15,7 +15,7 @@ import {
   insertSleepLog, updateSleepLog, upsertSleepLog, deleteSleepLog,
 } from './db.js'
 import { supabase, isSupabaseConfigured } from './supabase.js'
-import { getOutbox, saveOutbox, enqueue } from './outbox.js'
+import { getOutbox, saveOutbox, enqueue, recordDropOutcome, getDropOutcome, clearDropOutcome } from './outbox.js'
 import { logError } from './logError.js'
 
 const MAX_ATTEMPTS = 8
@@ -60,19 +60,6 @@ async function attempt(type, payload) {
   } catch (err) {
     return { error: err }
   }
-}
-
-// Errors for items the drain dropped (permanent rejection or retry cap),
-// keyed by queue id, so the syncWrite awaiting that flush can report
-// { queued: false } with the cause instead of mistaking the drop for a
-// delivery. Each writer reads its entry once; entries nobody awaits
-// (drops during timer flushes) are cleared wholesale at a safety bound.
-const dropOutcomes = new Map()
-
-function recordDrop(item, error) {
-  if (!item.id) return
-  if (dropOutcomes.size > 100) dropOutcomes.clear()
-  dropOutcomes.set(item.id, error)
 }
 
 let inFlight = null
@@ -166,7 +153,10 @@ async function drain() {
     if (isPermanent(error) || (countsTowardCap(error) && (head.attempts || 0) + 1 >= MAX_ATTEMPTS)) {
       console.error('Dropping unsyncable change:', head.type, error)
       logError(`sync.drop:${head.type}`, error)
-      recordDrop(head, error)
+      // Recorded before the removal below, and both are synchronous — see
+      // outbox.js for why that ordering is what makes this visible to
+      // whichever tab's syncWrite enqueued the item.
+      recordDropOutcome(head.id, error)
       saveOutbox(getOutbox().slice(1))
       continue
     }
@@ -209,9 +199,13 @@ export async function syncWrite(type, payload) {
   while (stillQueued(item) && drainSeenSeq < seq) await flushOutbox()
   if (stillQueued(item)) return { ok: false, queued: true }
 
-  if (dropOutcomes.has(item.id)) {
-    const error = dropOutcomes.get(item.id)
-    dropOutcomes.delete(item.id)
+  // The drop record (if any) lives in localStorage precisely because the
+  // drain that removed this item may have run in a different tab — see
+  // outbox.js. A tab-local map here would silently misreport a drop made
+  // by another tab as a delivery.
+  const error = getDropOutcome(item.id)
+  if (error) {
+    clearDropOutcome(item.id)
     return { ok: false, queued: false, error }
   }
   return { ok: true }

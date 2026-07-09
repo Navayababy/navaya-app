@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 vi.mock('./db.js', () => ({
   insertFeedSession: vi.fn(),
@@ -9,6 +9,8 @@ vi.mock('./db.js', () => ({
   insertMedicineLog: vi.fn(),
   deleteMedicineLog: vi.fn(),
   insertSleepLog: vi.fn(),
+  updateSleepLog: vi.fn(),
+  upsertSleepLog: vi.fn(),
   deleteSleepLog: vi.fn(),
 }))
 vi.mock('./supabase.js', () => ({
@@ -284,5 +286,116 @@ describe('flushOutbox', () => {
 
     const result = await flushOutbox()
     expect(result).toMatchObject({ flushed: 0, pending: 1 })
+  })
+})
+
+// Two tabs of the app are two separate JS realms — each gets its own copy
+// of sync.js's module state (enqueueSeq, inFlight, and formerly the
+// in-memory dropOutcomes map) but they share the SAME localStorage. The
+// most faithful in-process simulation of that is two independent module
+// instances loaded via vi.resetModules(), sharing only the jsdom
+// localStorage global — exactly mirroring what two real tabs share.
+//
+// A genuine mutual-exclusion lock is essential here, not a formality:
+// without one, both realms' own unlocked drains race the shared queue
+// independently and can BOTH attempt the same item (the exact defect the
+// real navigator.locks integration exists to prevent) — which would make
+// these tests fail for the wrong reason and prove nothing about outcome
+// reporting specifically.
+function fakeExclusiveLock() {
+  let tail = Promise.resolve()
+  return {
+    request: (_name, cb) => {
+      const run = tail.then(cb)
+      tail = run.catch(() => {})
+      return run
+    },
+  }
+}
+
+describe('cross-tab outcome visibility', () => {
+  afterEach(() => { delete navigator.locks })
+
+  // db.js (the network layer) is intercepted once for the whole test file
+  // by vi.mock — both simulated tabs share the same insertFeedSession spy,
+  // which matches reality: it's sync.js's own module state (enqueueSeq,
+  // drainSeenSeq, inFlight) that's genuinely per-tab, not the network
+  // client. Two fresh sync.js instances is therefore the right amount of
+  // "two tabs" to simulate; a shared call count is how we confirm only
+  // one of them ever actually attempted delivery for a given item.
+  it('reports a drop performed by another tab, not a false delivery', async () => {
+    navigator.locks = fakeExclusiveLock()
+
+    vi.resetModules()
+    const tabA = await import('./sync.js')
+    // The mock signals once it's actually been called, rather than the
+    // test guessing how many microtask ticks the fake lock and drain()'s
+    // own internal awaits need before reaching it.
+    let resolveSeed, seedCalled
+    const seedCalledPromise = new Promise(resolve => { seedCalled = resolve })
+    insertFeedSession
+      .mockImplementationOnce(() => {
+        const p = new Promise(resolve => { resolveSeed = resolve })
+        seedCalled()
+        return p
+      })
+      .mockImplementation(duplicateKey)
+
+    vi.resetModules()
+    const tabB = await import('./sync.js')
+
+    // Tab A is already mid-attempt on an earlier write of its own — and
+    // therefore already holds the lock — at the moment Tab B's write joins
+    // the shared queue.
+    enqueue('feed.insert', { id: 'seed' })
+    const aFlush = tabA.flushOutbox()
+
+    // Tab B enqueues and requests the (currently held) lock — queued
+    // behind Tab A, exactly as it would be behind a real tab's Web Lock.
+    const bWrite = tabB.syncWrite('feed.insert', { id: 'x' })
+
+    // Tab A's seed attempt now resolves; its drain continues on to Tab
+    // B's item next (still holding the lock throughout) and permanently
+    // rejects it. Exactly two attempts total (seed, then x) proves Tab B's
+    // own drain never got a turn at x — it was still queued on the lock.
+    await seedCalledPromise
+    resolveSeed({ error: null })
+    await aFlush
+    expect(insertFeedSession).toHaveBeenCalledTimes(2)
+
+    const result = await bWrite
+    expect(result).toMatchObject({ ok: false, queued: false })
+    expect(result.error).toMatchObject({ code: '23505' })
+  })
+
+  it('reports a delivery performed by another tab as ok, not stuck queued', async () => {
+    navigator.locks = fakeExclusiveLock()
+
+    vi.resetModules()
+    const tabA = await import('./sync.js')
+    let resolveSeed, seedCalled
+    const seedCalledPromise = new Promise(resolve => { seedCalled = resolve })
+    insertFeedSession
+      .mockImplementationOnce(() => {
+        const p = new Promise(resolve => { resolveSeed = resolve })
+        seedCalled()
+        return p
+      })
+      .mockImplementation(ok)
+
+    vi.resetModules()
+    const tabB = await import('./sync.js')
+
+    enqueue('feed.insert', { id: 'seed' })
+    const aFlush = tabA.flushOutbox()
+    const bWrite = tabB.syncWrite('feed.insert', { id: 'y' })
+
+    await seedCalledPromise
+    resolveSeed({ error: null })
+    await aFlush
+    expect(insertFeedSession).toHaveBeenCalledTimes(2)
+
+    const result = await bWrite
+    expect(result).toMatchObject({ ok: true })
   })
 })
