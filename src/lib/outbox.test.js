@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { getOutbox, saveOutbox, enqueue, outboxSize, recordDropOutcome, getDropOutcome, clearDropOutcome } from './outbox.js'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { getOutbox, saveOutbox, enqueue, outboxSize, recordDropOutcome, getDropOutcome, clearDropOutcome, withOutboxLock } from './outbox.js'
 
 beforeEach(() => localStorage.clear())
 
@@ -87,5 +87,34 @@ describe('drop outcomes', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('withOutboxLock', () => {
+  afterEach(() => { delete navigator.locks })
+
+  it('routes through navigator.locks under the shared lock name when available', async () => {
+    const request = vi.fn((_name, cb) => Promise.resolve().then(cb))
+    navigator.locks = { request }
+
+    const result = await withOutboxLock(() => 'result')
+    expect(result).toBe('result')
+    expect(request).toHaveBeenCalledWith('navaya_outbox_drain', expect.any(Function))
+  })
+
+  it('falls back to calling fn directly when the Web Locks API is unavailable', async () => {
+    delete navigator.locks
+    const result = await withOutboxLock(() => 'result')
+    expect(result).toBe('result')
+  })
+
+  it('propagates a rejection from fn without leaving the lock permanently held', async () => {
+    const request = vi.fn((_name, cb) => Promise.resolve().then(cb))
+    navigator.locks = { request }
+
+    await expect(withOutboxLock(() => { throw new Error('boom') })).rejects.toThrow('boom')
+    // A second acquisition must still succeed — the failed callback must
+    // not have wedged the (fake) lock for subsequent callers.
+    await expect(withOutboxLock(() => 'ok')).resolves.toBe('ok')
   })
 })

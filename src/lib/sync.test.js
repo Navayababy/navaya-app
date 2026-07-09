@@ -323,79 +323,155 @@ describe('cross-tab outcome visibility', () => {
   // client. Two fresh sync.js instances is therefore the right amount of
   // "two tabs" to simulate; a shared call count is how we confirm only
   // one of them ever actually attempted delivery for a given item.
+  //
+  // enqueue() is now itself lock-protected (see outbox.js), so Tab B's
+  // item genuinely cannot exist in the shared queue until Tab B's own
+  // enqueue has been granted the lock and released it — Tab A can no
+  // longer "catch" Tab B's write mid-attempt the way it could when only
+  // drain() held the lock. The scenario that DOES still happen in
+  // production, and is worth proving correct, is narrower but real: Tab
+  // B's write lands, then — before Tab B's own post-enqueue flush gets
+  // the lock back — something in Tab A (its periodic timer, another of
+  // Tab A's own writes) wins the next lock acquisition and processes it
+  // first. A manual gate makes that ordering deterministic instead of
+  // racing real microtask timing: everything queues up behind the gate in
+  // a known order, so releasing it plays out exactly this scenario.
   it('reports a drop performed by another tab, not a false delivery', async () => {
-    navigator.locks = fakeExclusiveLock()
+    const lock = fakeExclusiveLock()
+    navigator.locks = lock
 
     vi.resetModules()
     const tabA = await import('./sync.js')
-    // The mock signals once it's actually been called, rather than the
-    // test guessing how many microtask ticks the fake lock and drain()'s
-    // own internal awaits need before reaching it.
-    let resolveSeed, seedCalled
-    const seedCalledPromise = new Promise(resolve => { seedCalled = resolve })
-    insertFeedSession
-      .mockImplementationOnce(() => {
-        const p = new Promise(resolve => { resolveSeed = resolve })
-        seedCalled()
-        return p
-      })
-      .mockImplementation(duplicateKey)
+    insertFeedSession.mockImplementation(duplicateKey)
 
     vi.resetModules()
     const tabB = await import('./sync.js')
 
-    // Tab A is already mid-attempt on an earlier write of its own — and
-    // therefore already holds the lock — at the moment Tab B's write joins
-    // the shared queue.
-    enqueue('feed.insert', { id: 'seed' })
+    let releaseGate
+    const gate = new Promise(resolve => { releaseGate = resolve })
+    const gateHeld = lock.request('gate', () => gate)
+
+    // Tab B's enqueue queues behind the gate.
+    const bWrite = tabB.syncWrite('feed.insert', { id: 'x' })
+    // Tab A's flush queues behind Tab B's enqueue — registered now, before
+    // Tab B's own post-enqueue flush exists, so it wins the lock the
+    // moment the gate opens and Tab B's enqueue clears.
     const aFlush = tabA.flushOutbox()
 
-    // Tab B enqueues and requests the (currently held) lock — queued
-    // behind Tab A, exactly as it would be behind a real tab's Web Lock.
-    const bWrite = tabB.syncWrite('feed.insert', { id: 'x' })
-
-    // Tab A's seed attempt now resolves; its drain continues on to Tab
-    // B's item next (still holding the lock throughout) and permanently
-    // rejects it. Exactly two attempts total (seed, then x) proves Tab B's
-    // own drain never got a turn at x — it was still queued on the lock.
-    await seedCalledPromise
-    resolveSeed({ error: null })
+    releaseGate()
+    await gateHeld
     await aFlush
-    expect(insertFeedSession).toHaveBeenCalledTimes(2)
 
     const result = await bWrite
     expect(result).toMatchObject({ ok: false, queued: false })
     expect(result.error).toMatchObject({ code: '23505' })
+    expect(insertFeedSession).toHaveBeenCalledTimes(1)
   })
 
   it('reports a delivery performed by another tab as ok, not stuck queued', async () => {
-    navigator.locks = fakeExclusiveLock()
+    const lock = fakeExclusiveLock()
+    navigator.locks = lock
 
     vi.resetModules()
     const tabA = await import('./sync.js')
-    let resolveSeed, seedCalled
-    const seedCalledPromise = new Promise(resolve => { seedCalled = resolve })
-    insertFeedSession
-      .mockImplementationOnce(() => {
-        const p = new Promise(resolve => { resolveSeed = resolve })
-        seedCalled()
-        return p
-      })
-      .mockImplementation(ok)
+    insertFeedSession.mockImplementation(ok)
 
     vi.resetModules()
     const tabB = await import('./sync.js')
 
-    enqueue('feed.insert', { id: 'seed' })
-    const aFlush = tabA.flushOutbox()
-    const bWrite = tabB.syncWrite('feed.insert', { id: 'y' })
+    let releaseGate
+    const gate = new Promise(resolve => { releaseGate = resolve })
+    const gateHeld = lock.request('gate', () => gate)
 
-    await seedCalledPromise
-    resolveSeed({ error: null })
+    const bWrite = tabB.syncWrite('feed.insert', { id: 'y' })
+    const aFlush = tabA.flushOutbox()
+
+    releaseGate()
+    await gateHeld
     await aFlush
-    expect(insertFeedSession).toHaveBeenCalledTimes(2)
 
     const result = await bWrite
     expect(result).toMatchObject({ ok: true })
+    expect(insertFeedSession).toHaveBeenCalledTimes(1)
+  })
+
+  // The bug this whole PR fixes: enqueue() predated the lock and two tabs
+  // could each read the queue, build their own version with their own new
+  // item, and whichever committed last would silently erase the other's
+  // write — with the erased write's own syncWrite still reporting
+  // { ok: true }, since nothing ever recorded it as dropped (there was
+  // nothing TO drop; it just never existed).
+  //
+  // That race needs genuine OS-level thread interleaving to manifest —
+  // two real tabs each running their own fully-synchronous
+  // read-then-write with no yield point in between, interleaved at a
+  // granularity no single-threaded test runner can force. A test that
+  // tries to "simulate" it by calling two enqueues back to back proves
+  // nothing either way: without a lock, the first call's synchronous
+  // read+write completes entirely before the second call is even made,
+  // so nothing can race in this process regardless of whether the source
+  // has a lock — confirmed by deliberately reverting the fix locally and
+  // watching the naive version of this test keep passing. What IS
+  // mechanically provable, and is what actually prevents the race in a
+  // real multi-tab browser: syncWrite's enqueue step unconditionally
+  // acquires the shared cross-tab lock before touching the queue, for
+  // every write, with no path around it. That is asserted directly below.
+  it('does not commit to the shared queue until the cross-tab lock is granted', async () => {
+    // navigator.locks.request() is never synchronous — even an
+    // immediately-grantable lock defers its callback by at least one
+    // microtask, in every real implementation and per spec. So if
+    // syncWrite's enqueue step is genuinely gated behind it, the item
+    // cannot yet be visible in the shared queue in the same synchronous
+    // stretch of code that calls syncWrite — only once that call is
+    // awaited. (Checking "was navigator.locks.request called at all"
+    // doesn't discriminate here: flushOutbox's own drain() always
+    // acquires the lock regardless of whether enqueue does, so a naive
+    // call-count assertion passes whether or not the fix is present —
+    // confirmed by deliberately reverting locally. Checking queue
+    // visibility at this exact synchronous point is what actually
+    // distinguishes the two.)
+    navigator.locks = { request: (_name, cb) => Promise.resolve().then(cb) }
+
+    vi.resetModules()
+    const tab = await import('./sync.js')
+    insertFeedSession.mockImplementation(ok)
+
+    const writePromise = tab.syncWrite('feed.insert', { id: 'a' })
+    expect(getOutbox()).toEqual([])
+
+    await writePromise
+    expect(getOutbox()).toEqual([]) // delivered and removed, not stranded
+  })
+
+  // The gate technique still has real value once the lock is confirmed
+  // present: it proves that when the lock IS engaged (as the test above
+  // shows it always is), two writers queued behind it both survive —
+  // i.e. the lock's serialisation, once acquired, is actually sufficient
+  // to prevent the clobber, not merely present.
+  it('delivers both writes when two tabs\' enqueues are serialised by the lock', async () => {
+    const lock = fakeExclusiveLock()
+    navigator.locks = lock
+
+    vi.resetModules()
+    const tabA = await import('./sync.js')
+    insertFeedSession.mockImplementation(ok)
+
+    vi.resetModules()
+    const tabB = await import('./sync.js')
+
+    let releaseGate
+    const gate = new Promise(resolve => { releaseGate = resolve })
+    const gateHeld = lock.request('gate', () => gate)
+
+    const aWrite = tabA.syncWrite('feed.insert', { id: 'a' })
+    const bWrite = tabB.syncWrite('feed.insert', { id: 'b' })
+
+    releaseGate()
+    await gateHeld
+    await Promise.all([aWrite, bWrite])
+
+    expect(insertFeedSession).toHaveBeenCalledTimes(2)
+    const deliveredIds = insertFeedSession.mock.calls.map(([p]) => p.id).sort()
+    expect(deliveredIds).toEqual(['a', 'b'])
   })
 })
