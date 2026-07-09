@@ -7,6 +7,13 @@
 // edited times used to get overwritten. A write that cannot deliver yet
 // (offline, signed out, server hiccup) simply waits in the queue for the
 // next flush; an edit can never overtake the insert it depends on.
+//
+// syncWrite makes the write durable (via outbox.js's stageItem) before it
+// does anything else, deliberately before requesting the lock that joining
+// the canonical queue requires — that lock can legitimately be held for
+// seconds (drain() mid network call), and gating the only durable copy of
+// a write behind it means closing the app during that wait loses the
+// write outright.
 
 import {
   insertFeedSession, updateFeedSession, deleteFeedSession,
@@ -15,7 +22,7 @@ import {
   insertSleepLog, updateSleepLog, upsertSleepLog, deleteSleepLog,
 } from './db.js'
 import { supabase, isSupabaseConfigured } from './supabase.js'
-import { getOutbox, saveOutbox, enqueue, recordDropOutcome, getDropOutcome, clearDropOutcome, withOutboxLock } from './outbox.js'
+import { getOutbox, saveOutbox, stageItem, foldPendingItems, recordDropOutcome, getDropOutcome, clearDropOutcome, withOutboxLock } from './outbox.js'
 import { logError } from './logError.js'
 
 const MAX_ATTEMPTS = 8
@@ -105,6 +112,13 @@ function runDrain() {
 
 async function drain() {
   let flushed = 0
+  // Recovers anything staged (see syncWrite/stageItem in outbox.js) but
+  // never folded into the canonical queue — most commonly because the
+  // tab that staged it closed while this lock was held elsewhere. Runs on
+  // every pass, not just when this tab knows it staged something itself:
+  // a fold with nothing pending is a cheap no-op, and this is the only
+  // thing that recovers an orphaned write left by a DIFFERENT tab/session.
+  foldPendingItems()
   // Unconfigured builds can never deliver — everything pending counts as
   // considered, like the other blocked exits below.
   if (!isSupabaseConfigured) {
@@ -184,17 +198,28 @@ async function drain() {
 const stillQueued = (item) => getOutbox().some(queued => queued.id === item.id)
 
 export async function syncWrite(type, payload) {
-  // The seq bump and the actual queue write must land atomically with
-  // respect to every other tab's enqueue/drain — otherwise a drain
-  // elsewhere could read drainSeenSeq forward of this seq before this
-  // item is actually in the queue, and this call's own stillQueued check
-  // would then see "not queued" for an item that was never written at
-  // all, misreporting a lost write as delivered. withOutboxLock makes
-  // that one atomic unit, cross-tab.
+  // Durable the instant this is called, before the lock below is even
+  // requested — see stageItem in outbox.js for why that has to be
+  // unlocked. This is what stops a slow drain() elsewhere (mid network
+  // call, possibly for seconds) from creating a window where the write
+  // exists nowhere durable and closing the app loses it outright.
+  const staged = stageItem(type, payload)
+  // The seq bump and the item's actual arrival in the canonical queue
+  // must land atomically with respect to every other tab's fold/drain —
+  // otherwise a drain elsewhere could read drainSeenSeq forward of this
+  // seq before the item is actually there, and this call's own
+  // stillQueued check would then see "not queued" for an item that
+  // hasn't landed yet, misreporting a still-pending write as delivered.
+  // withOutboxLock makes that one atomic unit, cross-tab. foldPendingItems
+  // sweeps every currently-staged item, not just this one — if another
+  // tab's fold already picked `staged` up (visible the moment it was
+  // staged, regardless of who eventually folds it), this call's own fold
+  // finds nothing to do for it and that's fine: `staged` is what this
+  // call cares about, not which fold happened to move it.
   const { seq, item } = await withOutboxLock(() => {
     const seq = ++enqueueSeq
-    const item = enqueue(type, payload)
-    return { seq, item }
+    foldPendingItems()
+    return { seq, item: staged }
   })
   await flushOutbox()
   // A drain already in flight re-reads the queue between items, so it

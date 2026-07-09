@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { getOutbox, saveOutbox, enqueue, outboxSize, recordDropOutcome, getDropOutcome, clearDropOutcome, withOutboxLock } from './outbox.js'
+import { getOutbox, saveOutbox, enqueue, outboxSize, recordDropOutcome, getDropOutcome, clearDropOutcome, withOutboxLock, stageItem, foldPendingItems } from './outbox.js'
 
 beforeEach(() => localStorage.clear())
 
@@ -87,6 +87,78 @@ describe('drop outcomes', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+// stageItem is the durability fix: a write recorded here survives even if
+// the caller never gets to fold it into the canonical queue (e.g. the app
+// closes while withOutboxLock is held elsewhere for a long time — see
+// sync.js). foldPendingItems is the recovery half, and is what makes
+// staging actually deliverable, since drain() only ever reads the
+// canonical queue.
+describe('stageItem / foldPendingItems', () => {
+  it('is durable immediately, independent of ever being folded', () => {
+    const item = stageItem('feed.insert', { id: 'a' })
+    // Nothing has folded it yet — the canonical queue doesn't have it...
+    expect(getOutbox()).toEqual([])
+    // ...but it already exists somewhere durable, keyed by its own id, so
+    // it isn't lost even if nothing ever folds it in this session.
+    const raw = localStorage.getItem(`navaya_outbox_pending_${item.id}`)
+    expect(JSON.parse(raw)).toMatchObject({ type: 'feed.insert', payload: { id: 'a' } })
+  })
+
+  it('folds a staged item into the canonical queue and clears its staging key', () => {
+    const item = stageItem('feed.insert', { id: 'a' })
+    foldPendingItems()
+    expect(getOutbox()).toMatchObject([{ id: item.id, type: 'feed.insert', payload: { id: 'a' } }])
+    expect(localStorage.getItem(`navaya_outbox_pending_${item.id}`)).toBeNull()
+  })
+
+  it('is a no-op with nothing staged', () => {
+    foldPendingItems()
+    expect(getOutbox()).toEqual([])
+  })
+
+  it('skips an item that already exists in the canonical queue', () => {
+    // Simulates a concurrent fold (from another tab) having already
+    // picked this item up before this call's own fold runs.
+    const item = stageItem('feed.insert', { id: 'a' })
+    saveOutbox([{ ...item }])
+    foldPendingItems()
+    expect(getOutbox()).toHaveLength(1) // not duplicated
+    expect(localStorage.getItem(`navaya_outbox_pending_${item.id}`)).toBeNull() // still cleaned up
+  })
+
+  it('drops an unparseable staged entry rather than wedging every future fold on it', () => {
+    localStorage.setItem('navaya_outbox_pending_bad', '{not json')
+    foldPendingItems()
+    expect(getOutbox()).toEqual([])
+    expect(localStorage.getItem('navaya_outbox_pending_bad')).toBeNull()
+  })
+
+  it('orders same-millisecond items from the SAME tab correctly, never by chance', () => {
+    // Same queuedAt forces the fold to fall through to the tab+tabSeq
+    // tiebreaker — without it, two rapid same-tab writes (e.g. a sleep's
+    // raw stop time immediately followed by its corrected confirm) could
+    // fold in the wrong relative order purely from clock resolution.
+    vi.useFakeTimers()
+    try {
+      const first = stageItem('feed.insert', { id: 'first' })
+      const second = stageItem('feed.update', { id: 'second' })
+      expect(first.queuedAt).toBe(second.queuedAt) // same fake-timer instant
+      expect(first.tab).toBe(second.tab) // same module instance = same tab
+      foldPendingItems()
+      expect(getOutbox().map(i => i.payload.id)).toEqual(['first', 'second'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('appends staged items after whatever is already in the canonical queue', () => {
+    enqueue('feed.insert', { id: 'existing' })
+    stageItem('feed.insert', { id: 'new' })
+    foldPendingItems()
+    expect(getOutbox().map(i => i.payload.id)).toEqual(['existing', 'new'])
   })
 })
 
