@@ -77,13 +77,21 @@ function recordDrop(item, error) {
 
 let inFlight = null
 
-// Every enqueue through syncWrite bumps enqueueSeq; the drain records the
-// value it saw at its most recent read of a queue it was willing to
-// process. Together they answer the one question syncWrite has after
-// awaiting a flush that left its item queued: did that drain ever consider
-// the item (genuinely blocked — offline, signed out, failing write ahead),
-// or was it an in-flight pass that took its final look a moment before the
-// enqueue landed and must be re-run?
+// Every enqueue through syncWrite bumps enqueueSeq; drainSeenSeq is the
+// highest enqueue the drain has CONSIDERED — delivered, dropped, or
+// determined blocked. Together they answer the one question syncWrite has
+// after awaiting a flush that left its item queued: was the item
+// considered (genuinely blocked, next flush trigger owns it), or did an
+// in-flight pass exit before ever weighing it, so a fresh flush is owed?
+//
+// What counts as considered follows from FIFO, not from what the drain
+// happened to read: a transient head failure — and likewise the offline
+// and signed-out gates — blocks every item in the queue at that instant,
+// including ones enqueued mid-attempt the drain never laid eyes on. Those
+// exits mark the queue considered as of NOW (enqueueSeq). Only the
+// empty-queue exit is really about what was read: an item enqueued after
+// that final read was never weighed at all, so that exit keeps the
+// read-time value and the writer's re-flush picks the item up.
 let enqueueSeq = 0
 let drainSeenSeq = 0
 
@@ -99,8 +107,10 @@ async function drain() {
   let flushed = 0
   if (!isSupabaseConfigured) return { flushed, pending: getOutbox().length }
   // No point attempting while the browser knows it is offline; the 'online'
-  // event triggers the next flush.
+  // event triggers the next flush. Being offline blocks everything queued,
+  // so the whole pending queue counts as considered.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    drainSeenSeq = enqueueSeq
     return { flushed, pending: getOutbox().length }
   }
   // Same for a signed-out device: RLS rejects everything with a coded error,
@@ -109,7 +119,10 @@ async function drain() {
   // session expired mid-nap). Hold the queue; sign-in triggers a flush.
   if (supabase?.auth && getOutbox().length) {
     const { data } = await supabase.auth.getSession()
-    if (!data?.session) return { flushed, pending: getOutbox().length }
+    if (!data?.session) {
+      drainSeenSeq = enqueueSeq
+      return { flushed, pending: getOutbox().length }
+    }
   }
 
   // Head-of-line: stop at the first transient failure so later writes can
@@ -118,9 +131,9 @@ async function drain() {
     // Captured before the read, so an enqueue racing the read can only make
     // the drain look staler than it was — a false "unseen" costs one spare
     // flush; the reverse would silently strand a write until the next timer.
-    const seenSeq = enqueueSeq
+    const seqBeforeRead = enqueueSeq
     const items = getOutbox()
-    if (!items.length) { drainSeenSeq = seenSeq; break }
+    if (!items.length) { drainSeenSeq = seqBeforeRead; break }
     const head = items[0]
     const { error } = await attempt(head.type, head.payload)
 
@@ -142,7 +155,11 @@ async function drain() {
       const current = getOutbox()
       saveOutbox([{ ...current[0], attempts: (current[0].attempts || 0) + 1 }, ...current.slice(1)])
     }
-    drainSeenSeq = seenSeq
+    // The failing head blocks the entire queue as of this instant — writes
+    // that joined while the attempt was in flight included. Marking only
+    // the pre-read sequence here would send those writers into a fresh
+    // flush that retries this same head a second time.
+    drainSeenSeq = enqueueSeq
     break
   }
 

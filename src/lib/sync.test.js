@@ -111,6 +111,28 @@ describe('syncWrite', () => {
     expect(insertFeedSession).not.toHaveBeenCalled()
   })
 
+  it('does not retry a failing head for a write that joined mid-attempt', async () => {
+    // The head's attempt is already in flight when the new write enqueues.
+    // The head's failure blocks the whole queue as of that instant, so the
+    // new writer must not launch a fresh flush that retries the head again.
+    let failHead
+    updateFeedSession.mockImplementation(() => new Promise(resolve => { failHead = resolve }))
+    enqueue('feed.update', { id: 'a', moodScore: 4 })
+    const headFlush = flushOutbox()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    insertFeedSession.mockImplementation(ok)
+    const writePromise = syncWrite('feed.insert', { id: 'b' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    failHead({ error: { code: 'PGRST116', message: 'no rows returned' } })
+
+    await headFlush
+    expect(await writePromise).toMatchObject({ ok: false, queued: true })
+    expect(updateFeedSession).toHaveBeenCalledTimes(1)
+    expect(getOutbox().map(i => i.type)).toEqual(['feed.update', 'feed.insert'])
+    expect(getOutbox()[0].attempts).toBe(1)
+  })
+
   it('queues behind pending items so order is preserved', async () => {
     insertFeedSession.mockImplementation(networkFail)
     await syncWrite('feed.insert', { id: 'a' })
