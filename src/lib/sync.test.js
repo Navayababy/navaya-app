@@ -58,6 +58,44 @@ describe('syncWrite', () => {
     expect(outboxSize()).toBe(0)
   })
 
+  it('delivers concurrent writes strictly in call order even when the first is slow', async () => {
+    // The raw-stop-time write hangs on a slow network while the user
+    // adjusts times and saves: the corrected write must wait behind it,
+    // never overtake it and get overwritten.
+    const calls = []
+    let releaseInsert
+    insertFeedSession.mockImplementation((p) => new Promise(resolve => {
+      calls.push(['insert', p.id])
+      releaseInsert = resolve
+    }))
+    updateFeedSession.mockImplementation((id) => { calls.push(['update', id]); return ok() })
+
+    const first  = syncWrite('feed.insert', { id: 'a' })
+    const second = syncWrite('feed.update', { id: 'a', moodScore: 4 })
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(updateFeedSession).not.toHaveBeenCalled()
+
+    releaseInsert({ error: null })
+    const [r1, r2] = await Promise.all([first, second])
+    expect(r1).toMatchObject({ ok: true })
+    expect(r2).toMatchObject({ ok: true })
+    expect(calls).toEqual([['insert', 'a'], ['update', 'a']])
+    expect(outboxSize()).toBe(0)
+  })
+
+  it('reports a drop to the caller whose write was dropped, not its neighbours', async () => {
+    insertFeedSession.mockImplementation(ok)
+    deleteFeedSession.mockImplementation(duplicateKey)
+    const [insertResult, deleteResult] = await Promise.all([
+      syncWrite('feed.insert', { id: 'a' }),
+      syncWrite('feed.delete', { id: 'b' }),
+    ])
+    expect(insertResult).toMatchObject({ ok: true })
+    expect(deleteResult).toMatchObject({ ok: false, queued: false })
+    expect(deleteResult.error).toMatchObject({ code: '23505' })
+    expect(outboxSize()).toBe(0)
+  })
+
   it('queues behind pending items so order is preserved', async () => {
     insertFeedSession.mockImplementation(networkFail)
     await syncWrite('feed.insert', { id: 'a' })

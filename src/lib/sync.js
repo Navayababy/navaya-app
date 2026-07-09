@@ -1,8 +1,12 @@
-// All shared-mode Supabase writes flow through syncWrite. A write is attempted
-// immediately; if it fails (offline, server hiccup) it joins the outbox and is
-// retried in order on the next flush. Queue order is never bypassed: while
-// items are pending, new writes join the back of the queue, so an edit can
-// never overtake the insert it depends on.
+// All shared-mode Supabase writes flow through syncWrite, and every write
+// joins the outbox: a single-flight drain is the only code that talks to
+// the server, so writes always deliver strictly in call order. There is
+// deliberately NO fast path that bypasses the queue — two writes racing
+// each other over the network (a timer's raw stop time vs the corrected
+// confirm that follows it) can land in either order, which is exactly how
+// edited times used to get overwritten. A write that cannot deliver yet
+// (offline, signed out, server hiccup) simply waits in the queue for the
+// next flush; an edit can never overtake the insert it depends on.
 
 import {
   insertFeedSession, updateFeedSession, deleteFeedSession,
@@ -58,6 +62,19 @@ async function attempt(type, payload) {
   }
 }
 
+// Errors for items the drain dropped (permanent rejection or retry cap),
+// keyed by queue id, so the syncWrite awaiting that flush can report
+// { queued: false } with the cause instead of mistaking the drop for a
+// delivery. Each writer reads its entry once; entries nobody awaits
+// (drops during timer flushes) are cleared wholesale at a safety bound.
+const dropOutcomes = new Map()
+
+function recordDrop(item, error) {
+  if (!item.id) return
+  if (dropOutcomes.size > 100) dropOutcomes.clear()
+  dropOutcomes.set(item.id, error)
+}
+
 let inFlight = null
 
 export function flushOutbox() {
@@ -102,6 +119,7 @@ async function drain() {
     if (isPermanent(error) || (countsTowardCap(error) && (head.attempts || 0) + 1 >= MAX_ATTEMPTS)) {
       console.error('Dropping unsyncable change:', head.type, error)
       logError(`sync.drop:${head.type}`, error)
+      recordDrop(head, error)
       saveOutbox(getOutbox().slice(1))
       continue
     }
@@ -116,24 +134,25 @@ async function drain() {
   return { flushed, pending: getOutbox().length }
 }
 
+const stillQueued = (item) => getOutbox().some(queued => queued.id === item.id)
+
 export async function syncWrite(type, payload) {
+  const item = enqueue(type, payload)
   await flushOutbox()
+  // A drain already in flight re-reads the queue between items, so it
+  // normally picks this write up — but it may have taken its final look a
+  // moment before the enqueue landed. One fresh flush closes that gap: it
+  // is guaranteed to have started after the enqueue, so if the item is
+  // still queued afterwards, delivery is genuinely blocked (offline,
+  // signed out, or a failing write ahead of it) and the next flush
+  // trigger owns it.
+  if (stillQueued(item)) await flushOutbox()
+  if (stillQueued(item)) return { ok: false, queued: true }
 
-  // Something is still queued — keep strict ordering by queueing behind it
-  if (getOutbox().length) {
-    enqueue(type, payload)
-    return { ok: false, queued: true }
-  }
-
-  const { error } = await attempt(type, payload)
-  if (!error) return { ok: true }
-
-  if (isPermanent(error)) {
-    console.error('Write rejected by server:', type, error)
-    logError(`sync.reject:${type}`, error)
+  if (dropOutcomes.has(item.id)) {
+    const error = dropOutcomes.get(item.id)
+    dropOutcomes.delete(item.id)
     return { ok: false, queued: false, error }
   }
-
-  enqueue(type, payload)
-  return { ok: false, queued: true }
+  return { ok: true }
 }
