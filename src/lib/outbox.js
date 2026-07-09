@@ -152,6 +152,12 @@ export function stageItem(type, payload) {
 // shared queue.
 export function foldPendingItems() {
   const pendingKeys = []
+  // A concurrent stageItem from another tab, landing between two
+  // iterations of this scan, can be missed this pass — self-healing, not
+  // a correctness issue: the staging tab's own subsequent syncWrite folds
+  // shortly after (its key is untouched), and every drain() pass folds
+  // unconditionally anyway, so the item converges within one extra pass
+  // at worst, never lost.
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i)
     if (key?.startsWith(PENDING_PREFIX)) pendingKeys.push(key)

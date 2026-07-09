@@ -154,6 +154,35 @@ describe('stageItem / foldPendingItems', () => {
     }
   })
 
+  it('preserves same-tab order even when recovered by a DIFFERENT module instance', async () => {
+    // The harder version of the previous test: TAB_INSTANCE/stageSeq are
+    // module-level state, freshly re-initialised on every real page
+    // load — so the tiebreaker's guarantee is only meaningful if it
+    // survives being read back by code that never assigned it, e.g. a
+    // relaunch recovering writes orphaned by a closed tab. Same-millisecond
+    // timestamps here stand in for two writes close enough in wall-clock
+    // time that queuedAt alone can't distinguish them (the realistic case
+    // is seconds apart via a full page reload — see outbox.js's comment
+    // on foldPendingItems — but the tiebreaker must hold at the tightest
+    // possible spacing too, not just the common case).
+    vi.useFakeTimers()
+    try {
+      vi.resetModules()
+      const session1 = await import('./outbox.js')
+      session1.stageItem('sleep.update', { id: 's1', phase: 'raw-stop' })
+      session1.stageItem('sleep.update', { id: 's1', phase: 'confirm' })
+      // Session 1 closes before folding either — orphaned, exactly like
+      // an app closed mid-flow.
+
+      vi.resetModules()
+      const session2 = await import('./outbox.js') // fresh TAB_INSTANCE, fresh stageSeq
+      session2.foldPendingItems()
+      expect(session2.getOutbox().map(i => i.payload.phase)).toEqual(['raw-stop', 'confirm'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('appends staged items after whatever is already in the canonical queue', () => {
     enqueue('feed.insert', { id: 'existing' })
     stageItem('feed.insert', { id: 'new' })
