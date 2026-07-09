@@ -166,6 +166,16 @@ export function foldPendingItems() {
 
   const current = getOutbox()
   const currentIds = new Set(current.map(i => i.id))
+  // Pending keys are cleared in two different moments, deliberately: a
+  // key whose item is already durably in the canonical queue (or was
+  // never parseable — nothing recoverable either way) is safe to clear
+  // right away. A key whose item is NOT yet in the canonical queue must
+  // stay in place until the save below actually succeeds — clearing it
+  // first (as an earlier version of this function did) means a failed
+  // save (e.g. QuotaExceededError, realistic for a device that's
+  // accumulated a large offline backlog) leaves the write in NEITHER
+  // place: removed from staging, never landed in the queue. Durable then
+  // lost, exactly the failure this whole mechanism exists to prevent.
   const toAdd = []
   for (const key of pendingKeys) {
     let item = null
@@ -174,24 +184,34 @@ export function foldPendingItems() {
     } catch {
       // Corrupt entry — nothing recoverable, drop it rather than wedge
       // every future fold on the same unparseable key.
+      localStorage.removeItem(key)
+      continue
     }
-    localStorage.removeItem(key)
     // Defensive, not load-bearing under normal operation: stageItem's
     // ids are always fresh, and folding always clears a pending key in
     // the same pass it adds the item, so a pending key whose id is
     // ALREADY in the canonical queue shouldn't arise in practice. Kept
     // as a cheap guard against ever double-adding, rather than trusting
-    // that invariant to hold forever as this file changes.
-    if (item && !currentIds.has(item.id)) toAdd.push(item)
+    // that invariant to hold forever as this file changes. Safe to clear
+    // immediately: the item is already durable in the canonical queue.
+    if (currentIds.has(item.id)) {
+      localStorage.removeItem(key)
+      continue
+    }
+    toAdd.push({ key, item })
   }
   if (!toAdd.length) return
 
   toAdd.sort((a, b) => {
-    if (a.queuedAt !== b.queuedAt) return a.queuedAt - b.queuedAt
-    if (a.tab !== b.tab) return a.tab < b.tab ? -1 : 1
-    return a.tabSeq - b.tabSeq
+    if (a.item.queuedAt !== b.item.queuedAt) return a.item.queuedAt - b.item.queuedAt
+    if (a.item.tab !== b.item.tab) return a.item.tab < b.item.tab ? -1 : 1
+    return a.item.tabSeq - b.item.tabSeq
   })
-  saveOutbox([...current, ...toAdd])
+  // If this throws, every pending key above is still untouched — still
+  // durable, still recoverable by the next fold. Only clear them once
+  // the canonical queue genuinely has the items.
+  saveOutbox([...current, ...toAdd.map(x => x.item)])
+  for (const { key } of toAdd) localStorage.removeItem(key)
 }
 
 function getDrops() {

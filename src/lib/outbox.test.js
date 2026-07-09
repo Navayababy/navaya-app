@@ -136,6 +136,34 @@ describe('stageItem / foldPendingItems', () => {
     expect(localStorage.getItem('navaya_outbox_pending_bad')).toBeNull()
   })
 
+  it('keeps a staged item durable if the canonical queue write fails', () => {
+    // Codex P2: an earlier version cleared the pending key BEFORE the
+    // canonical saveOutbox call — if that call throws (e.g. localStorage
+    // quota exceeded, realistic for a device with a large offline
+    // backlog), the write ends up in neither place: removed from
+    // staging, never landed in the queue. Durable, then silently lost —
+    // exactly the failure this whole mechanism exists to prevent.
+    const item = stageItem('feed.insert', { id: 'a' })
+    const original = Storage.prototype.setItem
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'navaya_outbox') throw new Error('QuotaExceededError')
+      return original.call(this, key, value)
+    }
+    try {
+      expect(() => foldPendingItems()).toThrow()
+    } finally {
+      Storage.prototype.setItem = original
+    }
+    // Still durably staged — nothing was cleared by the failed attempt.
+    expect(localStorage.getItem(`navaya_outbox_pending_${item.id}`)).not.toBeNull()
+    expect(getOutbox()).toEqual([])
+
+    // And genuinely recoverable: a later fold, once the write can
+    // actually succeed, lands it — not stuck forever behind the failure.
+    foldPendingItems()
+    expect(getOutbox()).toMatchObject([{ id: item.id, payload: { id: 'a' } }])
+  })
+
   it('orders same-millisecond items from the SAME tab correctly, never by chance', () => {
     // Same queuedAt forces the fold to fall through to the tab+tabSeq
     // tiebreaker — without it, two rapid same-tab writes (e.g. a sleep's
