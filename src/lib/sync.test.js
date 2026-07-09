@@ -111,6 +111,54 @@ describe('syncWrite', () => {
     expect(insertFeedSession).not.toHaveBeenCalled()
   })
 
+  it('does not retry a failing head for a write that joined mid-attempt', async () => {
+    // The head's attempt is already in flight when the new write enqueues.
+    // The head's failure blocks the whole queue as of that instant, so the
+    // new writer must not launch a fresh flush that retries the head again.
+    let failHead
+    updateFeedSession.mockImplementation(() => new Promise(resolve => { failHead = resolve }))
+    enqueue('feed.update', { id: 'a', moodScore: 4 })
+    const headFlush = flushOutbox()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    insertFeedSession.mockImplementation(ok)
+    const writePromise = syncWrite('feed.insert', { id: 'b' })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    failHead({ error: { code: 'PGRST116', message: 'no rows returned' } })
+
+    await headFlush
+    expect(await writePromise).toMatchObject({ ok: false, queued: true })
+    expect(updateFeedSession).toHaveBeenCalledTimes(1)
+    expect(getOutbox().map(i => i.type)).toEqual(['feed.update', 'feed.insert'])
+    expect(getOutbox()[0].attempts).toBe(1)
+  })
+
+  it('holds a signed-out write after a single session check, with no second pass', async () => {
+    // The signed-out gate blocks the whole queue, so the writer must not
+    // launch a second drain (and second getSession) to learn that.
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } })
+    updateFeedSession.mockImplementation(ok)
+    const result = await syncWrite('feed.update', { id: 'a', moodScore: 4 })
+    expect(result).toMatchObject({ ok: false, queued: true })
+    expect(supabase.auth.getSession).toHaveBeenCalledTimes(1)
+    expect(updateFeedSession).not.toHaveBeenCalled()
+  })
+
+  it('serialises drains across tabs via the Web Locks API when available', async () => {
+    // jsdom has no navigator.locks — install a stub to prove drains route
+    // through the cross-tab lock when the browser provides one.
+    const request = vi.fn((_name, run) => run())
+    navigator.locks = { request }
+    try {
+      insertFeedSession.mockImplementation(ok)
+      const result = await syncWrite('feed.insert', { id: 'a' })
+      expect(result).toMatchObject({ ok: true })
+      expect(request).toHaveBeenCalledWith('navaya_outbox_drain', expect.any(Function))
+    } finally {
+      delete navigator.locks
+    }
+  })
+
   it('queues behind pending items so order is preserved', async () => {
     insertFeedSession.mockImplementation(networkFail)
     await syncWrite('feed.insert', { id: 'a' })
