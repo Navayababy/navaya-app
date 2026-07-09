@@ -77,6 +77,16 @@ function recordDrop(item, error) {
 
 let inFlight = null
 
+// Every enqueue through syncWrite bumps enqueueSeq; the drain records the
+// value it saw at its most recent read of a queue it was willing to
+// process. Together they answer the one question syncWrite has after
+// awaiting a flush that left its item queued: did that drain ever consider
+// the item (genuinely blocked — offline, signed out, failing write ahead),
+// or was it an in-flight pass that took its final look a moment before the
+// enqueue landed and must be re-run?
+let enqueueSeq = 0
+let drainSeenSeq = 0
+
 export function flushOutbox() {
   // Single-flight: concurrent callers await the same drain pass
   if (!inFlight) {
@@ -105,8 +115,12 @@ async function drain() {
   // Head-of-line: stop at the first transient failure so later writes can
   // never run ahead of an earlier one they may depend on.
   for (;;) {
+    // Captured before the read, so an enqueue racing the read can only make
+    // the drain look staler than it was — a false "unseen" costs one spare
+    // flush; the reverse would silently strand a write until the next timer.
+    const seenSeq = enqueueSeq
     const items = getOutbox()
-    if (!items.length) break
+    if (!items.length) { drainSeenSeq = seenSeq; break }
     const head = items[0]
     const { error } = await attempt(head.type, head.payload)
 
@@ -128,6 +142,7 @@ async function drain() {
       const current = getOutbox()
       saveOutbox([{ ...current[0], attempts: (current[0].attempts || 0) + 1 }, ...current.slice(1)])
     }
+    drainSeenSeq = seenSeq
     break
   }
 
@@ -137,16 +152,19 @@ async function drain() {
 const stillQueued = (item) => getOutbox().some(queued => queued.id === item.id)
 
 export async function syncWrite(type, payload) {
+  const seq = ++enqueueSeq
   const item = enqueue(type, payload)
   await flushOutbox()
   // A drain already in flight re-reads the queue between items, so it
   // normally picks this write up — but it may have taken its final look a
-  // moment before the enqueue landed. One fresh flush closes that gap: it
-  // is guaranteed to have started after the enqueue, so if the item is
-  // still queued afterwards, delivery is genuinely blocked (offline,
-  // signed out, or a failing write ahead of it) and the next flush
-  // trigger owns it.
-  if (stillQueued(item)) await flushOutbox()
+  // moment before the enqueue landed. Only in that case is one fresh
+  // flush needed to close the gap. When the drain provably saw the item
+  // (drainSeenSeq caught up to this enqueue), delivery is genuinely
+  // blocked — offline, signed out, or a failing write ahead — and
+  // re-flushing here would retry that failing head a second time per
+  // caller, burning its retry cap at double speed for someone else's
+  // writes. The next flush trigger owns it instead.
+  if (stillQueued(item) && drainSeenSeq < seq) await flushOutbox()
   if (stillQueued(item)) return { ok: false, queued: true }
 
   if (dropOutcomes.has(item.id)) {

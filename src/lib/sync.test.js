@@ -96,6 +96,21 @@ describe('syncWrite', () => {
     expect(outboxSize()).toBe(0)
   })
 
+  it('spends at most one retry of a failing head per syncWrite call', async () => {
+    // A write queued behind a failing head must not have its own flush
+    // retry that head a second time — unrelated callers would otherwise
+    // burn the head's retry cap at double speed.
+    updateFeedSession.mockImplementation(rowNotFound)
+    enqueue('feed.update', { id: 'a', moodScore: 4 })
+    insertFeedSession.mockImplementation(ok)
+
+    const result = await syncWrite('feed.insert', { id: 'b' })
+    expect(result).toMatchObject({ ok: false, queued: true })
+    expect(updateFeedSession).toHaveBeenCalledTimes(1)
+    expect(getOutbox()[0].attempts).toBe(1)
+    expect(insertFeedSession).not.toHaveBeenCalled()
+  })
+
   it('queues behind pending items so order is preserved', async () => {
     insertFeedSession.mockImplementation(networkFail)
     await syncWrite('feed.insert', { id: 'a' })
