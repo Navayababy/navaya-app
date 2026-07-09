@@ -98,14 +98,34 @@ let drainSeenSeq = 0
 export function flushOutbox() {
   // Single-flight: concurrent callers await the same drain pass
   if (!inFlight) {
-    inFlight = drain().finally(() => { inFlight = null })
+    inFlight = runDrain().finally(() => { inFlight = null })
   }
   return inFlight
 }
 
+// The outbox lives in localStorage, shared by every tab of the app — and
+// an installed PWA plus a browser tab is a realistic household setup. Two
+// tabs draining concurrently can both deliver the same head; the loser's
+// duplicate-key rejection then reads as "retried insert already landed"
+// and removes whatever item is at the head by then — silently destroying
+// an undelivered write. The Web Lock serialises drains across tabs (the
+// in-tab single-flight above handles everything else); browsers without
+// the API fall back to in-tab exclusivity, no worse than before.
+function runDrain() {
+  if (typeof navigator !== 'undefined' && navigator.locks?.request) {
+    return navigator.locks.request('navaya_outbox_drain', () => drain())
+  }
+  return drain()
+}
+
 async function drain() {
   let flushed = 0
-  if (!isSupabaseConfigured) return { flushed, pending: getOutbox().length }
+  // Unconfigured builds can never deliver — everything pending counts as
+  // considered, like the other blocked exits below.
+  if (!isSupabaseConfigured) {
+    drainSeenSeq = enqueueSeq
+    return { flushed, pending: getOutbox().length }
+  }
   // No point attempting while the browser knows it is offline; the 'online'
   // event triggers the next flush. Being offline blocks everything queued,
   // so the whole pending queue counts as considered.
@@ -174,14 +194,19 @@ export async function syncWrite(type, payload) {
   await flushOutbox()
   // A drain already in flight re-reads the queue between items, so it
   // normally picks this write up — but it may have taken its final look a
-  // moment before the enqueue landed. Only in that case is one fresh
-  // flush needed to close the gap. When the drain provably saw the item
-  // (drainSeenSeq caught up to this enqueue), delivery is genuinely
+  // moment before the enqueue landed. Only in that case is a fresh flush
+  // needed to close the gap. When a drain has provably considered the
+  // item (drainSeenSeq caught up to this enqueue), delivery is genuinely
   // blocked — offline, signed out, or a failing write ahead — and
   // re-flushing here would retry that failing head a second time per
   // caller, burning its retry cap at double speed for someone else's
-  // writes. The next flush trigger owns it instead.
-  if (stillQueued(item) && drainSeenSeq < seq) await flushOutbox()
+  // writes. The next flush trigger owns it instead. A `while`, not an
+  // `if`: every fresh drain either delivers the item or advances
+  // drainSeenSeq past it, so this settles in at most two passes today —
+  // but the loop makes the invariant self-enforcing, so any future edit
+  // that breaks that proof degrades to a spare flush, never a stranded
+  // write.
+  while (stillQueued(item) && drainSeenSeq < seq) await flushOutbox()
   if (stillQueued(item)) return { ok: false, queued: true }
 
   if (dropOutcomes.has(item.id)) {

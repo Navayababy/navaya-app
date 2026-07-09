@@ -133,6 +133,32 @@ describe('syncWrite', () => {
     expect(getOutbox()[0].attempts).toBe(1)
   })
 
+  it('holds a signed-out write after a single session check, with no second pass', async () => {
+    // The signed-out gate blocks the whole queue, so the writer must not
+    // launch a second drain (and second getSession) to learn that.
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } })
+    updateFeedSession.mockImplementation(ok)
+    const result = await syncWrite('feed.update', { id: 'a', moodScore: 4 })
+    expect(result).toMatchObject({ ok: false, queued: true })
+    expect(supabase.auth.getSession).toHaveBeenCalledTimes(1)
+    expect(updateFeedSession).not.toHaveBeenCalled()
+  })
+
+  it('serialises drains across tabs via the Web Locks API when available', async () => {
+    // jsdom has no navigator.locks — install a stub to prove drains route
+    // through the cross-tab lock when the browser provides one.
+    const request = vi.fn((_name, run) => run())
+    navigator.locks = { request }
+    try {
+      insertFeedSession.mockImplementation(ok)
+      const result = await syncWrite('feed.insert', { id: 'a' })
+      expect(result).toMatchObject({ ok: true })
+      expect(request).toHaveBeenCalledWith('navaya_outbox_drain', expect.any(Function))
+    } finally {
+      delete navigator.locks
+    }
+  })
+
   it('queues behind pending items so order is preserved', async () => {
     insertFeedSession.mockImplementation(networkFail)
     await syncWrite('feed.insert', { id: 'a' })
