@@ -66,6 +66,10 @@ export const FAQ_CATEGORIES = [
         q: 'Can I log a past sleep without using the timer?',
         a: 'Yes — tap "Log a sleep" and enter your own start and end times.',
       },
+      {
+        q: 'How is overnight sleep counted?',
+        a: 'A sleep day runs from 7am to 7am, so a night\'s sleep belongs to the evening it started rather than being split at midnight. You\'ll see it as "last night" alongside "naps today", and each Logbook day includes that day\'s naps and that night\'s sleep.',
+      },
     ],
   },
   {
@@ -206,7 +210,7 @@ export const FAQ_CATEGORIES = [
       },
       {
         q: 'What\'s the weekly summary panel, and how are the numbers worked out?',
-        a: 'Tap to expand it for a 7-day view: total feeds, average feed length, average gap between feeds, bottle totals, average sleep per day, and nappy/medicine counts. Averages only count days you actually logged something, so a lighter-tracking day doesn\'t unfairly drag the numbers down.',
+        a: 'Tap to expand it for a 7-day view: total feeds, average feed length, average gap between feeds, bottle totals, average sleep per day, and nappy/medicine counts. Average sleep per day only counts complete days — today isn\'t counted until its night is over — and, like the other averages, only counts days you actually logged something, so a lighter-tracking day doesn\'t unfairly drag the numbers down.',
       },
       {
         q: 'Nothing shows in my Logbook — is something wrong?',
