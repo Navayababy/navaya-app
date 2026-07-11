@@ -3,7 +3,7 @@ import { brand, palette, shadow, iconWellBg } from '../theme.js'
 import { getSleeps, addSleep, babyDisplayName, getPendingSleep, savePendingSleep, clearPendingSleep, getHouseholdLink } from '../lib/storage.js'
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
-import { sleepSecsOnDay } from '../lib/stats.js'
+import { latestNightSleep, napSecsOnSleepDay } from '../lib/stats.js'
 import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO, nearestDateForTime } from '../utils/time.js'
 import { newId } from '../lib/id.js'
 import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
@@ -107,8 +107,9 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     releaseActiveSleep()
   }, [trackedSleepClosedRemotely, sleepActive, pendingSleep, releaseActiveSleep])
 
-  // Re-render every 30s so the relative times stay current
-  const [, setClockTick] = useState(0)
+  // Re-render every 30s so the relative times stay current — also lets the
+  // sleep-day window (07:00/19:00 rollover) roll over without a reload.
+  const [clockTick, setClockTick] = useState(0)
   useEffect(() => {
     const tick = setInterval(() => setClockTick(t => t + 1), 30000)
     return () => clearInterval(tick)
@@ -120,9 +121,14 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
     , null)
   , [sleeps])
 
-  // Clamped to today's boundary: an overnight 22:00–06:00 sleep contributes
-  // only the after-midnight portion to today's total.
-  const todaySecs = useMemo(() => sleepSecsOnDay(sleeps), [sleeps])
+  // Sleep-day model: night sleep belongs to the evening it started rather
+  // than being split at midnight (see docs/plans/sleep-tracking-clarity.md).
+  // clockTick isn't read directly — it forces these to recompute so the
+  // 07:00/19:00 window boundary rolls over without a reload.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lastNight = useMemo(() => latestNightSleep(sleeps), [sleeps, clockTick])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const napSecs    = useMemo(() => napSecsOnSleepDay(sleeps), [sleeps, clockTick])
 
   // "2h 14m since last sleep" — mirrors the feed card's since-last-feed line
   const timeSinceLast = lastSleep?.endedAt && !sleepActive
@@ -301,8 +307,8 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
       {/* Stats — bigger, roomier tiles */}
       <div style={{ display: 'flex', gap: 10, padding: '0 16px 20px' }}>
         {[
-          [todaySecs > 0 ? fmtMins(todaySecs) : '—', 'sleep today'],
-          [lastSleep ? fmtMins(lastSleep.durationSecs || 0) : '—', 'last sleep'],
+          [lastNight.secs > 0 ? fmtMins(lastNight.secs) : '—', lastNight.inProgress ? 'tonight' : 'last night'],
+          [napSecs > 0 ? fmtMins(napSecs) : '—', 'naps today'],
           [lastSleep && !sleepActive ? timeAgo(lastSleep.endedAt).replace(' ago', '') : sleepActive ? 'now' : '—', sleepActive ? 'sleeping' : 'awake for'],
         ].map(([val, lbl]) => (
           <div key={lbl} style={{ flex: 1, background: p.card, borderRadius: 16, padding: '18px 8px', border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), textAlign: 'center' }}>

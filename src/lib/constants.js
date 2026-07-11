@@ -43,3 +43,8 @@ export const MEDICINE_OPTIONS = [
   { id: 'amoxicillin', label: 'Amoxicillin', form: 'Prescription' },
   { id: 'other',       label: 'Other',       form: 'Custom' },
 ]
+
+// Sleep-day model: a "sleep day" runs 07:00 → 07:00 so an overnight sleep
+// belongs wholly to the evening it started. 19:00 splits naps from night.
+export const SLEEP_DAY_START_HOUR = 7
+export const NIGHT_START_HOUR = 19

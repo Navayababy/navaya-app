@@ -2,7 +2,7 @@
 // Kept free of React so they can be unit-tested directly.
 
 import { dateStr, dayKey } from '../utils/time.js'
-import { MOOD_EMOJI, MOOD_LABEL } from './constants.js'
+import { MOOD_EMOJI, MOOD_LABEL, SLEEP_DAY_START_HOUR, NIGHT_START_HOUR } from './constants.js'
 import { isBottleFeed } from './normalize.js'
 
 export function feedMoodMeta(score) {
@@ -18,21 +18,87 @@ export function averageFeedMood(feeds) {
   return { ...feedMoodMeta(average), count: rated.length }
 }
 
-// Seconds of an interval that fall within the calendar day containing `day`.
-// Used to clamp overnight sleeps to day boundaries so daily totals only count
-// the portion that actually occurred on that day.
-export function secsOverlappingDay(startedAt, endedAt, day = new Date()) {
-  const dayStart = new Date(day)
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(dayStart)
-  dayEnd.setDate(dayEnd.getDate() + 1)
-  const start = Math.max(new Date(startedAt).getTime(), dayStart.getTime())
-  const end   = Math.min(new Date(endedAt).getTime(), dayEnd.getTime())
+// Seconds of [startedAt, endedAt] that fall inside [winStart, winEnd) —
+// the shared clamping primitive behind every windowed sleep total below.
+export function secsOverlapping(startedAt, endedAt, winStart, winEnd) {
+  const start = Math.max(new Date(startedAt).getTime(), new Date(winStart).getTime())
+  const end   = Math.min(new Date(endedAt).getTime(), new Date(winEnd).getTime())
   return Math.max(0, Math.round((end - start) / 1000))
 }
 
-export function sleepSecsOnDay(sleeps, day = new Date()) {
-  return sleeps.reduce((a, s) => a + secsOverlappingDay(s.startedAt, s.endedAt, day), 0)
+// ── Sleep-day model ──────────────────────────────────────────────────────
+// A "sleep day" runs SLEEP_DAY_START_HOUR → SLEEP_DAY_START_HOUR the next
+// morning (07:00→07:00 by default), so a night's sleep belongs wholly to
+// the evening it started rather than being split at the midnight boundary —
+// see docs/plans/sleep-tracking-clarity.md for the rationale. Within a
+// sleep day, NIGHT_START_HOUR (19:00) splits nap time from night time.
+
+// The 07:00 boundary of the sleep-day containing `at` — an instant before
+// 07:00 belongs to the previous calendar day's sleep-day.
+export function sleepDayStart(at = new Date()) {
+  const d = new Date(at)
+  const beforeDayStart = d.getHours() < SLEEP_DAY_START_HOUR
+  d.setHours(SLEEP_DAY_START_HOUR, 0, 0, 0)
+  if (beforeDayStart) d.setDate(d.getDate() - 1)
+  return d
+}
+
+function sleepsOverlapping(sleeps, winStart, winEnd) {
+  return sleeps.reduce((a, s) => {
+    if (!s.startedAt || !s.endedAt) return a
+    const secs = secsOverlapping(s.startedAt, s.endedAt, winStart, winEnd)
+    return Number.isNaN(secs) ? a : a + secs
+  }, 0)
+}
+
+// Total seconds of sleep in sleep-day D: [D 07:00, D+1 07:00)
+export function sleepSecsOnSleepDay(sleeps, day = new Date()) {
+  const winStart = sleepDayStart(day)
+  const winEnd = new Date(winStart)
+  winEnd.setDate(winEnd.getDate() + 1)
+  return sleepsOverlapping(sleeps, winStart, winEnd)
+}
+
+// Nap portion of sleep-day D: [D 07:00, D 19:00)
+export function napSecsOnSleepDay(sleeps, day = new Date()) {
+  const winStart = sleepDayStart(day)
+  const winEnd = new Date(winStart)
+  winEnd.setHours(NIGHT_START_HOUR, 0, 0, 0)
+  return sleepsOverlapping(sleeps, winStart, winEnd)
+}
+
+// Night portion of sleep-day D: [D 19:00, D+1 07:00)
+export function nightSecsOfSleepDay(sleeps, day = new Date()) {
+  const dayStart = sleepDayStart(day)
+  const winStart = new Date(dayStart)
+  winStart.setHours(NIGHT_START_HOUR, 0, 0, 0)
+  const winEnd = new Date(dayStart)
+  winEnd.setDate(winEnd.getDate() + 1)
+  return sleepsOverlapping(sleeps, winStart, winEnd)
+}
+
+// The most recently *started* night window relative to `now`: tonight's
+// (in progress) once NIGHT_START_HOUR has passed, otherwise last night's
+// (already ended at this morning's day-start).
+export function latestNightSleep(sleeps, now = new Date()) {
+  const dayStart = sleepDayStart(now)
+  const nightStart = new Date(dayStart)
+  nightStart.setHours(NIGHT_START_HOUR, 0, 0, 0)
+
+  let start, end
+  if (now >= nightStart) {
+    start = nightStart
+    end = new Date(dayStart)
+    end.setDate(end.getDate() + 1)
+  } else {
+    end = dayStart
+    start = new Date(dayStart)
+    start.setDate(start.getDate() - 1)
+    start.setHours(NIGHT_START_HOUR, 0, 0, 0)
+  }
+
+  const secs = sleepsOverlapping(sleeps, start, end)
+  return { start, end, secs, inProgress: now < end }
 }
 
 // Per-day 24-hour rhythm for the weekly summary chart: one entry per local
@@ -103,7 +169,7 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     days.push(d)
   }
 
-  const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, breastFeeds: 0, feedMins: 0, bottleFeeds: 0, bottleMl: 0, meds: 0, wet: 0, dirty: 0, sleepSecs: 0, moodTotal: 0, moodCount: 0 }]))
+  const byDay = Object.fromEntries(days.map(d => [dateStr(d.toISOString()), { feeds: 0, breastFeeds: 0, feedMins: 0, bottleFeeds: 0, bottleMl: 0, meds: 0, wet: 0, dirty: 0, moodTotal: 0, moodCount: 0 }]))
   feeds.forEach(s => {
     const k = dayKey(s.startedAt)
     if (!byDay[k]) return
@@ -132,19 +198,28 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     if (n.type === 'wet' || n.type === 'both') byDay[k].wet += 1
     if (n.type === 'poo' || n.type === 'both') byDay[k].dirty += 1
   })
-  // Sleep is clamped to each calendar day, so an overnight sleep contributes
-  // its pre-midnight portion to one row and the rest to the next.
-  days.forEach(d => {
-    byDay[dateStr(d.toISOString())].sleepSecs = sleepSecsOnDay(sleeps, d)
-  })
+  // Sleep uses its own "sleep day" axis (07:00→07:00, see sleepDayStart) so a
+  // night belongs wholly to the evening it started rather than being split
+  // at midnight. Built one day longer (offset 7) so the average below can
+  // draw on 7 *complete* sleep days without today's still-in-progress one.
+  const sleepDayOffsets = []
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    sleepDayOffsets.push(d)
+  }
+  const sleepDayTotals = sleepDayOffsets.map(d => sleepSecsOnSleepDay(sleeps, d))
+  const completeSleepDayTotals = sleepDayTotals.slice(0, 7) // offsets 7…1
+  const displaySleepDayTotals  = sleepDayTotals.slice(1)    // offsets 6…0, aligned with `rows`
 
-  const rows = days.map(d => {
+  const rows = days.map((d, i) => {
     const k = dateStr(d.toISOString())
     const v = byDay[k]
     return {
       key: k,
       label: d.toLocaleDateString('en-GB', { weekday: 'short' }),
       ...v,
+      sleepSecs: displaySleepDayTotals[i],
       mood: v.moodCount ? feedMoodMeta(v.moodTotal / v.moodCount) : null,
     }
   })
@@ -156,11 +231,13 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
   const totalMeds  = rows.reduce((a, r) => a + r.meds, 0)
   const totalWet   = rows.reduce((a, r) => a + r.wet, 0)
   const totalDirty = rows.reduce((a, r) => a + r.dirty, 0)
-  // Averaged over days that have sleep logged, so a half-tracked week
-  // doesn't drag the figure down to something misleading.
-  const sleepDays = rows.filter(r => r.sleepSecs > 0)
-  const avgSleepSecsPerDay = sleepDays.length
-    ? Math.round(sleepDays.reduce((a, r) => a + r.sleepSecs, 0) / sleepDays.length)
+  // Averaged over the 7 most recent *complete* sleep days that have sleep
+  // logged: today's still-in-progress sleep day never counts (it can only
+  // hold a partial night or a few naps so far), and a half-tracked week
+  // doesn't drag the figure down to something misleading either.
+  const completeSleepDays = completeSleepDayTotals.filter(secs => secs > 0)
+  const avgSleepSecsPerDay = completeSleepDays.length
+    ? Math.round(completeSleepDays.reduce((a, s) => a + s, 0) / completeSleepDays.length)
     : null
   const ratedFeeds = rows.reduce((a, r) => a + r.moodCount, 0)
   const avgFeedMins = totalBreastFeeds ? Math.round(rows.reduce((a, r) => a + r.feedMins, 0) / totalBreastFeeds) : 0

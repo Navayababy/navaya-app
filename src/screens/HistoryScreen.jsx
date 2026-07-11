@@ -6,7 +6,7 @@ import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, dayShort, timeStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep, isBottleFeed } from '../lib/normalize.js'
 import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL, bottleLabel } from '../lib/constants.js'
-import { averageFeedMood, computeWeeklyInsights, computeDayRhythm, sleepSecsOnDay } from '../lib/stats.js'
+import { averageFeedMood, computeWeeklyInsights, computeDayRhythm, sleepSecsOnSleepDay, napSecsOnSleepDay, latestNightSleep } from '../lib/stats.js'
 import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
 import AddNappyModal from '../components/modals/AddNappyModal.jsx'
@@ -136,7 +136,10 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     nappyList.filter(n => new Date(n.loggedAt) >= todayStart && (n.type === 'poo' || n.type === 'both')).length
   , [nappyList, todayStart])
 
-  const sleepTodaySecs = useMemo(() => sleepSecsOnDay(sleepList), [sleepList])
+  // Sleep-day model: naps today, plus last night as a sub-line — see
+  // docs/plans/sleep-tracking-clarity.md for why totals aren't midnight-split.
+  const napsTodaySecs = useMemo(() => napSecsOnSleepDay(sleepList), [sleepList])
+  const lastNight      = useMemo(() => latestNightSleep(sleepList), [sleepList])
 
   const fmtGap = (mins) => {
     if (mins == null) return '—'
@@ -318,10 +321,10 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     const meds     = entries.filter(e => e._type === 'medicine').length
     const feedDur  = entries.filter(e => e._type === 'feed' && !isBottleFeed(e)).reduce((a, e) => a + (e.durationSecs || 0), 0)
     const bottleMl = entries.filter(e => e._type === 'feed' && isBottleFeed(e)).reduce((a, e) => a + (e.amountMl || 0), 0)
-    // Sleep is clamped to this calendar day across ALL sleeps, so an overnight
-    // sleep contributes its pre-midnight portion here and the rest to the next
-    // day — totals stay accurate even though the row sits under the start day.
-    const sleepDur = sleepSecsOnDay(sleepList, day)
+    // Sleep uses the sleep-day window (07:00→07:00) across ALL sleeps, so this
+    // chip reads as that day's naps plus the night that started that evening —
+    // e.g. yesterday's chip includes the night that ended this morning.
+    const sleepDur = sleepSecsOnSleepDay(sleepList, day)
     const mood     = averageFeedMood(entries.filter(e => e._type === 'feed'))
     // Ordered feeding → sleep → nappies → medicine → mood, each part
     // self-explanatory so the chips read cleanly on their own
@@ -386,7 +389,7 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
           { val: feedsToday.length.toString(),                 lbl: 'feeds',  sub: [feedTimeTodaySecs > 0 ? `${fmtMins(feedTimeTodaySecs)} breast` : null, bottleMlToday > 0 ? `${bottleMlToday}ml bottle` : null].filter(Boolean).join(' · ') || null },
           { val: wetToday.toString(),                          lbl: 'wees',   sub: null },
           { val: dirtyToday.toString(),                        lbl: 'poos',   sub: null },
-          { val: sleepTodaySecs > 0 ? fmtMins(sleepTodaySecs) : '—', lbl: 'sleep',  sub: null },
+          { val: napsTodaySecs > 0 ? fmtMins(napsTodaySecs) : '—', lbl: 'naps', sub: lastNight.secs > 0 ? `${lastNight.inProgress ? 'tonight' : 'last night'} ${fmtMins(lastNight.secs)}` : null },
         ].map(({ val, lbl, sub }) => (
           <div key={lbl} style={{ background: p.card, borderRadius: 13, padding: '12px 10px', border: `1px solid ${p.border}`, boxShadow: shadow(night, 1), textAlign: 'left' }}>
             <span style={{ display: 'block', fontSize: 10, color: p.sub, lineHeight: 1.2, textTransform: 'uppercase', letterSpacing: '.08em' }}>{lbl} today</span>
