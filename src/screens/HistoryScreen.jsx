@@ -91,7 +91,17 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
     const map = {}
     const ensureGroup = (time) => {
       const key = new Date(time).toDateString()
-      if (!map[key]) map[key] = { label: dayLabel(time), date: new Date(time), entries: [] }
+      if (!map[key]) {
+        // Normalized to noon so `date` always represents this calendar day
+        // itself, never a specific moment within it — otherwise a day whose
+        // only entry is an early-morning sleep continuation row (e.g. 06:00)
+        // would carry that early hour, and sleepSecsOnSleepDay would resolve
+        // it to the *previous* sleep-day, double-counting that night onto
+        // both chips.
+        const date = new Date(time)
+        date.setHours(12, 0, 0, 0)
+        map[key] = { label: dayLabel(time), date, entries: [] }
+      }
       return map[key]
     }
     allEntries.forEach(entry => {

@@ -205,6 +205,11 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
   const sleepDayOffsets = []
   for (let i = 7; i >= 0; i--) {
     const d = new Date()
+    // Normalized to noon so each offset represents that calendar day itself,
+    // not "now" — otherwise, before 07:00, every offset's hour would fall
+    // before SLEEP_DAY_START_HOUR and sleepDayStart would shift all of them
+    // back by an extra day, uniformly mislabeling which day each total sits under.
+    d.setHours(12, 0, 0, 0)
     d.setDate(d.getDate() - i)
     sleepDayOffsets.push(d)
   }
