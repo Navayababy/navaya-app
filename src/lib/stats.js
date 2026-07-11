@@ -18,20 +18,24 @@ export function averageFeedMood(feeds) {
   return { ...feedMoodMeta(average), count: rated.length }
 }
 
-// Seconds of [startedAt, endedAt] that fall inside [winStart, winEnd) —
-// the shared clamping primitive behind every windowed sleep total below.
-export function secsOverlapping(startedAt, endedAt, winStart, winEnd) {
-  const start = Math.max(new Date(startedAt).getTime(), new Date(winStart).getTime())
-  const end   = Math.min(new Date(endedAt).getTime(), new Date(winEnd).getTime())
-  return Math.max(0, Math.round((end - start) / 1000))
-}
-
 // ── Sleep-day model ──────────────────────────────────────────────────────
 // A "sleep day" runs SLEEP_DAY_START_HOUR → SLEEP_DAY_START_HOUR the next
 // morning (07:00→07:00 by default), so a night's sleep belongs wholly to
 // the evening it started rather than being split at the midnight boundary —
 // see docs/plans/sleep-tracking-clarity.md for the rationale. Within a
 // sleep day, NIGHT_START_HOUR (19:00) splits nap time from night time.
+//
+// Each sleep SESSION is attributed wholly to the sleep-day (and the
+// nap/night half of it) that it *started* in — never split or clamped
+// across a boundary. A session that starts at 23:30 and runs to 07:30 the
+// next morning is one continuous night, not 7.5h of "last night" plus 30
+// minutes miscounted as a nap the next day: clamping at the boundary would
+// reintroduce exactly the kind of misleading split this model exists to
+// avoid, just moved from midnight to 07:00/19:00. The trade-off: a session
+// that runs for days (e.g. a forgotten running timer) sits entirely under
+// the day it started rather than being spread across the days it
+// technically touched — far rarer than an ordinary night running a little
+// past day-start, which happens most mornings.
 
 // The 07:00 boundary of the sleep-day containing `at` — an instant before
 // 07:00 belongs to the previous calendar day's sleep-day.
@@ -43,38 +47,42 @@ export function sleepDayStart(at = new Date()) {
   return d
 }
 
-function sleepsOverlapping(sleeps, winStart, winEnd) {
+// Sums the full duration of every sleep session whose start falls inside
+// [winStart, winEnd) — see the whole-session-attribution note above.
+function sessionSecsStartingIn(sleeps, winStart, winEnd) {
+  const winStartMs = winStart.getTime()
+  const winEndMs = winEnd.getTime()
   return sleeps.reduce((a, s) => {
     if (!s.startedAt || !s.endedAt) return a
-    const secs = secsOverlapping(s.startedAt, s.endedAt, winStart, winEnd)
-    return Number.isNaN(secs) ? a : a + secs
+    const startMs = new Date(s.startedAt).getTime()
+    const endMs = new Date(s.endedAt).getTime()
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) return a
+    if (startMs < winStartMs || startMs >= winEndMs) return a
+    return a + Math.max(0, Math.round((endMs - startMs) / 1000))
   }, 0)
 }
 
-// Total seconds of sleep in sleep-day D: [D 07:00, D+1 07:00)
-export function sleepSecsOnSleepDay(sleeps, day = new Date()) {
-  const winStart = sleepDayStart(day)
-  const winEnd = new Date(winStart)
-  winEnd.setDate(winEnd.getDate() + 1)
-  return sleepsOverlapping(sleeps, winStart, winEnd)
-}
-
-// Nap portion of sleep-day D: [D 07:00, D 19:00)
+// Nap portion of sleep-day D: sessions starting in [D 07:00, D 19:00)
 export function napSecsOnSleepDay(sleeps, day = new Date()) {
-  const winStart = sleepDayStart(day)
-  const winEnd = new Date(winStart)
-  winEnd.setHours(NIGHT_START_HOUR, 0, 0, 0)
-  return sleepsOverlapping(sleeps, winStart, winEnd)
+  const dayStart = sleepDayStart(day)
+  const nightStart = new Date(dayStart)
+  nightStart.setHours(NIGHT_START_HOUR, 0, 0, 0)
+  return sessionSecsStartingIn(sleeps, dayStart, nightStart)
 }
 
-// Night portion of sleep-day D: [D 19:00, D+1 07:00)
+// Night portion of sleep-day D: sessions starting in [D 19:00, D+1 07:00)
 export function nightSecsOfSleepDay(sleeps, day = new Date()) {
   const dayStart = sleepDayStart(day)
-  const winStart = new Date(dayStart)
-  winStart.setHours(NIGHT_START_HOUR, 0, 0, 0)
-  const winEnd = new Date(dayStart)
-  winEnd.setDate(winEnd.getDate() + 1)
-  return sleepsOverlapping(sleeps, winStart, winEnd)
+  const nightStart = new Date(dayStart)
+  nightStart.setHours(NIGHT_START_HOUR, 0, 0, 0)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setDate(dayEnd.getDate() + 1)
+  return sessionSecsStartingIn(sleeps, nightStart, dayEnd)
+}
+
+// Total seconds of sleep in sleep-day D: naps plus night, D 07:00 → D+1 07:00
+export function sleepSecsOnSleepDay(sleeps, day = new Date()) {
+  return napSecsOnSleepDay(sleeps, day) + nightSecsOfSleepDay(sleeps, day)
 }
 
 // The most recently *started* night window relative to `now`: tonight's
@@ -97,7 +105,7 @@ export function latestNightSleep(sleeps, now = new Date()) {
     start.setHours(NIGHT_START_HOUR, 0, 0, 0)
   }
 
-  const secs = sleepsOverlapping(sleeps, start, end)
+  const secs = sessionSecsStartingIn(sleeps, start, end)
   return { start, end, secs, inProgress: now < end }
 }
 
@@ -198,24 +206,28 @@ export function computeWeeklyInsights(feeds, nappies, medicines, sleeps = []) {
     if (n.type === 'wet' || n.type === 'both') byDay[k].wet += 1
     if (n.type === 'poo' || n.type === 'both') byDay[k].dirty += 1
   })
-  // Sleep uses its own "sleep day" axis (07:00→07:00, see sleepDayStart) so a
-  // night belongs wholly to the evening it started rather than being split
-  // at midnight. Built one day longer (offset 7) so the average below can
-  // draw on 7 *complete* sleep days without today's still-in-progress one.
-  const sleepDayOffsets = []
-  for (let i = 7; i >= 0; i--) {
-    const d = new Date()
-    // Normalized to noon so each offset represents that calendar day itself,
-    // not "now" — otherwise, before 07:00, every offset's hour would fall
-    // before SLEEP_DAY_START_HOUR and sleepDayStart would shift all of them
-    // back by an extra day, uniformly mislabeling which day each total sits under.
-    d.setHours(12, 0, 0, 0)
+  // Sleep uses its own "sleep day" axis (07:00→07:00, see sleepDayStart), so
+  // each session belongs wholly to the evening it started rather than being
+  // split at a fixed clock boundary. Display rows want each calendar day's
+  // own total, looked up via noon (any hour ≥ SLEEP_DAY_START_HOUR works —
+  // noon just reads clearly — so the lookup names that calendar day itself,
+  // not "now"). The average instead walks back from whichever sleep-day is
+  // *actually* in progress right now: before 07:00, that's still
+  // yesterday's, not today's, so a still-accumulating sleep-day is never
+  // counted as complete just because its calendar label is in the past.
+  const displaySleepDayTotals = days.map(d => {
+    const noon = new Date(d)
+    noon.setHours(12, 0, 0, 0)
+    return sleepSecsOnSleepDay(sleeps, noon)
+  })
+
+  const activeSleepDayStart = sleepDayStart(new Date())
+  const completeSleepDayTotals = []
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(activeSleepDayStart)
     d.setDate(d.getDate() - i)
-    sleepDayOffsets.push(d)
+    completeSleepDayTotals.push(sleepSecsOnSleepDay(sleeps, d))
   }
-  const sleepDayTotals = sleepDayOffsets.map(d => sleepSecsOnSleepDay(sleeps, d))
-  const completeSleepDayTotals = sleepDayTotals.slice(0, 7) // offsets 7…1
-  const displaySleepDayTotals  = sleepDayTotals.slice(1)    // offsets 6…0, aligned with `rows`
 
   const rows = days.map((d, i) => {
     const k = dateStr(d.toISOString())

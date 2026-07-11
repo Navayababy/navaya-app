@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   feedMoodMeta, averageFeedMood, computeWeeklyInsights, computeDayRhythm,
-  secsOverlapping, sleepDayStart, sleepSecsOnSleepDay, napSecsOnSleepDay,
+  sleepDayStart, sleepSecsOnSleepDay, napSecsOnSleepDay,
   nightSecsOfSleepDay, latestNightSleep,
 } from './stats.js'
 
@@ -59,22 +59,6 @@ describe('averageFeedMood', () => {
   })
 })
 
-describe('secsOverlapping', () => {
-  it('counts an interval fully inside the window', () => {
-    expect(secsOverlapping(at(0, 13), at(0, 14), at(0, 0), at(0, 23, 59))).toBe(3600)
-  })
-
-  it('clamps to the window boundaries', () => {
-    const winStart = at(1, 19) // yesterday 19:00
-    const winEnd   = at(0, 7)  // today 07:00
-    expect(secsOverlapping(at(1, 22), at(0, 6), winStart, winEnd)).toBe(8 * 3600)
-  })
-
-  it('returns zero for intervals entirely outside the window', () => {
-    expect(secsOverlapping(at(2, 13), at(2, 14), at(0, 0), at(0, 23, 59))).toBe(0)
-  })
-})
-
 describe('sleepDayStart', () => {
   it('resolves an instant after day-start to that same calendar day at 07:00', () => {
     expect(sleepDayStart(new Date(NOW))).toEqual(new Date(2026, 5, 9, 7, 0, 0, 0))
@@ -98,22 +82,31 @@ describe('sleepSecsOnSleepDay / napSecsOnSleepDay / nightSecsOfSleepDay', () => 
     expect(sleepSecsOnSleepDay(sleeps, NOW)).toBe(0)              // today's sleep-day: hadn't started at 06:00
   })
 
-  it('splits a sleep crossing the 19:00 night threshold between naps and night', () => {
-    const sleeps = [{ startedAt: at(0, 18, 30), endedAt: at(0, 19, 30) }]
-    expect(napSecsOnSleepDay(sleeps, NOW)).toBe(30 * 60)
-    expect(nightSecsOfSleepDay(sleeps, NOW)).toBe(30 * 60)
+  it('keeps a session whole even when it runs past a boundary, instead of splitting it', () => {
+    // A night that runs 30 minutes past day-start (a completely ordinary
+    // wake-up time) must stay one continuous night — not 7.5h of "last
+    // night" plus 30 minutes miscounted as a nap the next morning.
+    const overnight = { startedAt: at(1, 23, 30), endedAt: at(0, 7, 30) } // yesterday 23:30 → today 07:30, 8h
+    const nap       = { startedAt: at(0, 13, 10), endedAt: at(0, 14, 45) } // today 13:10 → 14:45, 1h35m
+    const sleeps = [overnight, nap]
+    expect(napSecsOnSleepDay(sleeps, NOW)).toBe(95 * 60)              // just the nap
+    expect(nightSecsOfSleepDay(sleeps, at(1, 12))).toBe(8 * 3600)     // the whole night, uncut
+    expect(sleepSecsOnSleepDay(sleeps, at(1, 12))).toBe(8 * 3600)     // yesterday's sleep-day: the whole night
+    expect(sleepSecsOnSleepDay(sleeps, NOW)).toBe(95 * 60)            // today's sleep-day: just the nap
+  })
+
+  it('attributes an evening nap wholly to naps even if it runs past the night threshold', () => {
+    const sleeps = [{ startedAt: at(0, 18, 30), endedAt: at(0, 19, 30) }] // starts before 19:00
+    expect(napSecsOnSleepDay(sleeps, NOW)).toBe(3600)
+    expect(nightSecsOfSleepDay(sleeps, NOW)).toBe(0)
     expect(sleepSecsOnSleepDay(sleeps, NOW)).toBe(3600)
   })
 
-  it('distributes a multi-day sleep across every sleep-day it touches with no loss', () => {
-    const sleeps = [{ startedAt: at(2, 20), endedAt: at(0, 20) }] // exactly 48h
-    const twoDaysAgo = sleepSecsOnSleepDay(sleeps, at(2, 12))
-    const oneDayAgo   = sleepSecsOnSleepDay(sleeps, at(1, 12))
-    const today       = sleepSecsOnSleepDay(sleeps, at(0, 12))
-    expect(twoDaysAgo).toBe(11 * 3600)
-    expect(oneDayAgo).toBe(24 * 3600)
-    expect(today).toBe(13 * 3600)
-    expect(twoDaysAgo + oneDayAgo + today).toBe(48 * 3600)
+  it('attributes a very long session wholly to the sleep-day it started in, however many days it runs', () => {
+    const sleeps = [{ startedAt: at(2, 20), endedAt: at(0, 20) }] // 48h, starts 2 days ago at night
+    expect(sleepSecsOnSleepDay(sleeps, at(2, 12))).toBe(48 * 3600) // the whole session, on the day it started
+    expect(sleepSecsOnSleepDay(sleeps, at(1, 12))).toBe(0)
+    expect(sleepSecsOnSleepDay(sleeps, NOW)).toBe(0)
   })
 
   it('skips open-ended sleeps and unparseable timestamps', () => {
@@ -223,6 +216,25 @@ describe('computeWeeklyInsights', () => {
   it('returns a null sleep average when no sleep is logged', () => {
     const insights = computeWeeklyInsights([], [], [])
     expect(insights.avgSleepSecsPerDay).toBeNull()
+  })
+
+  it("does not spill an overnight sleep's post-day-start tail into today's naps total", () => {
+    const overnight = { startedAt: at(1, 23, 30), endedAt: at(0, 7, 30) } // 8h, runs 30m past day-start
+    const nap       = { startedAt: at(0, 13, 10), endedAt: at(0, 14, 45) } // 1h35m
+    const insights = computeWeeklyInsights([], [], [], [overnight, nap])
+    expect(insights.rows[6].sleepSecs).toBe(95 * 60)  // today: just the nap
+    expect(insights.rows[5].sleepSecs).toBe(8 * 3600) // yesterday: the whole night, uncut
+  })
+
+  it("excludes the currently in-progress sleep-day from the average when it's before day-start", () => {
+    // At 06:30, the sleep-day that started yesterday evening hasn't finished
+    // yet (it runs until 07:00) — it must not count as "complete" just
+    // because its calendar label is technically in the past.
+    vi.setSystemTime(new Date(2026, 5, 9, 6, 30, 0))
+    const completeNight = { startedAt: new Date(2026, 5, 7, 22, 0).toISOString(), endedAt: new Date(2026, 5, 8, 6, 0).toISOString() }
+    const stillActive   = { startedAt: new Date(2026, 5, 8, 22, 0).toISOString(), endedAt: new Date(2026, 5, 9, 6, 0).toISOString() }
+    const insights = computeWeeklyInsights([], [], [], [completeNight, stillActive])
+    expect(insights.avgSleepSecsPerDay).toBe(8 * 3600) // only the complete night counts
   })
 
   it('splits a mixed-feeding week into breast durations and bottle ml', () => {
