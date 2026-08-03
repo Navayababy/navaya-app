@@ -48,3 +48,9 @@ export const MEDICINE_OPTIONS = [
 // belongs wholly to the evening it started. 19:00 splits naps from night.
 export const SLEEP_DAY_START_HOUR = 7
 export const NIGHT_START_HOUR = 19
+
+// A sleep timer left running past this long is almost certainly a forgotten
+// stop rather than a real sleep — used to surface a warning on the live
+// timer so a stuck timer gets noticed and corrected instead of silently
+// accumulating an implausible duration.
+export const SLEEP_TIMER_WARN_SECS = 12 * 3600

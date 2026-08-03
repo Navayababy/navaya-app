@@ -5,7 +5,7 @@ import { getSessions, getNappies, getMedicines, getSleeps, updateSession, delete
 import { syncWrite } from '../lib/sync.js'
 import { fmt, fmtMins, dayLabel, dayShort, timeStr } from '../utils/time.js'
 import { normalizeFeedSession, normalizeNappy, normalizeMedicine, normalizeSleep, isBottleFeed } from '../lib/normalize.js'
-import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL, bottleLabel } from '../lib/constants.js'
+import { MOOD_EMOJI, MOOD_LABEL, POO_HEX, POO_LABEL, bottleLabel, SLEEP_TIMER_WARN_SECS } from '../lib/constants.js'
 import { averageFeedMood, computeWeeklyInsights, computeDayRhythm, sleepSecsOnSleepDay, napSecsOnSleepDay, latestNightSleep } from '../lib/stats.js'
 import EditFeedModal from '../components/modals/EditFeedModal.jsx'
 import AddFeedModal from '../components/modals/AddFeedModal.jsx'
@@ -673,6 +673,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                       const isDel = confirmDel?.id === entry.id
                       const creatorId = getEntryCreatorId(entry)
                       const canEdit   = !sharedMode || !creatorId || creatorId === authUser?.id
+                      // Almost certainly a timer nobody stopped in time rather
+                      // than a real sleep — flag it so it doesn't blend in
+                      // with ordinary rows and go unnoticed (see SleepScreen's
+                      // live-timer warning for the same threshold).
+                      const implausible = (entry.durationSecs || 0) >= SLEEP_TIMER_WARN_SECS
                       return (
                         <div key={entry.id}
                           style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', borderBottom: borderStyle, cursor: canEdit && !isDel ? 'pointer' : 'default' }}
@@ -683,8 +688,11 @@ export default function HistoryScreen({ night, authUser, profile, sharedSessions
                             <MoonIcon color={p.sub} size={13} />
                           </div>
                           <div style={{ flex: 1 }}>
-                            <span style={{ display: 'block', fontSize: 12, color: p.text }}>Sleep · {fmtMins(entry.durationSecs || 0)}</span>
-                            <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>{timeStr(entry.startedAt)} – {timeStr(entry.endedAt)}</span>
+                            <span style={{ display: 'block', fontSize: 12, color: implausible ? brand.danger : p.text, fontWeight: implausible ? 600 : 400 }}>Sleep · {fmtMins(entry.durationSecs || 0)}</span>
+                            <span style={{ display: 'block', fontSize: 10, color: p.sub, marginTop: 1 }}>
+                              {timeStr(entry.startedAt)} – {timeStr(entry.endedAt)}
+                              {implausible && (canEdit ? ' · unusually long, tap to fix' : ' · unusually long')}
+                            </span>
                           </div>
                           {canEdit && (isDel ? (
                             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
