@@ -87,6 +87,22 @@ export function buildISO(dateVal, timeVal) {
   return new Date(y, mo - 1, d, h, m, 0, 0).toISOString()
 }
 
+// Same as buildISO, but for callers that build a *live* preview from
+// controlled date/time inputs on every render: a native date or time input
+// reports its value as '' while the user is mid-edit (cleared, about to
+// retype), and buildISO('', ...) constructs an Invalid Date whose
+// toISOString() throws — which, called from render, would crash the whole
+// screen. Returns null for anything incomplete or unparseable instead of
+// throwing, so callers can treat "still typing" as a distinct, safe state.
+export function tryBuildISO(dateVal, timeVal) {
+  if (!dateVal || !timeVal) return null
+  const [y, mo, d] = dateVal.split('-').map(Number)
+  const [h, m]     = timeVal.split(':').map(Number)
+  if (![y, mo, d, h, m].every(Number.isFinite)) return null
+  const date = new Date(y, mo - 1, d, h, m, 0, 0)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
 // Rebuilds a corrected time-of-day into a full timestamp, choosing whichever
 // calendar date (the reference instant's day, or the day before/after) lands
 // closest to that reference. A correction that crosses a midnight boundary —

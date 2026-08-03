@@ -4,7 +4,7 @@ import { getSleeps, addSleep, babyDisplayName, getPendingSleep, savePendingSleep
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
 import { latestNightSleep, napSecsOnSleepDay } from '../lib/stats.js'
-import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO } from '../utils/time.js'
+import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO, tryBuildISO } from '../utils/time.js'
 import { newId } from '../lib/id.js'
 import { SLEEP_TIMER_WARN_SECS } from '../lib/constants.js'
 import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
@@ -45,53 +45,56 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   // record also carries whatever the user has typed into the confirmation
   // fields so far — otherwise an edit made just before a tab switch or
   // reload would silently revert to the original start/stop times.
-  // { startedAt, endedAt, durationSecs, confirmStartDate, confirmStartTime, confirmEndDate, confirmEndTime }
-  const [pendingSleep, setPendingSleep] = useState(() => getPendingSleep())
-  // Date fields default from the raw stop, but — unlike a time-of-day-only
-  // fix — they let a correction land on any day, not just the day next to
-  // wherever the timer happened to be stopped. That's what makes a timer
-  // left running for a long time (see SLEEP_TIMER_WARN_SECS) recoverable:
-  // otherwise the confirm step could only nudge the time within a day of the
-  // (already wrong) raw stop, never truly fix the span.
-  const [confirmStartDate, setConfirmStartDate] = useState(() => {
+  // pendingSleep is the single source of truth for the confirm draft — it
+  // carries startedAt/endedAt/durationSecs/shared *and* the four
+  // confirmStart*/confirmEnd* fields the user is editing, all in one object,
+  // both in state and in localStorage. Splitting the confirm fields into
+  // their own useStates (as an earlier version of this did) let each
+  // field's save spread a stale copy of the others, so editing the date and
+  // then the time would silently drop the date edit from the persisted
+  // draft — restoring it after a tab switch or reload would resurrect the
+  // original, uncorrected span. One object updated with the previous-state
+  // functional form (see updateConfirmField) closes that gap: there is only
+  // ever one copy of the draft to go stale.
+  // { id, shared, startedAt, endedAt, durationSecs, confirmStartDate, confirmStartTime, confirmEndDate, confirmEndTime }
+  const [pendingSleep, setPendingSleep] = useState(() => {
     const restored = getPendingSleep()
-    return restored ? (restored.confirmStartDate || dateStr(restored.startedAt)) : ''
-  })
-  const [confirmStartTime, setConfirmStartTime] = useState(() => {
-    const restored = getPendingSleep()
-    return restored ? (restored.confirmStartTime || timeStr(restored.startedAt)) : ''
-  })
-  const [confirmEndDate, setConfirmEndDate] = useState(() => {
-    const restored = getPendingSleep()
-    return restored ? (restored.confirmEndDate || dateStr(restored.endedAt)) : ''
-  })
-  const [confirmEndTime, setConfirmEndTime] = useState(() => {
-    const restored = getPendingSleep()
-    return restored ? (restored.confirmEndTime || timeStr(restored.endedAt)) : ''
+    if (!restored) return null
+    // Defaults cover a draft persisted before these fields existed.
+    return {
+      ...restored,
+      confirmStartDate: restored.confirmStartDate || dateStr(restored.startedAt),
+      confirmStartTime: restored.confirmStartTime || timeStr(restored.startedAt),
+      confirmEndDate:   restored.confirmEndDate   || dateStr(restored.endedAt),
+      confirmEndTime:   restored.confirmEndTime   || timeStr(restored.endedAt),
+    }
   })
 
-  const updateConfirmStartDate = (value) => {
-    setConfirmStartDate(value)
-    if (pendingSleep) savePendingSleep({ ...pendingSleep, confirmStartDate: value })
-  }
-  const updateConfirmStartTime = (value) => {
-    setConfirmStartTime(value)
-    if (pendingSleep) savePendingSleep({ ...pendingSleep, confirmStartTime: value })
-  }
-  const updateConfirmEndDate = (value) => {
-    setConfirmEndDate(value)
-    if (pendingSleep) savePendingSleep({ ...pendingSleep, confirmEndDate: value })
-  }
-  const updateConfirmEndTime = (value) => {
-    setConfirmEndTime(value)
-    if (pendingSleep) savePendingSleep({ ...pendingSleep, confirmEndTime: value })
+  // Functional update so this always merges onto the latest draft, not
+  // whatever `pendingSleep` closed over — the root cause of the stale-spread
+  // bug above was reading a snapshot instead of the current state.
+  const updateConfirmField = (key, value) => {
+    setPendingSleep(prev => {
+      if (!prev) return prev
+      const next = { ...prev, [key]: value }
+      savePendingSleep(next)
+      return next
+    })
   }
 
   // Live preview of the corrected duration so an implausible span (the
   // timer-left-on failure mode) is obvious before saving, not just after.
-  const confirmDurationSecs = pendingSleep && confirmStartDate && confirmStartTime && confirmEndDate && confirmEndTime
-    ? Math.round((new Date(buildISO(confirmEndDate, confirmEndTime)) - new Date(buildISO(confirmStartDate, confirmStartTime))) / 1000)
+  // null while a field is mid-edit (a native date/time input reports '' when
+  // cleared) — see tryBuildISO — so this can never throw during render.
+  const confirmStartedAtPreview = pendingSleep ? tryBuildISO(pendingSleep.confirmStartDate, pendingSleep.confirmStartTime) : null
+  const confirmEndedAtPreview   = pendingSleep ? tryBuildISO(pendingSleep.confirmEndDate, pendingSleep.confirmEndTime) : null
+  const confirmDurationSecs = confirmStartedAtPreview && confirmEndedAtPreview
+    ? Math.round((new Date(confirmEndedAtPreview) - new Date(confirmStartedAtPreview)) / 1000)
     : null
+  // As with AddSleepModal: a reversed interval is a genuine input mistake
+  // (most often an overnight sleep whose "Woke up" date wasn't advanced) —
+  // block Save until the dates agree rather than silently guessing a fix.
+  const canConfirmSleep = confirmDurationSecs !== null && confirmDurationSecs >= 0
 
   // Keep the list in sync with shared sleeps when in shared mode. An
   // in-progress sleep (no ended_at yet) is excluded — it's not a completed
@@ -250,20 +253,15 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
 
   const handleStop = () => {
     const sleepData = stopSleep()
-    const initialConfirmStartDate = dateStr(sleepData.startedAt)
-    const initialConfirmStartTime = timeStr(sleepData.startedAt)
-    const initialConfirmEndDate = dateStr(sleepData.endedAt)
-    const initialConfirmEndTime = timeStr(sleepData.endedAt)
-    savePendingSleep({
+    const nextPendingSleep = {
       ...sleepData,
-      confirmStartDate: initialConfirmStartDate, confirmStartTime: initialConfirmStartTime,
-      confirmEndDate: initialConfirmEndDate, confirmEndTime: initialConfirmEndTime,
-    })
-    setPendingSleep(sleepData)
-    setConfirmStartDate(initialConfirmStartDate)
-    setConfirmStartTime(initialConfirmStartTime)
-    setConfirmEndDate(initialConfirmEndDate)
-    setConfirmEndTime(initialConfirmEndTime)
+      confirmStartDate: dateStr(sleepData.startedAt),
+      confirmStartTime: timeStr(sleepData.startedAt),
+      confirmEndDate:   dateStr(sleepData.endedAt),
+      confirmEndTime:   timeStr(sleepData.endedAt),
+    }
+    savePendingSleep(nextPendingSleep)
+    setPendingSleep(nextPendingSleep)
     // Raw stop time, ahead of whatever adjustment happens on confirm — this
     // is what lets a household member's device see it end immediately. A
     // provably unshared sleep (shared false) has no row to close and is
@@ -281,21 +279,11 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   // raw stop time: a timer left running for a long time (the fail-safe
   // warning above targets exactly this) needs the confirm step to be able
   // to land on any day, not just the one next to wherever it happened to be
-  // stopped.
+  // stopped. Blocked by canConfirmSleep (Save is disabled) rather than
+  // guessed at here if the dates are still reversed.
   const confirmSleep = () => {
-    if (!pendingSleep) return
-    const startedAt = buildISO(confirmStartDate, confirmStartTime)
-    let endedAt = buildISO(confirmEndDate, confirmEndTime)
-    // Safety net for the (now rare) case both corrected times still end up
-    // out of order — never save a negative-duration sleep. Equal times are
-    // left alone (a genuine same-minute start/stop), not treated as reversed.
-    if (new Date(endedAt) < new Date(startedAt)) {
-      const d = new Date(endedAt)
-      d.setDate(d.getDate() + 1)
-      endedAt = d.toISOString()
-    }
-    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
-    const sleep = { id: pendingSleep.id || newId(), startedAt, endedAt, durationSecs }
+    if (!pendingSleep || !canConfirmSleep) return
+    const sleep = { id: pendingSleep.id || newId(), startedAt: confirmStartedAtPreview, endedAt: confirmEndedAtPreview, durationSecs: confirmDurationSecs }
     setSleeps(addSleep(sleep))
     // A sleep whose whole timer ran signed out never opened a shared row, so
     // there is nothing to patch. When the flag says the row exists, patch it
@@ -415,13 +403,13 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
               <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase' }}>Fell asleep</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 <input
-                  type="date" value={confirmStartDate}
-                  onChange={e => updateConfirmStartDate(e.target.value)}
+                  type="date" value={pendingSleep.confirmStartDate}
+                  onChange={e => updateConfirmField('confirmStartDate', e.target.value)}
                   style={{ ...inputStyle, flex: 1.3, fontSize: 13, boxSizing: 'border-box' }}
                 />
                 <input
-                  type="time" value={confirmStartTime}
-                  onChange={e => updateConfirmStartTime(e.target.value)}
+                  type="time" value={pendingSleep.confirmStartTime}
+                  onChange={e => updateConfirmField('confirmStartTime', e.target.value)}
                   style={{ ...inputStyle, flex: 1, fontSize: 15, textAlign: 'center', boxSizing: 'border-box' }}
                 />
               </div>
@@ -432,13 +420,13 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
               <span style={{ display: 'block', fontSize: 11, color: p.sub, marginBottom: 6, letterSpacing: '.04em', textTransform: 'uppercase' }}>Woke up</span>
               <div style={{ display: 'flex', gap: 6 }}>
                 <input
-                  type="date" value={confirmEndDate}
-                  onChange={e => updateConfirmEndDate(e.target.value)}
+                  type="date" value={pendingSleep.confirmEndDate}
+                  onChange={e => updateConfirmField('confirmEndDate', e.target.value)}
                   style={{ ...inputStyle, flex: 1.3, fontSize: 13, boxSizing: 'border-box' }}
                 />
                 <input
-                  type="time" value={confirmEndTime}
-                  onChange={e => updateConfirmEndTime(e.target.value)}
+                  type="time" value={pendingSleep.confirmEndTime}
+                  onChange={e => updateConfirmField('confirmEndTime', e.target.value)}
                   style={{ ...inputStyle, flex: 1, fontSize: 15, textAlign: 'center', boxSizing: 'border-box' }}
                 />
               </div>
@@ -449,8 +437,8 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
               {confirmDurationSecs < 0 ? 'Woke up is before fell asleep — check the dates.' : `Duration: ${fmtMins(confirmDurationSecs)}`}
             </span>
           )}
-          <button onClick={confirmSleep}
-            style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), cursor: 'pointer', fontSize: 15, color: brand.sand, fontWeight: 600 }}>
+          <button onClick={confirmSleep} disabled={!canConfirmSleep}
+            style={{ width: '100%', padding: '16px', borderRadius: 14, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), cursor: canConfirmSleep ? 'pointer' : 'not-allowed', fontSize: 15, color: brand.sand, fontWeight: 600, opacity: canConfirmSleep ? 1 : 0.5 }}>
             Save
           </button>
         </div>

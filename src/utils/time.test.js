@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { fmt, fmtMins, fmtSince, timeAgo, dayLabel, dayShort, fmtDayTime, timeStr, dateStr, buildISO, todayDateStr, dayKey, nearestDateForTime } from './time.js'
+import { fmt, fmtMins, fmtSince, timeAgo, dayLabel, dayShort, fmtDayTime, timeStr, dateStr, buildISO, tryBuildISO, todayDateStr, dayKey, nearestDateForTime } from './time.js'
 
 // Fixed "now": Tuesday 9 June 2026, 14:30 local time
 const NOW = new Date(2026, 5, 9, 14, 30, 0)
@@ -120,6 +120,24 @@ describe('buildISO', () => {
     expect(d.getDate()).toBe(9)
     expect(d.getHours()).toBe(14)
     expect(d.getMinutes()).toBe(5)
+  })
+})
+
+describe('tryBuildISO', () => {
+  it('matches buildISO for complete, valid input', () => {
+    expect(tryBuildISO('2026-06-09', '14:05')).toBe(buildISO('2026-06-09', '14:05'))
+  })
+
+  it('returns null instead of throwing for an empty date (mid-edit, cleared input)', () => {
+    expect(tryBuildISO('', '14:05')).toBeNull()
+  })
+
+  it('returns null instead of throwing for an empty time', () => {
+    expect(tryBuildISO('2026-06-09', '')).toBeNull()
+  })
+
+  it('returns null instead of throwing when both are empty', () => {
+    expect(tryBuildISO('', '')).toBeNull()
   })
 })
 
