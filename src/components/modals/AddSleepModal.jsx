@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { brand, palette, shadow } from '../../theme.js'
-import { timeStr, dateStr, tryBuildISO, fmtMins } from '../../utils/time.js'
+import { timeStr, dateStr, resolveEditedISO, fmtMins } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
@@ -22,6 +22,15 @@ export default function AddSleepModal({ night, onSave, onClose, initial = null }
   const now              = new Date()
   const defaultStartDate = new Date(now.getTime() - 60 * 60 * 1000)
 
+  // The unambiguous instant each date/time pair was seeded from — captured
+  // once, on mount, alongside the fields below (not recomputed on every
+  // render, since `now`/`defaultStartDate` above are). Preserved verbatim by
+  // resolveEditedISO for as long as the fields go unedited; see its comment
+  // for why re-deriving from strings alone can't always be trusted (a DST
+  // fall-back's repeated local hour is genuinely ambiguous without it).
+  const [originalStartedAt] = useState(() => initial ? initial.startedAt : defaultStartDate.toISOString())
+  const [originalEndedAt]   = useState(() => initial ? initial.endedAt   : now.toISOString())
+
   const [startDate, setStartDate] = useState(initial ? dateStr(initial.startedAt) : dateStr(defaultStartDate))
   const [startTime, setStartTime] = useState(initial ? timeStr(initial.startedAt) : timeStr(defaultStartDate))
   const [endDate,   setEndDate]   = useState(initial ? dateStr(initial.endedAt)   : dateStr(now))
@@ -29,9 +38,9 @@ export default function AddSleepModal({ night, onSave, onClose, initial = null }
 
   // null while a field is mid-edit (a native date/time input reports '' when
   // cleared) rather than an Invalid Date, so nothing here can throw during
-  // render — see tryBuildISO.
-  const startedAtPreview = tryBuildISO(startDate, startTime)
-  const endedAtPreview   = tryBuildISO(endDate, endTime)
+  // render — see tryBuildISO (used inside resolveEditedISO).
+  const startedAtPreview = resolveEditedISO(originalStartedAt, startDate, startTime)
+  const endedAtPreview   = resolveEditedISO(originalEndedAt, endDate, endTime)
   const durationSecsPreview = startedAtPreview && endedAtPreview
     ? Math.round((new Date(endedAtPreview) - new Date(startedAtPreview)) / 1000)
     : null

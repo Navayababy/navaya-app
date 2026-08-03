@@ -103,6 +103,23 @@ export function tryBuildISO(dateVal, timeVal) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
+// Rebuilding a timestamp from separate date+time-of-day strings is lossy: it
+// has no offset to work from, so a local time that occurs twice a year (the
+// repeated hour a DST fall-back creates) is genuinely ambiguous — "01:10" on
+// the night the clocks go back could be the EDT instant or the EST instant,
+// and buildISO/tryBuildISO can only ever pick one, silently. That only
+// matters once something has actually changed: `originalIso` (the instant
+// this field was seeded from, still unambiguous) is exactly right until the
+// user edits the date or time away from what produced it — so preserve it
+// verbatim in that case, and only fall to the lossy reconstruction once an
+// edit means there's no unambiguous source left to prefer.
+export function resolveEditedISO(originalIso, dateVal, timeVal) {
+  if (originalIso && dateVal === dateStr(originalIso) && timeVal === timeStr(originalIso)) {
+    return originalIso
+  }
+  return tryBuildISO(dateVal, timeVal)
+}
+
 // Rebuilds a corrected time-of-day into a full timestamp, choosing whichever
 // calendar date (the reference instant's day, or the day before/after) lands
 // closest to that reference. A correction that crosses a midnight boundary —

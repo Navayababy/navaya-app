@@ -4,7 +4,7 @@ import { getSleeps, addSleep, babyDisplayName, getPendingSleep, savePendingSleep
 import { syncWrite } from '../lib/sync.js'
 import { normalizeSleep } from '../lib/normalize.js'
 import { latestNightSleep, napSecsOnSleepDay } from '../lib/stats.js'
-import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO, tryBuildISO } from '../utils/time.js'
+import { fmtMins, fmtSince, timeAgo, timeStr, dateStr, buildISO, resolveEditedISO } from '../utils/time.js'
 import { newId } from '../lib/id.js'
 import { SLEEP_TIMER_WARN_SECS } from '../lib/constants.js'
 import { useOneTimeHint } from '../hooks/useOneTimeHint.js'
@@ -86,8 +86,12 @@ export default function SleepScreen({ night, timer, authUser, profile, sharedSle
   // timer-left-on failure mode) is obvious before saving, not just after.
   // null while a field is mid-edit (a native date/time input reports '' when
   // cleared) — see tryBuildISO — so this can never throw during render.
-  const confirmStartedAtPreview = pendingSleep ? tryBuildISO(pendingSleep.confirmStartDate, pendingSleep.confirmStartTime) : null
-  const confirmEndedAtPreview   = pendingSleep ? tryBuildISO(pendingSleep.confirmEndDate, pendingSleep.confirmEndTime) : null
+  // resolveEditedISO prefers the original raw startedAt/endedAt when a field
+  // hasn't been touched, rather than re-deriving from strings that can't
+  // represent a DST fall-back's repeated local hour unambiguously — see its
+  // comment. Only an actual edit falls back to the lossy reconstruction.
+  const confirmStartedAtPreview = pendingSleep ? resolveEditedISO(pendingSleep.startedAt, pendingSleep.confirmStartDate, pendingSleep.confirmStartTime) : null
+  const confirmEndedAtPreview   = pendingSleep ? resolveEditedISO(pendingSleep.endedAt, pendingSleep.confirmEndDate, pendingSleep.confirmEndTime) : null
   const confirmDurationSecs = confirmStartedAtPreview && confirmEndedAtPreview
     ? Math.round((new Date(confirmEndedAtPreview) - new Date(confirmStartedAtPreview)) / 1000)
     : null

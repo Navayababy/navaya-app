@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { fmt, fmtMins, fmtSince, timeAgo, dayLabel, dayShort, fmtDayTime, timeStr, dateStr, buildISO, tryBuildISO, todayDateStr, dayKey, nearestDateForTime } from './time.js'
+import { fmt, fmtMins, fmtSince, timeAgo, dayLabel, dayShort, fmtDayTime, timeStr, dateStr, buildISO, tryBuildISO, resolveEditedISO, todayDateStr, dayKey, nearestDateForTime } from './time.js'
 
 // Fixed "now": Tuesday 9 June 2026, 14:30 local time
 const NOW = new Date(2026, 5, 9, 14, 30, 0)
@@ -138,6 +138,51 @@ describe('tryBuildISO', () => {
 
   it('returns null instead of throwing when both are empty', () => {
     expect(tryBuildISO('', '')).toBeNull()
+  })
+})
+
+describe('resolveEditedISO', () => {
+  it('preserves the original instant exactly when date and time still match it', () => {
+    const original = buildISO('2026-06-09', '20:35')
+    expect(resolveEditedISO(original, '2026-06-09', '20:35')).toBe(original)
+  })
+
+  it('re-derives from the fields once the date has been edited', () => {
+    const original = buildISO('2026-06-09', '20:35')
+    const result = resolveEditedISO(original, '2026-06-10', '20:35')
+    expect(result).toBe(buildISO('2026-06-10', '20:35'))
+    expect(result).not.toBe(original)
+  })
+
+  it('re-derives from the fields once the time has been edited', () => {
+    const original = buildISO('2026-06-09', '20:35')
+    const result = resolveEditedISO(original, '2026-06-09', '20:40')
+    expect(result).toBe(buildISO('2026-06-09', '20:40'))
+  })
+
+  it('falls through to tryBuildISO (null) when the edited fields are incomplete', () => {
+    const original = buildISO('2026-06-09', '20:35')
+    expect(resolveEditedISO(original, '2026-06-09', '')).toBeNull()
+  })
+
+  // Regression: reconstructing a timestamp from local date+time strings alone
+  // is ambiguous during a DST fall-back's repeated hour — the same "01:10"
+  // could be either side of the transition. Preserving the original instant
+  // for an untouched field sidesteps the ambiguity entirely instead of
+  // guessing an offset (see comment on resolveEditedISO).
+  it('preserves the correct side of a DST fall-back repeated hour when unedited', () => {
+    const prevTZ = process.env.TZ
+    process.env.TZ = 'America/New_York'
+    try {
+      // 2026-11-01 01:10 EST (America/New_York falls back at 2026-11-01 02:00 EDT -> 01:00 EST)
+      const original = new Date(Date.UTC(2026, 10, 1, 6, 10, 0)).toISOString()
+      expect(timeStr(original)).toBe('01:10')
+      expect(dateStr(original)).toBe('2026-11-01')
+      // Unedited: must return the true EST instant, not a re-derived (EDT) guess.
+      expect(resolveEditedISO(original, '2026-11-01', '01:10')).toBe(original)
+    } finally {
+      process.env.TZ = prevTZ
+    }
   })
 })
 
