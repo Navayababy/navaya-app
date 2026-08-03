@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { brand, palette, shadow } from '../../theme.js'
-import { timeStr, dateStr, buildISO, fmtMins } from '../../utils/time.js'
+import { timeStr, dateStr, tryBuildISO, fmtMins } from '../../utils/time.js'
 import { newId } from '../../lib/id.js'
 import { makeModalStyles } from './modalStyles.js'
 import ModalShell from './ModalShell.jsx'
@@ -27,15 +27,23 @@ export default function AddSleepModal({ night, onSave, onClose, initial = null }
   const [endDate,   setEndDate]   = useState(initial ? dateStr(initial.endedAt)   : dateStr(now))
   const [endTime,   setEndTime]   = useState(initial ? timeStr(initial.endedAt)   : timeStr(now))
 
-  const startedAtPreview = buildISO(startDate, startTime)
-  const endedAtPreview   = buildISO(endDate, endTime)
-  const durationSecsPreview = Math.round((new Date(endedAtPreview) - new Date(startedAtPreview)) / 1000)
+  // null while a field is mid-edit (a native date/time input reports '' when
+  // cleared) rather than an Invalid Date, so nothing here can throw during
+  // render — see tryBuildISO.
+  const startedAtPreview = tryBuildISO(startDate, startTime)
+  const endedAtPreview   = tryBuildISO(endDate, endTime)
+  const durationSecsPreview = startedAtPreview && endedAtPreview
+    ? Math.round((new Date(endedAtPreview) - new Date(startedAtPreview)) / 1000)
+    : null
+  // A reversed interval (commonly: an overnight sleep entered without
+  // advancing "Woke up" to the next day) is a genuine input mistake, not
+  // something to silently guess a fix for — block Save until the dates
+  // actually agree, rather than persisting an endedAt before startedAt.
+  const canSave = durationSecsPreview !== null && durationSecsPreview >= 0
 
   const handleSave = () => {
-    const startedAt = startedAtPreview
-    const endedAt    = endedAtPreview
-    const durationSecs = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
-    onSave({ id: newId(), startedAt, endedAt, durationSecs })
+    if (!canSave) return
+    onSave({ id: newId(), startedAt: startedAtPreview, endedAt: endedAtPreview, durationSecs: durationSecsPreview })
   }
 
   return (
@@ -52,13 +60,15 @@ export default function AddSleepModal({ night, onSave, onClose, initial = null }
         <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
       </div>
 
-      <span style={{ display: 'block', fontSize: 12, marginBottom: 16, color: durationSecsPreview < 0 ? brand.danger : p.sub, fontWeight: durationSecsPreview < 0 ? 600 : 400 }}>
-        {durationSecsPreview < 0
-          ? 'Woke up is before fell asleep — check the dates.'
-          : `Duration: ${fmtMins(durationSecsPreview)}`}
-      </span>
+      {durationSecsPreview !== null && (
+        <span style={{ display: 'block', fontSize: 12, marginBottom: 16, color: durationSecsPreview < 0 ? brand.danger : p.sub, fontWeight: durationSecsPreview < 0 ? 600 : 400 }}>
+          {durationSecsPreview < 0
+            ? 'Woke up is before fell asleep — check the dates.'
+            : `Duration: ${fmtMins(durationSecsPreview)}`}
+        </span>
+      )}
 
-      <button onClick={handleSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+      <button onClick={handleSave} disabled={!canSave} style={{ width: '100%', padding: '14px', borderRadius: 13, border: 'none', background: brand.barkGradient, boxShadow: shadow(night, 1), color: brand.sand, cursor: canSave ? 'pointer' : 'not-allowed', fontSize: 14, fontWeight: 500, opacity: canSave ? 1 : 0.5 }}>
         {editing ? 'Save changes' : 'Add sleep'}
       </button>
     </ModalShell>
